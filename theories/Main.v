@@ -718,13 +718,12 @@ Definition iso_of_transition_lm (t: Transition): local_morphism F2 :=
 
 Let transitions_isos := map iso_of_transition_lm A.
 
-Let F := HNN transitions_isos.
-Let ts := HNN_ts transitions_isos.
+Let F := HNNI_extension transitions_isos.
+Let ts := HNNI_ts transitions_isos.
 
 (* H = <a_m, t_1, ..., t_n> *)
-Let H := generatedSubgroup (
-  [:: (subgroup_inj (encoding m : HNN_extension_base F2)) ] ++ ts
-).
+Let H_gens := [:: (subgroup_inj (encoding m : HNNI_extension_base F2)) ] ++ ts.
+Let H := finGeneratedSubgroup H_gens.
 
 Definition K_defining_property (w: F2) :=
   exists (z': int),
@@ -732,14 +731,7 @@ Definition K_defining_property (w: F2) :=
       /\
     (equivalence_problem A z' m).
 
-Lemma Kdp_preserves_eq: forall w w', w == w' -> K_defining_property w -> K_defining_property w'.
-Proof.
-move=> w w' eq; case=> [z' [? ?]].
-exists z'; split=> //.
-by rewrite -eq.
-Qed.
-
-Let K := generatedSubgroupByProp K_defining_property Kdp_preserves_eq.
+Let K := generatedSubgroup K_defining_property.
 
 Lemma inH_if_equiv_m:
     equivalence_problem A z m
@@ -984,7 +976,7 @@ move=> c l.
 Admitted.
 
 Lemma H'_invariance: forall i: 'I_(size transitions_isos),
-    is_subgroup_stable (HNN_nth_iso _ transitions_isos i) K.
+    is_subgroup_stable (HNNI_nth_iso _ transitions_isos i) K.
 Proof.
 move=> i; rewrite /HNN_nth_iso /transitions_isos (nth_map 0) => [x [x' x_is_x']|]; last first.
   move: i; rewrite /transitions_isos size_map; exact: ltn_ord.
@@ -994,11 +986,13 @@ move=> i; rewrite /HNN_nth_iso /transitions_isos (nth_map 0) => [x [x' x_is_x']|
 Admitted.
 
 (* G \subset <a_m, t1, ..., tn> *)
-Check HNN_stable_inter_G_is_G _ _ H'_invariance.
+Check HNNI_stable_inter_G_is_G _ _ H'_invariance.
+
+(*
 
 Check H: subgroup F.
 Check K: subgroup F2.
-
+(*
 Check HNN_extension_base F2: subgroup F.
 Variable x: H.
 Check subgroup_inj (s:=H) x.
@@ -1007,6 +1001,7 @@ Variable x': K.
 Check subgroup_inj (s:=K) x'.
 Check (subgroup_inj (s:=K) x': F2).
 Check subgroup_inj (subgroup_inj (s:=K) x': HNN_extension_base F2).
+*)
 
 Lemma inH_if_inK:
   forall (x: H), (subgroup_inj x) \insubgroup K.
@@ -1017,9 +1012,11 @@ Lemma inK_if_inH:
 Admitted.
 
 Definition reduction_output : GWPArguments := {|
-  P := admit A;
-  u := admit z;
-  v := admit m;
+  P := E_presentation;
+  (* (encoding z) @ t *)
+  u := (subgroup_inj (s:=HNNSG_extension_base F) (subgroup_inj (s:=HNNI_extension_base F2) (encoding z))) @ t;
+  (* t @ (encoding z) *)
+  v := t @ (subgroup_inj (s:=HNNSG_extension_base F) (subgroup_inj (s:=HNNI_extension_base F2) (encoding z)));
 |}.
 
 End Reduction.
@@ -1030,7 +1027,9 @@ exists (fun '(A, z, m) => reduction_output A z m).
 move=> [] [A z] m.
 rewrite /equivalence_problem_uncurried /GWP_uncurried; split.
 - move=> /inH_if_equiv_m.
-
+  admit.
+- move=> /inH_if_Eeq.
+  admit.
 Admitted.
 
 Theorem novikov_boone : undecidable GWP_uncurried.

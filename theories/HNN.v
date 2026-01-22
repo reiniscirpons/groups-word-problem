@@ -75,34 +75,28 @@ Variable K: subgroup G.
 
 Hypothesis K_invariance: forall i: 'I_isos_count, is_subgroup_stable (HNNI_nth_iso i) K.
 
-Definition HNNI_subgroup_ts_extension : HNNI_extension -> Prop.
-Admitted.
+Inductive HNNI_subgroup_ts_extension_gen: HNNI_extension -> Type :=
+  | steg_K: forall (x: K), HNNI_subgroup_ts_extension_gen (subgroup_inj (s:=HNNI_extension_base) (subgroup_inj x))
+  | steg_t: forall t, List.In t HNNI_ts -> HNNI_subgroup_ts_extension_gen t.
 
-Lemma HNNsgte_law: forall x y : HNNI_extension,
-  HNNI_subgroup_ts_extension x ->
-  HNNI_subgroup_ts_extension y -> HNNI_subgroup_ts_extension (x @ y).
-Admitted.
+Let K_extended := generatedSubgroup HNNI_subgroup_ts_extension_gen.
 
-Lemma HNNsgte_neutral: HNNI_subgroup_ts_extension e.
-Admitted.
+(* <K, t1, ..., tn> \cap G = K *)
+(* K -> <K, t1, ..., tn> \cap G: always true *)
+(* <K, t1, ..., tn> \cap G -> K: ! *)
 
-Lemma HNNsgte_inv: forall x : HNNI_extension,
-  HNNI_subgroup_ts_extension x -> HNNI_subgroup_ts_extension (inv x).
-Admitted.
-
-HB.instance Definition _ := isSubgroupCharacterizer.Build HNNI_extension HNNI_subgroup_ts_extension HNNsgte_law HNNsgte_neutral HNNsgte_inv.
-
-Let K_extended := subgroup_by HNNI_subgroup_ts_extension.
-
-(* <K, t1, ..., tn> \cap G = G *)
 (* x \in G -> x \in <K, t1, ..., tn> *)
-Lemma HNNI_stable_inter_G_is_G : forall (x: G),
-  (subgroup_inj (x: HNNI_extension_base)) \insubgroup (K_extended: subgroup HNNI_extension).
+Lemma HNNI_stable_extended_inter_G_is_stable : forall (x: HNNI_extension),
+  x \insubgroup K_extended
+    ->
+  x \insubgroup HNNI_extension_base (* G *)
+    ->
+  x \insubsubgroup[HNNI_extension_base] K.
 Admitted.
 
 End HNNStableSubgroup.
 End HNNIsos.
 
-Arguments HNNI_stable_inter_G_is_G {G} isos K.
+Arguments HNNI_stable_extended_inter_G_is_stable {G} isos K.
 Arguments HNNI_extension {G}.
 Arguments HNNI_ts {G}.

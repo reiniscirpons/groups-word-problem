@@ -338,6 +338,23 @@ exists xS.
 by rewrite -Heq.
 Qed.
 
+Lemma in_subgroup_law {Group: group} {Subgroup: subgroup Group} (x y: Group):
+  (x \insubgroup Subgroup) -> (y \insubgroup Subgroup) -> ((x @ y) \insubgroup Subgroup).
+Proof.
+case=> [x' Hx'].
+case=> [y' Hy'].
+exists (x' @ y').
+by rewrite morphism_preserve_law -Hx' -Hy'.
+Qed.
+
+Lemma in_subgroup_inv {Group: group} {Subgroup: subgroup Group} (x: Group):
+  (x \insubgroup Subgroup) -> ((inv x) \insubgroup Subgroup).
+Proof.
+case=> [x' Hx'].
+exists (inv x').
+by rewrite -Hx' morphism_preserve_inv.
+Qed.
+
 Lemma in_subsubgroup_proper {G: group} (H: subgroup G) (I: subgroup H) (x x': G) :
   x == x' ->
   (x \insubsubgroup[H] I) ->
@@ -501,21 +518,65 @@ Section GeneratedSubgroup.
 Variable G: group.
 Variable genChar: G -> Type.
 
-Inductive in_generated_subgroup : G -> Prop :=
-  | igs_gen (x: G): genChar x -> in_generated_subgroup x
-  | igs_e: in_generated_subgroup e
-  | igs_law x y: in_generated_subgroup x -> in_generated_subgroup y -> in_generated_subgroup (x @ y)
-  | igs_inv x: in_generated_subgroup x -> in_generated_subgroup (inv x).
+Inductive subgroup_ast : Type :=
+  | sa_e: subgroup_ast
+  | sa_gen (gen: G): genChar gen -> subgroup_ast
+  | sa_law: subgroup_ast -> subgroup_ast -> subgroup_ast
+  | sa_inv: subgroup_ast -> subgroup_ast.
+
+Fixpoint interpret_subgroup_ast (ast: subgroup_ast): G := match ast with
+  | sa_e => e
+  | sa_gen gen _ => gen
+  | sa_law ast1 ast2 => (interpret_subgroup_ast ast1) @ (interpret_subgroup_ast ast2)
+  | sa_inv ast => inv (interpret_subgroup_ast ast)
+  end.
+
+Definition in_generated_subgroup (x: G): Prop :=
+  exists ast, x == interpret_subgroup_ast ast.
+
+Lemma igs_law (x y: G) (Hx: in_generated_subgroup x) (Hy: in_generated_subgroup y):
+  in_generated_subgroup (x @ y).
+Proof.
+case: Hx => [astx Hx].
+case: Hy => [asty Hy].
+exists (sa_law astx asty) => /=.
+by rewrite Hx Hy.
+Defined.
+
+Lemma igs_e: in_generated_subgroup e.
+Proof. by exists sa_e. Defined.
+
+Lemma igs_inv (x: G) (Hx: in_generated_subgroup x): in_generated_subgroup (inv x).
+Proof.
+case: Hx => [astx Hx].
+exists (sa_inv astx).
+by rewrite Hx.
+Defined.
 
 HB.instance Definition _ := isSubgroupCharacterizer.Build G in_generated_subgroup igs_law igs_e igs_inv.
+
+Lemma igs_gen (x: G) (Hx: genChar x): in_generated_subgroup x.
+Proof.
+unshelve eexists.
+  exact: (sa_gen x).
+done.
+Qed.
 
 Definition generatedSubgroup := subgroup_by in_generated_subgroup.
 
 End GeneratedSubgroup.
 Arguments generatedSubgroup {_}.
 Arguments in_generated_subgroup {_}.
+Arguments interpret_subgroup_ast {_ _}.
+Arguments sa_gen {_ _}.
+Arguments igs_gen {_ _}.
 
-Definition finGeneratedSubgroup {G: group} (gens: seq G) := generatedSubgroup (fun x => List.In x gens).
+(* TODO: move elsewhere *)
+Inductive in_list {T: Type}: T -> seq T -> Type :=
+  | in_head a l : in_list a (a::l)
+  | in_tail a b l : in_list a l -> in_list a (b::l).
+
+Definition finGeneratedSubgroup {G: group} (gens: seq G) := generatedSubgroup (fun x => in_list x gens).
 
 (* Intersection of subgroups *)
 Section SubgroupIntersection.

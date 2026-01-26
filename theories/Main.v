@@ -14,391 +14,264 @@ Proof. by elim: x => [//|a l /= ->]. Qed.
 
 (* + LM2.sizeE *)
 
-Lemma nthE {T: Type} (default: T) (l: seq T) k:
-  nth default l k = ListDef.nth k l default.
+Inductive or_in_type (P Q: Type) : Type :=
+  | oit_left: P -> or_in_type P Q
+  | oit_right: Q -> or_in_type P Q.
+
+Lemma in_list_inv {T: Type} (x a: T) (l: seq T):
+  in_list x (a::l) -> or_in_type (x = a) (in_list x l).
+Proof. move=> H; dependent induction H; do [exact: oit_left|exact: oit_right]. Qed.
+
+Lemma nth_in_list {T: Type} (d: T) (l: seq T) i:
+  (i < size l)%N -> in_list (nth d l i) l.
 Proof.
-elim: k l => [l|k IH l].
-  by case: l.
-elim: l k IH => [k|a l IHk k IHl /=].
-  by case: k.
-exact: IHl.
+elim: l i => [//|a l /= IH].
+case=> [_|i ? /=]; first exact: in_head.
+apply /in_tail /IH; lia.
 Qed.
 
-(*
-HB.factory Record isMorphismBase (G: group) (gens gens': seq G) (map: G -> G) := {
-  mb_preserve_eq x y: x == y -> map x == map y;
-  mb_preserve_e: map e == e;
-  mb_preserve_gen x: List.In x gens -> List.In (map x) gens'
+Arguments subgroup_ast {_}.
+Arguments sa_e {_}.
+Arguments sa_law {_ _}.
+Arguments sa_inv {_ _}.
+
+Section NormalizeSubgroupAST.
+Variable G: deceqGroupType.
+Variable P: G -> Type.
+
+Record subgroupBase := {
+  gen: G;
+  Pgen: P gen;
+  inverted: bool;
 }.
+Definition comb := list subgroupBase.
 
-HB.builders Context G gens gens' map of isMorphismBase G gens gens' map.
+Definition invert_base (b: subgroupBase): subgroupBase := {|
+  gen := gen b;
+  Pgen := Pgen b;
+  inverted := negb (inverted b);
+|}.
 
-Let H := finGeneratedSubgroup gens.
-Let H' := finGeneratedSubgroup gens'.
+Fixpoint comb_ast (ast: subgroup_ast P): comb :=
+  match ast with
+  | sa_e => [::]
+  | sa_gen gen Pgen => [:: {| Pgen := Pgen; inverted := false |}]
+  | sa_inv ast => rev (map invert_base (comb_ast ast))
+  | sa_law ast1 ast2 => (comb_ast ast1) ++ (comb_ast ast2)
+  end.
 
-Definition map_extended (x: H): H'.
+Definition subgroup_base_to_ast (b: subgroupBase): subgroup_ast P :=
+  match inverted b with
+  | true => sa_inv (sa_gen (gen b) (Pgen b))
+  | false => sa_gen (gen b) (Pgen b)
+  end.
+
+Fixpoint comb_to_ast (c: comb): subgroup_ast P := match c with
+  | [::] => sa_e P
+  | base::rest => sa_law (subgroup_base_to_ast base) (comb_to_ast rest)
+  end.
+
+Lemma comb_to_ast_correct ast:
+  interpret_subgroup_ast ast == interpret_subgroup_ast (comb_to_ast (comb_ast ast)).
 Proof.
-case: x => [point_x] Hx.
-induction Hx.
-- exists (map x).
-  exact /igs_gen /mb_preserve_gen.
-- exact: e.
-- exact: (IHHx1 @ IHHx2).
-- exact: (inv IHHx).
+elim: ast => //= [gen Pgen|ast1 IH1 ast2 IH2|ast IH].
+- by rewrite neutral_right.
+- admit.
+- admit.
+Admitted.
+
+Definition invertible_base (b1 b2: subgroupBase): bool :=
+  ((gen b1) == (gen b2)) && (inverted b1 != inverted b2).
+
+Fixpoint simplify_comb (c: comb): comb := match c with
+  | [::] => [::]
+  | h::c => match c with
+     | [::] => [:: h]
+     | h'::c => if invertible_base h h' then simplify_comb c else h::h'::(simplify_comb c)
+     end
+  end.
+
+Definition normalize_ast (ast: subgroup_ast P): subgroup_ast P :=
+  comb_to_ast (simplify_comb (comb_ast ast)).
+
+Lemma ast_combing_correct ast:
+  interpret_subgroup_ast ast == interpret_subgroup_ast (comb_to_ast (comb_ast ast)).
+Proof.
+elim: ast => //= [gen _|ast1 IH1 ast2 IH2|ast IH].
+- by rewrite neutral_right.
+- rewrite {}IH1 {}IH2.
+  set l1 := comb_ast ast1.
+  set l2 := comb_ast ast2.
+  elim: l1 => /= [|b1 l1 IH].
+  + by rewrite neutral_left.
+  + by rewrite -IH associativity.
+- rewrite {}IH.
+  set l := comb_ast ast.
+  elim/last_ind: l => //= [|l1 b1 IH].
+    by rewrite inv_e.
+  rewrite map_rcons rev_rcons /= -{}IH.
+  elim: l1 => //= [|b2 l1 IH]; last first.
+    by rewrite !inverse_law {}IH associativity.
+  rewrite inverse_law inv_e neutral_left neutral_right.
+  case: b1 => gen Pgen [] //=.
+  by rewrite inv_involutive.
+Qed.
+
+Lemma normalize_ast_correct (ast: subgroup_ast P):
+  interpret_subgroup_ast ast == interpret_subgroup_ast (normalize_ast ast).
+Proof.
+rewrite ast_combing_correct /normalize_ast.
+set c := comb_ast ast.
+elim: c => //= base l ->.
+elim: l base => //= base' l IH base.
+rewrite -{}IH.
+have /orP [/[dup] H ->|/negbTE -> //] := orbN (invertible_base base base').
+rewrite associativity.
+move: H=> /andP /= [/eqP H].
+rewrite /subgroup_base_to_ast /=.
+case: (inverted base); case: (inverted base') => //= _;
+by rewrite H ?inverse_left ?inverse_right neutral_left.
+Qed.
+
+Lemma normalize_inv_inv (ast: subgroup_ast P):
+  normalize_ast (sa_inv (sa_inv ast)) = normalize_ast ast.
+Proof. by rewrite /normalize_ast/= map_rev revK mapK // => [[gen Pgen []]]. Qed.
+
+Lemma normalize_distr_inv_law (ast1 ast2: subgroup_ast P):
+  normalize_ast (sa_inv (sa_law ast1 ast2)) = normalize_ast (sa_law (sa_inv ast2) (sa_inv ast1)).
+Proof. by rewrite /normalize_ast/= map_cat rev_cat. Qed.
+
+Lemma normalize_law_associativity (ast1 ast2 ast3: subgroup_ast P):
+  normalize_ast (sa_law (sa_law ast1 ast2) ast3) = normalize_ast (sa_law ast1 (sa_law ast2 ast3)).
+Proof. by rewrite /normalize_ast/= catA. Qed.
+
+Lemma unique_normalization_e: forall (ast ast': subgroup_ast P),
+  interpret_subgroup_ast ast == e ->
+  normalize_ast ast = normalize_ast (sa_e P).
+Proof.
+Admitted.
+
+Lemma unique_normalization: forall (ast ast': subgroup_ast P),
+  interpret_subgroup_ast ast == interpret_subgroup_ast ast' ->
+  normalize_ast ast = normalize_ast ast'.
+Proof.
+Admitted.
+
+End NormalizeSubgroupAST.
+
+(* https://discourse.rocq-prover.org/t/allowing-large-elimination/2451/2 *)
+Unset Universe Checking.
+Inductive Bad (A:Type) : Prop := bad (_:A).
+Set Universe Checking.
+
+Definition in_generated_subgroup_Type {G: group} (P: G -> Type) (x: G) :=
+  { ast : subgroup_ast P | x == interpret_subgroup_ast ast }.
+
+Lemma igs_to_igsType {G: group} (P: G -> Type) {x: G}:
+  in_generated_subgroup P x -> in_generated_subgroup_Type P x.
+Proof.
+move=> H.
+have@ [//]: Bad (in_generated_subgroup_Type P x).
+by case: H => [ast ?]; exists; exists ast.
 Defined.
 
-Lemma extension_preserve_e: map_extended e == e.
-Proof. done. Qed.
-
-Lemma extension_preserve_law x y: map_extended (x @ y) == (map_extended x) @ (map_extended y).
-Proof. done. Qed.
-
-Lemma extension_preserve_inv x: map_extended (inv x) == inv (map_extended x).
-Proof. done. Qed.
-
-Lemma extension_preserve_equiv' x:
-  x == e -> map_extended x == e.
-Proof.
-Admitted.
-(*
-case: x => x x_in_subgroup Heq.
-elim: x_in_subgroup Heq.
-- move=> x' x'_in_gens /=.
-  rewrite /eq/=/subgroupby_eq/=.
-  rewrite -{2}map_preserve_e.
-  exact: map_preserve_eq.
-- by rewrite /eq/=/subgroupby_eq/=.
-- rewrite /eq/=/subgroupby_eq/=.
-  move=> x' y' x'_in_gens IHx'.
-  move=> y'_in_gens IHy'.
-  move=> Heq.
-  transitivity (
-    subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-      (map_extended
-         (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) x' x'_in_gens))
-      @
-    subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-      (map_extended
-         (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) y' y'_in_gens))
-  ); first done.
-  rewrite IHx' //.
-  rewrite IHy' //.
-- rewrite /eq/=/subgroupby_eq/=.
-  move=> x' x'_in_gens IHx' Hinvx'.
-  transitivity (
-    inv (
-      subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-        (map_extended
-          (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) x' x'_in_gens))
-    )
-  ); first done.
-  by rewrite -inv_e IHx' // -inv_e -[x']inv_involutive Hinvx'.
-Admitted.
-*)
-
-Lemma extension_preserve_equiv x y:
-  x == y -> map_extended x == map_extended y.
-Proof.
-have Heq: x @ (inv y) == e -> (map_extended x) @ (map_extended (inv y)) == e; last first.
-  move=> H1.
-  have {}H1: x @ (inv y) == e by rewrite H1 inverse_left.
-  move: Heq => /(_ H1) {H1}.
-  rewrite extension_preserve_inv => H1.
-  transitivity (((map_extended x) @ (inv (map_extended y))) @ (map_extended y)).
-    by rewrite -associativity inverse_right neutral_right.
-  by rewrite H1 neutral_left.
-move=> Heq.
-rewrite -extension_preserve_law.
-exact: extension_preserve_equiv'.
-Qed.
-
-HB.instance Definition _ := isMonoidMorphism.Build H H' map_extended extension_preserve_equiv extension_preserve_e extension_preserve_law.
-HB.instance Definition _ := isInvMorphism.Build H H' map_extended extension_preserve_inv.
-
-HB.end.
-*)
-
-(*
-Section GeneratedSubgroupNormalizer.
-Variable G: group.
-Variable P: G -> Prop.
-
-Hypothesis dec_eq_G: G -> G -> bool.
-Hypothesis dec_eq_G_reflect: forall (x y: G), reflect (x == y) (dec_eq_G x y).
-
-Inductive subgroup_element_ast: Type :=
-  | sea_e : subgroup_element_ast
-  | sea_mul_gen : forall gen: G, P gen -> subgroup_element_ast -> subgroup_element_ast
-  | sea_mul_inv_gen : forall gen: G, P gen -> subgroup_element_ast -> subgroup_element_ast.
-
-Fixpoint simplify_subgroup_ast (ast: subgroup_element_ast) := match ast with
-  | sea_e => sea_e
-  | sea_mul_gen gen Pgen ast => (match simplify_subgroup_ast ast with
-      | sea_mul_inv_gen gen' Pgen' ast =>
-          if dec_eq_G gen gen'
-          then ast
-          else sea_mul_gen Pgen (sea_mul_inv_gen Pgen' ast)
-      | ast => sea_mul_gen Pgen ast
-      end
-      )
-  | sea_mul_inv_gen gen Pgen ast => (match simplify_subgroup_ast ast with
-      | sea_mul_gen gen' Pgen' ast =>
-          if dec_eq_G gen gen'
-          then ast
-          else sea_mul_inv_gen Pgen (sea_mul_gen Pgen' ast)
-      | ast => sea_mul_inv_gen Pgen ast
-      end
-      )
-  end.
-
-Fixpoint interp (ast: subgroup_element_ast) := match ast with
-  | sea_e => e
-  | sea_mul_gen gen Pgen ast => gen @ (interp ast)
-  | sea_mul_inv_gen gen Pgen ast => (inv gen) @ (interp ast)
-  end.
-
-Lemma simplify_preserve_interp: forall ast,
-    interp ast == interp (simplify_subgroup_ast ast).
-Proof.
-elim => [//|gen Pgen ast /= ->|gen Pgen ast /= ->].
-- set l := simplify_subgroup_ast ast.
-  case: l => //.
-  move=> gen' Pgen' ast'.
-  have /orP [/[dup] /dec_eq_G_reflect H -> /=|/negbTE -> //] := orbN (dec_eq_G gen gen').
-  by rewrite associativity H inverse_left neutral_left.
-- set l := simplify_subgroup_ast ast.
-  case: l => //.
-  move=> gen' Pgen' ast'.
-  have /orP [/[dup] /dec_eq_G_reflect H -> /=|/negbTE -> //] := orbN (dec_eq_G gen gen').
-  by rewrite associativity H inverse_right neutral_left.
-Qed.
-
-(*
-Lemma preserve_eq_interp_e: forall ast,
-  (interp ast) == e -> (simplify_subgroup_ast ast) = sea_e.
-Proof.
-Admitted.
-
-Fixpoint sea_law (ast ast': subgroup_element_ast) := match ast with
-  | sea_e => ast'
-  | sea_mul_gen gen Pgen ast => sea_mul_gen Pgen (sea_law ast ast')
-  | sea_mul_inv_gen gen Pgen ast => sea_mul_inv_gen Pgen (sea_law ast ast')
-  end.
-
-Lemma sea_law_correct ast ast': interp (sea_law ast ast') == (interp ast) @ (interp ast').
-Proof.
-elim: ast => [/=|gen Pgen ast /= ->|gen Pgen ast /= ->].
-- by rewrite neutral_left.
-- by rewrite associativity.
-- by rewrite associativity.
-Qed.
-
-Fixpoint sea_inv (ast: subgroup_element_ast) := match ast with
-  | sea_e => sea_e
-  | sea_mul_gen gen Pgen ast => sea_law (sea_inv ast) (sea_mul_inv_gen Pgen sea_e)
-  | sea_mul_inv_gen gen Pgen ast => sea_law (sea_inv ast) (sea_mul_gen Pgen sea_e)
-  end.
-
-Lemma sea_mul_gen_is_sea_law gen (Pgen: P gen) ast:
-  simplify_subgroup_ast (sea_mul_gen Pgen ast)
-    =
-  simplify_subgroup_ast (sea_law (sea_mul_gen Pgen sea_e) ast).
-Admitted.
-
-Lemma sea_law_introduce_simplify ast ast':
-  simplify_subgroup_ast (sea_law ast ast') = simplify_subgroup_ast (sea_law (simplify_subgroup_ast ast) (simplify_subgroup_ast ast')).
-Proof.  
-
-Lemma sea_law_associativity ast ast' ast'':
-  simplify_subgroup_ast (sea_law (sea_law ast ast') ast'')
-    =
-  simplify_subgroup_ast (sea_law ast (sea_law ast' ast'')).
-Proof.
-elim: ast ast' ast'' => [//|gen Pgen ast IH ast' ast''|gen Pgen ast IH ast' ast''].
-
-Admitted.
-
-Lemma simplify_sea_law_mul_gen_left gen (Pgen: P gen) ast ast':
-  simplify_subgroup_ast (sea_law (sea_mul_gen Pgen ast) ast')
-    = 
-  simplify_subgroup_ast (sea_mul_gen Pgen (sea_law ast ast')).
-Proof.
-Admitted.
-
-Lemma simplify_sea_law_mul_inv_gen_left gen (Pgen: P gen) ast ast':
-  simplify_subgroup_ast (sea_law (sea_mul_inv_gen Pgen ast) ast')
-    = 
-  simplify_subgroup_ast (sea_mul_inv_gen Pgen (sea_law ast ast')).
-Proof.
-Admitted.
-
-Lemma simplify_sea_law_right_e ast:
-  simplify_subgroup_ast (sea_law ast sea_e) = simplify_subgroup_ast ast.
-Proof.
-elim: ast => [//|gen Pgen ast IH|gen Pgen ast IH].
-- by rewrite simplify_sea_law_mul_gen_left /= IH.
-- by rewrite simplify_sea_law_mul_inv_gen_left /= IH.
-Qed.
-
-Lemma simplify_sea_inv ast:
-  simplify_subgroup_ast (sea_inv ast) = sea_e
-    ->
-  simplify_subgroup_ast ast = sea_e.
-Proof.
-elim: ast => [//|gen Pgen ast IH|].
-- 
-Admitted.
-
-Lemma simplify_sea_law_comm ast ast':
-  simplify_subgroup_ast (sea_law ast ast') = sea_e
-    ->
-  simplify_subgroup_ast (sea_law ast' ast) = sea_e.
-Proof.
-elim: ast ast' => [/= ast'|gen Pgen ast IH ast'|gen Pgen ast IH ast' H].
-- by rewrite simplify_sea_law_right_e.
-- rewrite simplify_sea_law_mul_gen_left.
-  rewrite 
-- admit.
-Admitted.
-
-Lemma simplify_sea_law ast ast': 
-  simplify_subgroup_ast (sea_law ast (sea_inv ast')) = sea_e
-    ->
-  simplify_subgroup_ast ast = simplify_subgroup_ast ast'.
-Proof.
-elim: ast ast' => [/= ast'||].
-- admit.
-- move=> gen Pgen ast IH ast' H.
-  have := IH.
-Admitted.
-
-Lemma sea_inv_correct ast: interp (sea_inv ast) == inv (interp ast).
-Proof.
-elim: ast => [/=|gen Pgen ast /=|gen Pgen ast /=].
-- by rewrite inv_e.
-- by rewrite sea_law_correct inverse_law /= neutral_right => ->.
-- by rewrite sea_law_correct inverse_law /= neutral_right inv_involutive => ->.
-Qed.
-*)
-
-Lemma preserve_eq_interp: forall ast ast',
-  (interp ast) == (interp ast') -> (simplify_subgroup_ast ast) = (simplify_subgroup_ast ast').
-Proof.
-Admitted.
-(*
-move=> ast ast' H.
-have {H}: (interp ast) @ (inv (interp ast')) == e.
-  by rewrite H inverse_left.
-rewrite -sea_inv_correct -sea_law_correct.
-move=> /preserve_eq_interp_e /=.
-elim: ast => [/=|gen Pgen ast IH|gen Pgen].
-- admit.
-- 
-- move=> gen Pgen ast IH ast'.
-  elim: ast' ast IH.
-  + move=> ast IH H.
-    have: interp ast == interp (sea_mul_inv_gen Pgen sea_e) by admit.
-    move=> /IH /= ->.
-    by have ->: dec_eq_G gen gen by apply /dec_eq_G_reflect.
-
-done.
-*)
-
-*)
-
 Section MapSubgroupGens.
-Variable G: group.
+Variable G: deceqGroupType.
 Variable gens gens': seq G.
 
 Variable map: G -> G.
-Hypothesis map_preserve_gen: forall x, List.In x gens -> List.In (map x) gens'.
-(* these hypotheses are not minimal *)
-Hypothesis map_preserve_eq: forall x y, x == y -> map x == map y.
-Hypothesis map_preserve_e: map e == e.
+Hypothesis map_preserve_gen: forall x, in_list x gens -> in_list (map x) gens'.
 
 Let H := finGeneratedSubgroup gens.
 Let H' := finGeneratedSubgroup gens'.
 
+Let H_char := (fun x => in_list x gens).
+Let H'_char := (fun x => in_list x gens').
+
+Fixpoint extend_ast (ast: subgroup_ast H_char): subgroup_ast H'_char :=
+  match ast with
+  | sa_e => sa_e H'_char
+  | sa_law ast_l ast_r => sa_law (extend_ast ast_l) (extend_ast ast_r)
+  | sa_inv ast => sa_inv (extend_ast ast)
+  | sa_gen gen Pgen => sa_gen (map gen) (map_preserve_gen Pgen)
+  end.
+
 Definition map_extended (x: H): H'.
 Proof.
-Admitted.
-(*
-  rewrite /gens'.
-  apply in_list_map.
- /map_preserve_gen.
-- exact: e.
-- exact: (IHHx1 @ IHHx2).
-- exact: (inv IHHx).
+case: x => [x /igs_to_igsType]; elim=> [ast Hx].
+have@ ast' := extend_ast (normalize_ast ast).
+exists (interpret_subgroup_ast ast').
+by exists ast'.
 Defined.
-*)
 
 Lemma extension_preserve_e: map_extended e == e.
-Proof. Admitted. (*done. Qed.*)
+Proof. done. Qed.
+
+Lemma interpret_extend_comb_cas b c:
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb (b::c)))) ==
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb [::b]))) @
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c))).
+Proof.
+elim: c b => [/= b|a c IH b].
+  by rewrite !neutral_right.
+rewrite IH.
+rewrite /=.
+have /orP [/[dup] Hinv ->|/negbTE -> /=] := orbN (invertible_base b a); last first.
+  by rewrite !neutral_right.
+rewrite !neutral_right.
+move: Hinv => /andP [/eqP Heq].
+rewrite /subgroup_base_to_ast.
+case: (inverted b); case: (inverted a) => //= _;
+by rewrite !associativity Heq ?inverse_left ?inverse_right neutral_left.
+Qed.
+
+Lemma interpret_extend_comb_cat c1 c2:
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb (c1 ++ c2)))) ==
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c1))) @
+  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c2))).
+Proof.
+elim: c1 c2 => // [c2|b1 c1 IH c2].
+  by rewrite neutral_left.
+rewrite -cat1s -catA !cat1s.
+rewrite interpret_extend_comb_cas (interpret_extend_comb_cas b1 c1).
+by rewrite IH !associativity.
+Qed.
+
+Lemma interpret_extend_ast_law ast_x ast_y:
+  interpret_subgroup_ast (extend_ast (normalize_ast (sa_law ast_x ast_y))) ==
+  interpret_subgroup_ast (extend_ast (normalize_ast ast_x)) @
+  interpret_subgroup_ast (extend_ast (normalize_ast ast_y)).
+Proof. by rewrite /normalize_ast/= interpret_extend_comb_cat. Qed.
 
 Lemma extension_preserve_law x y: map_extended (x @ y) == (map_extended x) @ (map_extended y).
-Proof. Admitted. (*done. Qed.*)
+Proof. 
+case: x => [x [ast_x eqx]].
+case: y => [y [ast_y eqy]].
+rewrite /eq/=/subgroupby_eq/=.
+exact: interpret_extend_ast_law.
+Qed.
 
 Lemma extension_preserve_inv x: inv (map_extended x) == map_extended (inv x).
-Proof. Admitted. (*done. Qed.*)
-
-Lemma extension_preserve_equiv' x:
-  x == e -> map_extended x == e.
 Proof.
-Admitted.
-(*
-case: x => x x_in_subgroup Heq.
-elim: x_in_subgroup Heq.
-- move=> x' x'_in_gens /=.
-  rewrite /eq/=/subgroupby_eq/=.
-  rewrite -{2}map_preserve_e.
-  exact: map_preserve_eq.
-- by rewrite /eq/=/subgroupby_eq/=.
-- rewrite /eq/=/subgroupby_eq/=.
-  move=> x' y' x'_in_gens IHx'.
-  move=> y'_in_gens IHy'.
-  move=> Heq.
-  transitivity (
-    subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-      (map_extended
-         (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) x' x'_in_gens))
-      @
-    subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-      (map_extended
-         (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) y' y'_in_gens))
-  ); first done.
-  rewrite IHx' //.
-  rewrite IHy' //.
-- rewrite /eq/=/subgroupby_eq/=.
-  move=> x' x'_in_gens IHx' Hinvx'.
-  transitivity (
-    inv (
-      subgroupby_inj G (in_generated_subgroup ((List.In (A:=G))^~ gens'))
-        (map_extended
-          (Build_subgroup_by G (in_generated_subgroup ((List.In (A:=G))^~ gens)) x' x'_in_gens))
-    )
-  ); first done.
-  by rewrite -inv_e IHx' // -inv_e -[x']inv_involutive Hinvx'.
-Admitted.
-*)
+case: x => [x [ast_x]].
+rewrite /eq/=/subgroupby_eq/= => _.
+elim: ast_x => [|gen Pgen /=|ast1 IH1 ast2 IH2|ast Hast].
+- by rewrite inv_e.
+- by rewrite !neutral_right.
+- by rewrite normalize_distr_inv_law !interpret_extend_ast_law inverse_law IH1 IH2.
+- by rewrite normalize_inv_inv -Hast inv_involutive.
+Qed.
 
 Lemma extension_preserve_equiv x y:
   x == y -> map_extended x == map_extended y.
 Proof.
-Admitted.
-(*
-have Heq: x @ (inv y) == e -> (map_extended x) @ (map_extended (inv y)) == e; last first.
-  move=> H1.
-  have {}H1: x @ (inv y) == e by rewrite H1 inverse_left.
-  move: Heq => /(_ H1) {H1}.
-  rewrite extension_preserve_inv => H1.
-  transitivity (((map_extended x) @ (inv (map_extended y))) @ (map_extended y)).
-    by rewrite -associativity inverse_right neutral_right.
-  by rewrite H1 neutral_left.
-move=> Heq.
-rewrite -extension_preserve_law.
-exact: extension_preserve_equiv'.
+case: x => [x [ast_x Hx]].
+case: y => [y [ast_y Hy]].
+rewrite /eq/=/subgroupby_eq/= => Heq.
+have /unique_normalization -> //: interpret_subgroup_ast ast_x == interpret_subgroup_ast ast_y.
+transitivity x; first by symmetry.
+transitivity y => //.
 Qed.
-*)
 
 HB.instance Definition _ := isMonoidMorphism.Build H H' map_extended extension_preserve_equiv extension_preserve_e extension_preserve_law.
 HB.instance Definition _ := isInvMorphism.Build H H' map_extended extension_preserve_inv.
@@ -430,17 +303,107 @@ Definition affine_state_encoding_gens (s: State) := [::
   ].
 Definition affine_state_encoding (s: State) := finGeneratedSubgroup (affine_state_encoding_gens s).
 
-Definition admit {T: Type}: T. Admitted.
+Definition encoding_p_state_encoding (s: State): affine_state_encoding s.
+Proof.
+exists (encoding s.1).
+by apply: igs_gen; left.
+Defined.
+
+Definition power_b_state_encoding (s: State): affine_state_encoding s.
+Proof.
+exists (power (`[b]: F2) s.2).
+by apply: igs_gen; right; left.
+Defined.  
+
+Fixpoint power_subgroup_pos {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: nat): generatedSubgroup P.
+Proof.
+case: x => [x x_in_subgroup].
+elim: k => [|k [power_k power_k_in_subgroup]].
+  exact: e.
+exists (x @ power_k).
+exact: igs_law.
+Defined.
+
+Definition power_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int): generatedSubgroup P := match k with
+  | Posz k => power_subgroup_pos x k
+  | Negz k => inv (power_subgroup_pos x k.+1)
+  end.
+
+Definition power_subgroup_pos_value {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: nat):
+  subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k) == power (subgroup_inj (s:=generatedSubgroup P) x) k.
+Proof.
+elim: k => [//|k H].
+rewrite powerS.
+transitivity (power (subgroup_inj (s:=generatedSubgroup P) x) k @ power (subgroup_inj (s:=generatedSubgroup P) x) 1); last first.
+  by rewrite /= neutral_left.
+rewrite powerC.
+move: H.
+have ->: power_subgroup_pos x k.+1 = x @ (power_subgroup_pos x k).
+  by elim: k => [//|k //].
+rewrite morphism_preserve_law => <- /=.
+by rewrite neutral_left.
+Qed.
+
+Definition power_subgroup_value {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
+  subgroup_inj (s:=generatedSubgroup P) (power_subgroup x k) == power (subgroup_inj (s:=generatedSubgroup P) x) k.
+Proof.
+case: k => [k|k].
+  by rewrite power_subgroup_pos_value.
+rewrite /power_subgroup.
+have: inv (subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k.+1)) == inv (power (subgroup_inj (s:=generatedSubgroup P) x) k.+1).
+  by rewrite power_subgroup_pos_value.
+rewrite morphism_preserve_inv => ->.
+by rewrite -power_inv.
+Qed.
+
+Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
+  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
+  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power_subgroup x k)).
+Proof.
+case: k; elim=> [/= Px|k IH Px].
+- exact: igs_e.
+- move: (IH Px) => {IH}.
+  have ->: power_subgroup x k.+1 = x @ (power_subgroup x k).
+    by elim: k => [//|k //].
+  move=> H.
+  exact: igs_law.
+- apply /igs_inv /igs_law => //.
+  exact: igs_e.
+- move: (IH Px) => {IH}.
+  rewrite /power_subgroup.
+  have ->: power_subgroup_pos x k.+2 = x @ (power_subgroup_pos x k.+1).
+    by elim: k => [//|k //].
+  case=> [ast_x' Hx'].
+  have {}Hx': subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k.+1) == inv (interpret_subgroup_ast ast_x').
+    by rewrite -Hx' -morphism_preserve_inv inv_involutive.
+  apply /igs_inv.
+  apply /igs_law => //.
+  exists (sa_inv _ _ ast_x').
+  exact: Hx'.
+Qed.
 
 Definition encoding_state_k (s: State) (k: int) : affine_state_encoding s.
 Proof.
-exists (encoding (s.1 + (s.2: int) * k)).
-exact: admit.
+exists (
+    subgroup_inj (s:=affine_state_encoding s) (power_subgroup (power_b_state_encoding s) k) @
+      subgroup_inj (s:=affine_state_encoding s) (encoding_p_state_encoding s) @
+    subgroup_inj (s:=affine_state_encoding s) (power_subgroup (power_b_state_encoding s) (-k))
+).
+apply: igs_law; do [apply: igs_law|simpl].
+- apply: power_subgroup_in_generated_subgroup => /=.
+  by apply: igs_gen; right; left.
+- by apply: igs_gen; left.
+- apply: power_subgroup_in_generated_subgroup => /=.
+  by apply: igs_gen; right; left.
 Defined.
 
 Lemma encoding_state_k_value: forall s k,
-  subgroup_inj (s:=(affine_state_encoding s)) (encoding_state_k s k) = encoding (s.1 + (s.2: int) * k).
-Proof. done. Qed.
+  subgroup_inj (s:=(affine_state_encoding s)) (encoding_state_k s k) == encoding (s.1 + (s.2: int) * k).
+Proof.
+move=> s k.
+rewrite /encoding power_inv /encoding_state_k/= !power_subgroup_value /=.
+by rewrite addrC !poweradd !powermul inverse_law -!power_inv !associativity.
+Qed.
 
 (* TODO: move to EquivalenceAlgebra.v *)
 Lemma prod_map: forall {M N: monoid} (s: seq M) (f: monoidMorphism M N), prod (map f s) == f (prod s).
@@ -797,7 +760,6 @@ Lemma encoding_in_encset_char P k:
     ->
   P k.
 Proof.
-case=> [[x x_in_subgroup] /= eq].
 Admitted.
 
 Let K := encoding_set (fun k => equivalence_problem A k m).
@@ -847,34 +809,38 @@ Lemma inKextended_if_inH (x: F):
     ->
   x \insubgroup K_extended.
 Proof.
-case; case=> [x' x'_in_subgroup /=].
-elim: x'_in_subgroup x => /= [x|x Heq||].
-- case=> [<- xF Heq|x_in_ts xF Heq].
+case; case=> [x' [x'_ast] /= ->].
+elim: x'_ast x => /= [x Heq|x||].
+- apply: in_subgroup_proper.
+    exact: Heq.
+  by exists e.
+- rewrite /H_gens/Hlike_gens cat1s => Hx.
+  case: (in_list_inv Hx) => [-> xF Heq|x_in_ts xF Heq].
     unshelve eexists.
-      unshelve eexists (subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (s:=K) _)).
+      exists (subgroup_inj (encoding m: HNNI_extension_base F2)) => //.
+      unshelve eexists (sa_gen (subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (s:=K) _)) _).
         exists (encoding m).
-        apply /igs_gen.
+        apply: igs_gen.
         exists m; split=> //.
         exact: Relation_Operators.rst_refl.
-      exact /igs_gen /steg_K.
+      exact /steg_K.
+    done.
     done.
   unshelve eexists.
     exists x.
     exact /igs_gen /steg_t.
   done.
-- exists e.
-  by rewrite -Heq.
-- move=> x y Hx IHx Hy IHy x'' Heq.
-  case: (IHx x) => // x2 {IHx} Hx2.
-  case: (IHy y) => // y2 {IHy} Hy2.
-  exists (x2 @ y2).
+- move=> ast_x IHx ast_y IHy x'' /=.
+  case: (IHx (interpret_subgroup_ast ast_x))=> // x {IHx} Hx.
+  case: (IHy (interpret_subgroup_ast ast_y))=> // y {IHy} Hy Heq.
+  exists (x @ y).
   rewrite morphism_preserve_law. 
   move: Heq.
-  by rewrite -Hx2 -Hy2.
-- move=> x Hx IH x'' Heq.
-  case: (IH x) => // x2 {IH} Hx2.
-  exists (inv x2).
-  by rewrite -morphism_preserve_inv -Heq -Hx2.
+  by rewrite -Hx -Hy.
+- move=> ast_x IHx x'' /=.
+  case: (IHx (interpret_subgroup_ast ast_x)) => // x {IHx} Hx Heq.
+  exists (inv x).
+  by rewrite -morphism_preserve_inv -Heq -Hx.
 Qed.
 
 Definition dummyTransition: Transition.
@@ -927,72 +893,87 @@ have {Heq}:
 
 have ->: lm_morphism _ (iso_of_transition_lm ((p, q), (p', q'))) = iso_of_transition ((p, q), (p', q')) by done.
 
-rewrite iso_of_transition_image_encoding => Heq.
+rewrite iso_of_transition_image_encoding encoding_state_k_value => Heq.
 
-have <- := encoding_state_k_value (p, q) k.
+apply: in_subgroup_proper.
+  symmetry.
+  have := encoding_state_k_value (p, q) k.
+  exact.
 
 apply /in_subgroup_proper.
   exact: Heq.
 
+set u' := subgroup_inj (s:=HNNI_extension_base F2) (encoding (p' + (q': int) * k)).
 set u := subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (s:=affine_state_encoding (p', q')) (encoding_state_k (p', q') k)).
 
-have t_in_subgroup: in_generated_subgroup (fun x => List.In x (u::ts)) t.
-  apply /igs_gen /List.in_cons.
-  rewrite /t (tnth_nth e) nthE.
-  apply /List.nth_In /ltP.
-  rewrite -LM2.sizeE.
-  rewrite size_tuple.
-  exact: ltn_ord.
+have t_in_subgroup: in_generated_subgroup (fun x => in_list x (u'::ts)) t.
+  apply /igs_gen /in_tail.
+  rewrite /t (tnth_nth e).
+  apply: nth_in_list.
+  by rewrite size_tuple.
 
-unshelve eexists.
-  exists ((inv t) @ u @ t).
-  apply /igs_law => //.
-  apply /igs_law.
-    exact /igs_inv.
-  by apply /igs_gen; left.
-done.
+apply: in_subgroup_law; do [apply: in_subgroup_law; do [apply in_subgroup_inv|]|].
+- by unshelve eexists; first exists t.
+- unshelve eexists.
+    exists u'.
+    by apply: igs_gen; left.
+  by rewrite /=/u/u' encoding_state_k_value.
+- by unshelve eexists; first exists t.
 Qed.
 
 (* this lemma is badly-named, it is not specific to the Hlike definition *)
 Lemma Hlike_transitivity p q x' y':
-  in_generated_subgroup (fun x => List.In x (Hlike_gens p)) x' ->
-  in_generated_subgroup (fun x => List.In x (Hlike_gens q)) y' ->
+  in_generated_subgroup (fun x => in_list x (Hlike_gens p)) x' ->
+  in_generated_subgroup (fun x => in_list x (Hlike_gens q)) y' ->
   y' == subgroup_inj (encoding p: HNNI_extension_base F2) ->
   x' \insubgroup (finGeneratedSubgroup (Hlike_gens q)).
 Proof.
-elim=> [x|_ _|x y Hx IHx Hy IHy Hy' eq_y'|x Hx IHx Hy' eq_y'].
-- rewrite /Hlike_gens cat1s => Hx.
-  case: (List.in_inv Hx) => [-> ? ?|? ? ?]; last first.
+case=> ast.
+elim: ast x' y' => /= [x' y' Heq _ _|gen||].
+- apply: in_subgroup_proper.
+    symmetry.
+    exact: Heq.
+  by exists e.
+- rewrite /H_gens/Hlike_gens cat1s => Hx.
+  case: (in_list_inv Hx) => [<- x' y' <- y'_in_subgroup Hx'y'|Hgen x' y' Hx' y'_in_subgroup Hy'].
+    apply: in_subgroup_proper.
+      exact: Hx'y'.
     unshelve eexists.
-      exists x.
-      exact /igs_gen /List.in_cons.
+      by exists y'.
     done.
+  apply: in_subgroup_proper.
+    symmetry.
+    exact: Hx'.
   unshelve eexists.
-    by exists y'.
+    exists gen.
+    by apply: igs_gen; right.
   done.
-- unshelve eexists.
-    exists e.
-    exact: igs_e.
-  done.
-- case: IHx => // [[x'' /=] Hx'' eq_x''].
-  case: IHy => // [[y'' /=] Hy'' eq_y''].
+- move=> ast_x IHx' ast_y IHy' x' y' Hlaw y'_in_subgroup Hy'.
+  apply: in_subgroup_proper.
+    symmetry.
+    exact: Hlaw.
+  case: (IHx' (interpret_subgroup_ast ast_x) y' (refl _) y'_in_subgroup Hy') => [[x Hx] /= eqx] {IHx'}.
+  case: (IHy' (interpret_subgroup_ast ast_y) y' (refl _) y'_in_subgroup Hy') => [[y Hy] /= eqy] {IHy'}.
   unshelve eexists.
-    exists (x'' @ y'').
-    apply: igs_law.
-      exact /Hx''.
-    exact /Hy''.
-  by rewrite /= eq_x'' eq_y''.
-- case: IHx => // [[x'' /=] Hx'' eq_x''].
-  unshelve eexists.
-    exists (inv x'').
-    exact: igs_inv.
-  by rewrite /= eq_x''.
+    exists (x @ y).
+    exact: igs_law.
+  by rewrite /= eqx eqy.
+- move=> ast_x IH x' y' Hx' y'_in_subgroup Hy'.
+  case: (IH (interpret_subgroup_ast ast_x) y') => // [[x Hx] /= eqx].
+  apply: in_subgroup_proper.
+    symmetry.
+    exact: Hx'.
+  apply: in_subgroup_inv.
+  apply: in_subgroup_proper.
+    exact: eqx.
+  by unshelve eexists; first by exists x.
 Qed.
 
 Lemma Hlike_symmetry o p:
   (subgroup_inj (encoding o: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup (Hlike_gens p)) ->
   (subgroup_inj (encoding p: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup (Hlike_gens o)).
 Proof.
+case=> [[x [ast_x /=] ? ?]].
 (* more complicated than the proof attempted below: this is true only because encoding o and encoding p are free or = *)
 Admitted.
 (*
@@ -1037,7 +1018,7 @@ dependent induction E.
     exists (subgroup_inj (encoding x: HNNI_extension_base F2)).
     apply /igs_gen.
     rewrite /Hlike_gens cat1s.
-    exact: List.in_eq.
+    exact: in_head.
   done.
 - exact: Hlike_symmetry.
 - case: IHE1 => [[] x' x'_in_subgroup /= Heqx'].

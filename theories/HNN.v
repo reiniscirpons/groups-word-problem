@@ -77,7 +77,7 @@ Hypothesis K_invariance: forall i: 'I_isos_count, is_subgroup_stable (HNNI_nth_i
 
 Inductive HNNI_subgroup_ts_extension_gen: HNNI_extension -> Type :=
   | steg_K: forall (x: K), HNNI_subgroup_ts_extension_gen (subgroup_inj (s:=HNNI_extension_base) (subgroup_inj x))
-  | steg_t: forall t, List.In t HNNI_ts -> HNNI_subgroup_ts_extension_gen t.
+  | steg_t: forall t, in_list t HNNI_ts -> HNNI_subgroup_ts_extension_gen t.
 
 Let K_extended := generatedSubgroup HNNI_subgroup_ts_extension_gen.
 

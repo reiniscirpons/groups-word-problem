@@ -71,15 +71,6 @@ Fixpoint comb_to_ast (c: comb): subgroup_ast P := match c with
   | base::rest => sa_law (subgroup_base_to_ast base) (comb_to_ast rest)
   end.
 
-Lemma comb_to_ast_correct ast:
-  interpret_subgroup_ast ast == interpret_subgroup_ast (comb_to_ast (comb_ast ast)).
-Proof.
-elim: ast => //= [gen Pgen|ast1 IH1 ast2 IH2|ast IH].
-- by rewrite neutral_right.
-- admit.
-- admit.
-Admitted.
-
 Definition invertible_base (b1 b2: subgroupBase): bool :=
   ((gen b1) == (gen b2)) && (inverted b1 != inverted b2).
 
@@ -151,29 +142,14 @@ Lemma unique_normalization_e: forall (ast ast': subgroup_ast P),
 Proof.
 Admitted.
 
-Lemma unique_normalization: forall (ast ast': subgroup_ast P),
+Lemma unique_normalization (ast ast': subgroup_ast P):
   interpret_subgroup_ast ast == interpret_subgroup_ast ast' ->
   normalize_ast ast = normalize_ast ast'.
 Proof.
+elim: ast.
 Admitted.
 
 End NormalizeSubgroupAST.
-
-(* https://discourse.rocq-prover.org/t/allowing-large-elimination/2451/2 *)
-Unset Universe Checking.
-Inductive Bad (A:Type) : Prop := bad (_:A).
-Set Universe Checking.
-
-Definition in_generated_subgroup_Type {G: group} (P: G -> Type) (x: G) :=
-  { ast : subgroup_ast P | x == interpret_subgroup_ast ast }.
-
-Lemma igs_to_igsType {G: group} (P: G -> Type) {x: G}:
-  in_generated_subgroup P x -> in_generated_subgroup_Type P x.
-Proof.
-move=> H.
-have@ [//]: Bad (in_generated_subgroup_Type P x).
-by case: H => [ast ?]; exists; exists ast.
-Defined.
 
 Section MapSubgroupGens.
 Variable G: deceqGroupType.
@@ -198,7 +174,7 @@ Fixpoint extend_ast (ast: subgroup_ast H_char): subgroup_ast H'_char :=
 
 Definition map_extended (x: H): H'.
 Proof.
-case: x => [x /igs_to_igsType]; elim=> [ast Hx].
+case: x => [x]; elim=> [ast Hx].
 have@ ast' := extend_ast (normalize_ast ast).
 exists (interpret_subgroup_ast ast').
 by exists ast'.
@@ -315,20 +291,7 @@ exists (power (`[b]: F2) s.2).
 by apply: igs_gen; right; left.
 Defined.  
 
-Fixpoint power_subgroup_pos {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: nat): generatedSubgroup P.
-Proof.
-case: x => [x x_in_subgroup].
-elim: k => [|k [power_k power_k_in_subgroup]].
-  exact: e.
-exists (x @ power_k).
-exact: igs_law.
-Defined.
-
-Definition power_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int): generatedSubgroup P := match k with
-  | Posz k => power_subgroup_pos x k
-  | Negz k => inv (power_subgroup_pos x k.+1)
-  end.
-
+(*
 Definition power_subgroup_pos_value {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: nat):
   subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k) == power (subgroup_inj (s:=generatedSubgroup P) x) k.
 Proof.
@@ -343,51 +306,52 @@ have ->: power_subgroup_pos x k.+1 = x @ (power_subgroup_pos x k).
 rewrite morphism_preserve_law => <- /=.
 by rewrite neutral_left.
 Qed.
+*)
 
-Definition power_subgroup_value {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
-  subgroup_inj (s:=generatedSubgroup P) (power_subgroup x k) == power (subgroup_inj (s:=generatedSubgroup P) x) k.
-Proof.
-case: k => [k|k].
-  by rewrite power_subgroup_pos_value.
-rewrite /power_subgroup.
-have: inv (subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k.+1)) == inv (power (subgroup_inj (s:=generatedSubgroup P) x) k.+1).
-  by rewrite power_subgroup_pos_value.
-rewrite morphism_preserve_inv => ->.
-by rewrite -power_inv.
-Qed.
+Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
+  f (power x k) == power (f x) k.
+Admitted.
+Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
+  f (power x k) == power (f x) k.
+Admitted.
 
 Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
-  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power_subgroup x k)).
+  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power x k)).
 Proof.
 case: k; elim=> [/= Px|k IH Px].
 - exact: igs_e.
-- move: (IH Px) => {IH}.
-  have ->: power_subgroup x k.+1 = x @ (power_subgroup x k).
-    by elim: k => [//|k //].
-  move=> H.
+- move: (IH Px) => {IH} Hx.
+  rewrite powerS.
   exact: igs_law.
-- apply /igs_inv /igs_law => //.
-  exact: igs_e.
+- exact /igs_inv /Px.
 - move: (IH Px) => {IH}.
+  case: k => [/= Hx|k Hx].
+    exact /igs_inv /igs_law.
+  admit.
+(*
+  have ->: power x (Negz k.+2) = power x (Negz k.+1) @ (inv x).
+    admit.
+
+
   rewrite /power_subgroup.
   have ->: power_subgroup_pos x k.+2 = x @ (power_subgroup_pos x k.+1).
     by elim: k => [//|k //].
   case=> [ast_x' Hx'].
   have {}Hx': subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k.+1) == inv (interpret_subgroup_ast ast_x').
     by rewrite -Hx' -morphism_preserve_inv inv_involutive.
-  apply /igs_inv.
-  apply /igs_law => //.
-  exists (sa_inv _ _ ast_x').
-  exact: Hx'.
-Qed.
+  apply /igs_inv /igs_law => //.
+  exists (sa_inv ast_x').
+  by rewrite /= -Hx'.
+*)
+Admitted.
 
 Definition encoding_state_k (s: State) (k: int) : affine_state_encoding s.
 Proof.
 exists (
-    subgroup_inj (s:=affine_state_encoding s) (power_subgroup (power_b_state_encoding s) k) @
+    subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) k) @
       subgroup_inj (s:=affine_state_encoding s) (encoding_p_state_encoding s) @
-    subgroup_inj (s:=affine_state_encoding s) (power_subgroup (power_b_state_encoding s) (-k))
+    subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) (-k))
 ).
 apply: igs_law; do [apply: igs_law|simpl].
 - apply: power_subgroup_in_generated_subgroup => /=.
@@ -401,24 +365,8 @@ Lemma encoding_state_k_value: forall s k,
   subgroup_inj (s:=(affine_state_encoding s)) (encoding_state_k s k) == encoding (s.1 + (s.2: int) * k).
 Proof.
 move=> s k.
-rewrite /encoding power_inv /encoding_state_k/= !power_subgroup_value /=.
+rewrite /encoding power_inv /encoding_state_k/= !morphism_preserve_power /=.
 by rewrite addrC !poweradd !powermul inverse_law -!power_inv !associativity.
-Qed.
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma prod_map: forall {M N: monoid} (s: seq M) (f: monoidMorphism M N), prod (map f s) == f (prod s).
-Proof.
-move=> M N s f; elim: s => /= [|a l eq].
-  by rewrite morphism_preserve_e.
-by rewrite morphism_preserve_law eq.
-Qed.
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma prod_inv {G: group} (decomp: seq G) :
-  inv (prod decomp) == prod (rev (map inv decomp)).
-Proof.
-elim: decomp => [/=|a decomp IH /=]; first by rewrite inv_e.
-by rewrite inverse_law IH -cat1s rev_cat prod_cat /= neutral_right.
 Qed.
 
 (*
@@ -718,7 +666,7 @@ Qed.
 *)
 
 Lemma iso_of_transition_gens_preserve_gen t: forall w,
-  List.In w (affine_state_encoding_gens t.1) -> List.In (iso_of_transition_gens t w) (affine_state_encoding_gens t.2).
+  in_list w (affine_state_encoding_gens t.1) -> in_list (iso_of_transition_gens t w) (affine_state_encoding_gens t.2).
 Admitted.
 
 Lemma iso_of_transition_gens_preserve_eq t: forall x y,
@@ -730,9 +678,7 @@ Lemma iso_of_transition_gens_preserve_e t:
 Admitted.
 
 Definition iso_of_transition (t: Transition): morphism (affine_state_encoding t.1) (affine_state_encoding t.2) :=
-  (* ugly but using "map_extended (@iso_of_transition_gens_preserve_gen t)" has unresolved implicit arguments *)
-  Main_map_extended__canonical__EquivalenceAlgebra_Morphism (iso_of_transition_gens_preserve_gen (t:=t))
-  (iso_of_transition_gens_preserve_eq t) (iso_of_transition_gens_preserve_e t).
+  map_extended (@iso_of_transition_gens_preserve_gen t).
 Arguments iso_of_transition: clear implicits.
 
 Definition iso_of_transition_lm (t: Transition): local_morphism F2 :=
@@ -855,9 +801,19 @@ exists (Ordinal Hle) => /=.
 exact: nth_index.
 Qed.
 
+Lemma encoding_state_k_value_subgroup s k:
+  encoding_state_k s k
+    ==
+  (power (power_b_state_encoding s) k) @ (encoding_p_state_encoding s) @ (power (power_b_state_encoding s) (-k)).
+Proof. by rewrite /encoding_state_k/= /eq/=/subgroupby_eq/=. Qed.
+
 Lemma iso_of_transition_image_encoding s1 s2 k:
   iso_of_transition (s1, s2) (encoding_state_k s1 k) == encoding_state_k s2 k.
 Proof.
+have -> := morphism_preserve_equiv (s:=iso_of_transition (s1, s2)) _ _ (encoding_state_k_value_subgroup s1 k).
+rewrite (encoding_state_k_value_subgroup s2 k) !morphism_preserve_law.
+have := morphism_preserve_power (iso_of_transition (s1, s2)) (power_b_state_encoding s1) k.
+Set Printing Coercions.
 Admitted.
 
 Lemma transA_implies_inHlike s1 s2 x y:
@@ -935,7 +891,8 @@ elim: ast x' y' => /= [x' y' Heq _ _|gen||].
     exact: Heq.
   by exists e.
 - rewrite /H_gens/Hlike_gens cat1s => Hx.
-  case: (in_list_inv Hx) => [<- x' y' <- y'_in_subgroup Hx'y'|Hgen x' y' Hx' y'_in_subgroup Hy'].
+  case: (in_list_inv Hx) => [<- x' y' H' y'_in_subgroup|Hgen x' y' Hx' y'_in_subgroup Hy'].
+    rewrite -H' => {H'}Hx'y'.
     apply: in_subgroup_proper.
       exact: Hx'y'.
     unshelve eexists.

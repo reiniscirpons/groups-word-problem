@@ -531,8 +531,8 @@ Fixpoint interpret_subgroup_ast (ast: subgroup_ast): G := match ast with
   | sa_inv ast => inv (interpret_subgroup_ast ast)
   end.
 
-Definition in_generated_subgroup (x: G): Prop :=
-  exists ast, x == interpret_subgroup_ast ast.
+Definition in_generated_subgroup (x: G): Type :=
+  { ast | x == interpret_subgroup_ast ast }.
 
 Lemma igs_law (x y: G) (Hx: in_generated_subgroup x) (Hy: in_generated_subgroup y):
   in_generated_subgroup (x @ y).
@@ -560,7 +560,7 @@ Proof.
 unshelve eexists.
   exact: (sa_gen x).
 done.
-Qed.
+Defined.
 
 Definition generatedSubgroup := subgroup_by in_generated_subgroup.
 

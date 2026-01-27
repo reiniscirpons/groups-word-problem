@@ -8,12 +8,6 @@ Import GRing.Theory.
 
 From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equivalence HNN.
 
-(* TODO: factor out those proof into a separate file *)
-Lemma catE {T: Type} (x y: seq T): x ++ y = (x ++ y)%list.
-Proof. by elim: x => [//|a l /= ->]. Qed.
-
-(* + LM2.sizeE *)
-
 Inductive or_in_type (P Q: Type) : Type :=
   | oit_left: P -> or_in_type P Q
   | oit_right: Q -> or_in_type P Q.
@@ -30,6 +24,7 @@ case=> [_|i ? /=]; first exact: in_head.
 apply /in_tail /IH; lia.
 Qed.
 
+(* TODO: move to EquivalenceAlgebra.v *)
 Arguments subgroup_ast {_}.
 Arguments sa_e {_}.
 Arguments sa_law {_ _}.
@@ -308,12 +303,23 @@ by rewrite neutral_left.
 Qed.
 *)
 
+(* TODO: move to EquivalenceAlgebra.v *)
 Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
   f (power x k) == power (f x) k.
-Admitted.
+Proof.
+elim: k => [/=|k].
+  by rewrite morphism_preserve_e.
+by rewrite !powerS morphism_preserve_law => <-.
+Qed.
 Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
   f (power x k) == power (f x) k.
-Admitted.
+Proof.
+case: k => k.
+  exact: morphism_preserve_power_pos.
+have ->: Negz k = - (k.+1)%:Z by done.
+rewrite !power_inv -morphism_preserve_inv.
+by rewrite morphism_preserve_power_pos.
+Qed.
 
 Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
@@ -326,25 +332,14 @@ case: k; elim=> [/= Px|k IH Px].
   exact: igs_law.
 - exact /igs_inv /Px.
 - move: (IH Px) => {IH}.
-  case: k => [/= Hx|k Hx].
-    exact /igs_inv /igs_law.
-  admit.
-(*
-  have ->: power x (Negz k.+2) = power x (Negz k.+1) @ (inv x).
-    admit.
-
-
-  rewrite /power_subgroup.
-  have ->: power_subgroup_pos x k.+2 = x @ (power_subgroup_pos x k.+1).
-    by elim: k => [//|k //].
-  case=> [ast_x' Hx'].
-  have {}Hx': subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k.+1) == inv (interpret_subgroup_ast ast_x').
-    by rewrite -Hx' -morphism_preserve_inv inv_involutive.
-  apply /igs_inv /igs_law => //.
-  exists (sa_inv ast_x').
-  by rewrite /= -Hx'.
-*)
-Admitted.
+  have ->: Negz k = - (k.+1)%:Z by done.
+  have ->: Negz k.+1 = - (k.+2)%:Z by done.
+  case=> [ast H].
+  case: Px => [ast_x Hx].
+  exists (sa_law (sa_inv ast_x) ast).
+  simpl interpret_subgroup_ast.
+  by rewrite -H -Hx powerP.
+Qed.
 
 Definition encoding_state_k (s: State) (k: int) : affine_state_encoding s.
 Proof.
@@ -807,14 +802,50 @@ Lemma encoding_state_k_value_subgroup s k:
   (power (power_b_state_encoding s) k) @ (encoding_p_state_encoding s) @ (power (power_b_state_encoding s) (-k)).
 Proof. by rewrite /encoding_state_k/= /eq/=/subgroupby_eq/=. Qed.
 
+Lemma iso_of_transition_image_power s1 s2:
+  iso_of_transition (s1, s2) (power_b_state_encoding s1) == power_b_state_encoding s2.
+Proof.
+rewrite /eq/=/subgroupby_eq/= neutral_right.
+Admitted.
+
+Lemma iso_of_transition_image_encoding_p s1 s2:
+  iso_of_transition (s1, s2) (encoding_p_state_encoding s1) == encoding_p_state_encoding s2.
+Proof.
+rewrite /eq/=/subgroupby_eq/= neutral_right.
+Admitted.
+
+(* TODO: move to EquivalenceAlgebra.v *)
+Lemma power_proper_pos {G: group} (x y: G) (k: nat):
+  x == y -> power x k == power y k.
+Proof.
+move=> Heq.
+elim: k => [//|k IH].
+by rewrite !powerS IH Heq.
+Qed.
+Lemma power_proper {G: group} (x y: G) (k: int):
+  x == y -> power x k == power y k.
+Proof.
+move=> Heq.
+case: k => k.
+  exact: power_proper_pos.
+have ->: Negz k = - (k.+1)%:Z by done.
+by rewrite !power_inv power_proper_pos.
+Qed.
+
 Lemma iso_of_transition_image_encoding s1 s2 k:
   iso_of_transition (s1, s2) (encoding_state_k s1 k) == encoding_state_k s2 k.
 Proof.
 have -> := morphism_preserve_equiv (s:=iso_of_transition (s1, s2)) _ _ (encoding_state_k_value_subgroup s1 k).
 rewrite (encoding_state_k_value_subgroup s2 k) !morphism_preserve_law.
+rewrite -(iso_of_transition_image_encoding_p s1 s2).
+(* at this point everything is so mysteriously broken that these don't rewrite directly anymore. woah *)
+have := power_proper k (iso_of_transition_image_power s1 s2).
+have := power_proper (- k) (iso_of_transition_image_power s1 s2).
 have := morphism_preserve_power (iso_of_transition (s1, s2)) (power_b_state_encoding s1) k.
-Set Printing Coercions.
-Admitted.
+have := morphism_preserve_power (iso_of_transition (s1, s2)) (power_b_state_encoding s1) (-k).
+move=> /= -> -> -> ->.
+done.
+Qed.
 
 Lemma transA_implies_inHlike s1 s2 x y:
   transitionStep A (s1, s2) x y ->

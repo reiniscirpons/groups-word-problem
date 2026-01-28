@@ -6,29 +6,7 @@ From mathcomp Require Import eqtype seq fintype all_algebra tuple.
 From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
 
-From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equivalence HNN.
-
-Inductive or_in_type (P Q: Type) : Type :=
-  | oit_left: P -> or_in_type P Q
-  | oit_right: Q -> or_in_type P Q.
-
-Lemma in_list_inv {T: Type} (x a: T) (l: seq T):
-  in_list x (a::l) -> or_in_type (x = a) (in_list x l).
-Proof. move=> H; dependent induction H; do [exact: oit_left|exact: oit_right]. Qed.
-
-Lemma nth_in_list {T: Type} (d: T) (l: seq T) i:
-  (i < size l)%N -> in_list (nth d l i) l.
-Proof.
-elim: l i => [//|a l /= IH].
-case=> [_|i ? /=]; first exact: in_head.
-apply /in_tail /IH; lia.
-Qed.
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Arguments subgroup_ast {_}.
-Arguments sa_e {_}.
-Arguments sa_law {_ _}.
-Arguments sa_inv {_ _}.
+From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equivalence HNN Utils.
 
 Section NormalizeSubgroupAST.
 Variable G: deceqGroupType.
@@ -131,20 +109,48 @@ Lemma normalize_law_associativity (ast1 ast2 ast3: subgroup_ast P):
   normalize_ast (sa_law (sa_law ast1 ast2) ast3) = normalize_ast (sa_law ast1 (sa_law ast2 ast3)).
 Proof. by rewrite /normalize_ast/= catA. Qed.
 
-Lemma unique_normalization_e: forall (ast ast': subgroup_ast P),
-  interpret_subgroup_ast ast == e ->
-  normalize_ast ast = normalize_ast (sa_e P).
+Lemma simplify_comb_cons b1 (c: comb):
+  simplify_comb (b1::c) =
+  match simplify_comb c with
+  | nil => [::b1]
+  | b2::simplified =>
+      if invertible_base b1 b2
+      then simplified
+      else b1::b2::simplified
+  end.
+Admitted.
+
+Lemma unique_comb_simplification_e c:
+  interpret_subgroup_ast (comb_to_ast c) == e ->
+  simplify_comb c = [::].
 Proof.
+Admitted.
+
+Lemma unique_comb_simplification c c':
+  interpret_subgroup_ast (comb_to_ast c) == interpret_subgroup_ast (comb_to_ast c') ->
+  simplify_comb c = simplify_comb c'.
+Proof.
+elim: c' c => [c|b' c' IH c].
+  exact: unique_comb_simplification_e.
+move=> Heq.
+have /IH {Heq IH}: interpret_subgroup_ast (comb_to_ast (invert_base b' :: c)) == interpret_subgroup_ast (comb_to_ast c').
+  rewrite /= {}Heq /= associativity.
+  case: b' => [gen Pgen []] /=;
+  by rewrite ?inverse_right ?inverse_left neutral_left.
 Admitted.
 
 Lemma unique_normalization (ast ast': subgroup_ast P):
   interpret_subgroup_ast ast == interpret_subgroup_ast ast' ->
   normalize_ast ast = normalize_ast ast'.
 Proof.
-elim: ast.
-Admitted.
+move=> H.
+rewrite /normalize_ast.
+rewrite (@unique_comb_simplification (comb_ast ast) (comb_ast ast')) //.
+by rewrite -!ast_combing_correct.
+Qed.
 
 End NormalizeSubgroupAST.
+
 
 Section MapSubgroupGens.
 Variable G: deceqGroupType.
@@ -302,24 +308,6 @@ rewrite morphism_preserve_law => <- /=.
 by rewrite neutral_left.
 Qed.
 *)
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
-  f (power x k) == power (f x) k.
-Proof.
-elim: k => [/=|k].
-  by rewrite morphism_preserve_e.
-by rewrite !powerS morphism_preserve_law => <-.
-Qed.
-Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
-  f (power x k) == power (f x) k.
-Proof.
-case: k => k.
-  exact: morphism_preserve_power_pos.
-have ->: Negz k = - (k.+1)%:Z by done.
-rewrite !power_inv -morphism_preserve_inv.
-by rewrite morphism_preserve_power_pos.
-Qed.
 
 Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
@@ -727,6 +715,7 @@ Proof. exact: encoding_in_encset_char. Qed.
 Lemma H'_invariance: forall i: 'I_(size transitions_isos),
     is_subgroup_stable (HNNI_nth_iso _ transitions_isos i) K.
 Proof.
+move=> i x Hx.
 (* TODO: propriété "<a_p, b^q> inter [ZZ] = [p + qZ]" *)
 Admitted.
 
@@ -813,24 +802,6 @@ Lemma iso_of_transition_image_encoding_p s1 s2:
 Proof.
 rewrite /eq/=/subgroupby_eq/= neutral_right.
 Admitted.
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma power_proper_pos {G: group} (x y: G) (k: nat):
-  x == y -> power x k == power y k.
-Proof.
-move=> Heq.
-elim: k => [//|k IH].
-by rewrite !powerS IH Heq.
-Qed.
-Lemma power_proper {G: group} (x y: G) (k: int):
-  x == y -> power x k == power y k.
-Proof.
-move=> Heq.
-case: k => k.
-  exact: power_proper_pos.
-have ->: Negz k = - (k.+1)%:Z by done.
-by rewrite !power_inv power_proper_pos.
-Qed.
 
 Lemma iso_of_transition_image_encoding s1 s2 k:
   iso_of_transition (s1, s2) (encoding_state_k s1 k) == encoding_state_k s2 k.
@@ -962,6 +933,10 @@ Lemma Hlike_symmetry o p:
   (subgroup_inj (encoding p: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup (Hlike_gens o)).
 Proof.
 case=> [[x [ast_x /=] ? ?]].
+
+have: interpret_subgroup_ast ast_x == subgroup_inj (encoding o: HNNI_extension_base F2).
+  transitivity x; last done.
+  by symmetry.
 (* more complicated than the proof attempted below: this is true only because encoding o and encoding p are free or = *)
 Admitted.
 (*

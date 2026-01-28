@@ -2,7 +2,7 @@ From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import seq eqtype fintype tuple.
 
-From GWP Require Import Presentation EquivalenceAlgebra Equivalence.
+From GWP Require Import Presentation EquivalenceAlgebra Equivalence Utils.
 
 (* HNN extension to characterize a subgroup *)
 Section HNNSubgroup.

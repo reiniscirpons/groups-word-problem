@@ -5,9 +5,8 @@ From mathcomp Require Import eqtype seq fintype all_algebra.
 From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
 Require Import Setoid Morphisms.
-From Stdlib Require List.
 
-From GWP Require Import Equivalence.
+From GWP Require Import Utils Equivalence.
 
 Open Scope int_scope.
 Open Scope ring_scope.
@@ -295,6 +294,41 @@ elim: x => [|x|x].
     by rewrite powerS associativity.
 Qed.
 
+Lemma power_proper_pos {G: group} (x y: G) (k: nat):
+  x == y -> power x k == power y k.
+Proof.
+move=> Heq.
+elim: k => [//|k IH].
+by rewrite !powerS IH Heq.
+Qed.
+Lemma power_proper {G: group} (x y: G) (k: int):
+  x == y -> power x k == power y k.
+Proof.
+move=> Heq.
+case: k => k.
+  exact: power_proper_pos.
+have ->: Negz k = - (k.+1)%:Z by done.
+by rewrite !power_inv power_proper_pos.
+Qed.
+Arguments power_proper {_ _ _}.
+
+Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
+  f (power x k) == power (f x) k.
+Proof.
+elim: k => [/=|k].
+  by rewrite morphism_preserve_e.
+by rewrite !powerS morphism_preserve_law => <-.
+Qed.
+Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
+  f (power x k) == power (f x) k.
+Proof.
+case: k => k.
+  exact: morphism_preserve_power_pos.
+have ->: Negz k = - (k.+1)%:Z by done.
+rewrite !power_inv -morphism_preserve_inv.
+by rewrite morphism_preserve_power_pos.
+Qed.
+
 #[short(type="deceqGroupType")]
 HB.structure Definition DecEqGroup := { G of isGroup G & hasEq G & isMonoid G & hasDecEq G }.
 
@@ -567,14 +601,13 @@ Definition generatedSubgroup := subgroup_by in_generated_subgroup.
 End GeneratedSubgroup.
 Arguments generatedSubgroup {_}.
 Arguments in_generated_subgroup {_}.
+Arguments subgroup_ast {_}.
 Arguments interpret_subgroup_ast {_ _}.
+Arguments sa_e {_}.
+Arguments sa_law {_ _}.
+Arguments sa_inv {_ _}.
 Arguments sa_gen {_ _}.
 Arguments igs_gen {_ _}.
-
-(* TODO: move elsewhere *)
-Inductive in_list {T: Type}: T -> seq T -> Type :=
-  | in_head a l : in_list a (a::l)
-  | in_tail a b l : in_list a l -> in_list a (b::l).
 
 Definition finGeneratedSubgroup {G: group} (gens: seq G) := generatedSubgroup (fun x => in_list x gens).
 

@@ -292,23 +292,6 @@ exists (power (`[b]: F2) s.2).
 by apply: igs_gen; right; left.
 Defined.  
 
-(*
-Definition power_subgroup_pos_value {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: nat):
-  subgroup_inj (s:=generatedSubgroup P) (power_subgroup_pos x k) == power (subgroup_inj (s:=generatedSubgroup P) x) k.
-Proof.
-elim: k => [//|k H].
-rewrite powerS.
-transitivity (power (subgroup_inj (s:=generatedSubgroup P) x) k @ power (subgroup_inj (s:=generatedSubgroup P) x) 1); last first.
-  by rewrite /= neutral_left.
-rewrite powerC.
-move: H.
-have ->: power_subgroup_pos x k.+1 = x @ (power_subgroup_pos x k).
-  by elim: k => [//|k //].
-rewrite morphism_preserve_law => <- /=.
-by rewrite neutral_left.
-Qed.
-*)
-
 Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power x k)).
@@ -505,17 +488,27 @@ Lemma encoding_state_k_value_subgroup s k:
   (power (power_b_state_encoding s) k) @ (encoding_p_state_encoding s) @ (power (power_b_state_encoding s) (-k)).
 Proof. by rewrite /encoding_state_k/= /eq/=/subgroupby_eq/=. Qed.
 
+Lemma power_neq_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (encoding p).
+Admitted.
+
+Lemma power_neq_inv_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (inv (encoding p)).
+Admitted.
+
+Lemma F2_refl p: F2_dec_eq p p.
+Admitted.
+
 Lemma iso_of_transition_image_power s1 s2:
   iso_of_transition (s1, s2) (power_b_state_encoding s1) == power_b_state_encoding s2.
 Proof.
-rewrite /eq/=/subgroupby_eq/= neutral_right.
-Admitted.
+rewrite /eq/=/subgroupby_eq/= neutral_right /iso_of_transition_gens.
+rewrite (negbTE (power_neq_encoding s1.1 s1.2)).
+rewrite (negbTE (power_neq_inv_encoding s1.1 s1.2)).
+by rewrite F2_refl.
+Qed.
 
 Lemma iso_of_transition_image_encoding_p s1 s2:
   iso_of_transition (s1, s2) (encoding_p_state_encoding s1) == encoding_p_state_encoding s2.
-Proof.
-rewrite /eq/=/subgroupby_eq/= neutral_right.
-Admitted.
+Proof. by rewrite /eq/=/subgroupby_eq/= neutral_right /iso_of_transition_gens F2_refl. Qed.
 
 Lemma iso_of_transition_image_encoding s1 s2 k:
   iso_of_transition (s1, s2) (encoding_state_k s1 k) == encoding_state_k s2 k.

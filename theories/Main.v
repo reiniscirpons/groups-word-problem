@@ -818,9 +818,14 @@ move=> /= -> -> -> ->.
 done.
 Qed.
 
-Lemma transA_implies_inHlike s1 s2 x y:
+Let T := finGeneratedSubgroup ts.
+
+Lemma transA_implies_conjugateT s1 s2 x y:
   transitionStep A (s1, s2) x y ->
-  (subgroup_inj (encoding x: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup ([:: subgroup_inj (encoding y: HNNI_extension_base F2)] ++ ts)).
+  exists (t_prod: T),
+    (subgroup_inj (s:=HNNI_extension_base F2) (encoding x))
+      ==
+    (subgroup_inj (s:=T) t_prod) @ (subgroup_inj (s:=HNNI_extension_base F2) (encoding y)) @ inv (subgroup_inj (s:=T) t_prod).
 Proof.
 case: s1 => [p q]; case: s2 => [p' q'].
 case=> inA [k /andP [/eqP -> /eqP ->]].
@@ -841,154 +846,72 @@ set t := tnth ts i.
 
 move=> /(_ (encoding_state_k (p, q) k)) Heq.
 
-have {Heq}:
-  (inv t) @ subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (iso_of_transition_lm (p, q, (p', q')) (encoding_state_k (p, q) k))) @ t
-    ==
-  subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (s:=affine_state_encoding (p, q)) (encoding_state_k (p, q) k)).
-  rewrite Heq.
-  rewrite !associativity inverse_right neutral_left.
-  by rewrite -!associativity inverse_right neutral_right.
-
-have ->: lm_morphism _ (iso_of_transition_lm ((p, q), (p', q'))) = iso_of_transition ((p, q), (p', q')) by done.
-
-rewrite iso_of_transition_image_encoding encoding_state_k_value => Heq.
-
-apply: in_subgroup_proper.
-  symmetry.
-  have := encoding_state_k_value (p, q) k.
-  exact.
-
-apply /in_subgroup_proper.
-  exact: Heq.
-
-set u' := subgroup_inj (s:=HNNI_extension_base F2) (encoding (p' + (q': int) * k)).
-set u := subgroup_inj (s:=HNNI_extension_base F2) (subgroup_inj (s:=affine_state_encoding (p', q')) (encoding_state_k (p', q') k)).
-
-have t_in_subgroup: in_generated_subgroup (fun x => in_list x (u'::ts)) t.
-  apply /igs_gen /in_tail.
+unshelve eexists.
+  exists (inv t).
+  apply /igs_inv /igs_gen.
   rewrite /t (tnth_nth e).
   apply: nth_in_list.
   by rewrite size_tuple.
-
-apply: in_subgroup_law; do [apply: in_subgroup_law; do [apply in_subgroup_inv|]|].
-- by unshelve eexists; first exists t.
-- unshelve eexists.
-    exists u'.
-    by apply: igs_gen; left.
-  by rewrite /=/u/u' encoding_state_k_value.
-- by unshelve eexists; first exists t.
+simpl.
+move: Heq.
+rewrite iso_of_transition_image_encoding !encoding_state_k_value /= => ->.
+by rewrite !associativity inverse_right neutral_left -!associativity inverse_left neutral_right.
 Qed.
 
-(* this lemma is badly-named, it is not specific to the Hlike definition *)
-Lemma Hlike_transitivity p q x' y':
-  in_generated_subgroup (fun x => in_list x (Hlike_gens p)) x' ->
-  in_generated_subgroup (fun x => in_list x (Hlike_gens q)) y' ->
-  y' == subgroup_inj (encoding p: HNNI_extension_base F2) ->
-  x' \insubgroup (finGeneratedSubgroup (Hlike_gens q)).
+Lemma equiv_implies_conjugateT u v:
+  equivalence_problem A u v ->
+  exists (t_prod: T),
+    (subgroup_inj (s:=HNNI_extension_base F2) (encoding u))
+      ==
+    (subgroup_inj (s:=T) t_prod) @ (subgroup_inj (s:=HNNI_extension_base F2) (encoding v)) @ inv (subgroup_inj (s:=T) t_prod).
 Proof.
-case=> ast.
-elim: ast x' y' => /= [x' y' Heq _ _|gen||].
-- apply: in_subgroup_proper.
-    symmetry.
-    exact: Heq.
-  by exists e.
-- rewrite /H_gens/Hlike_gens cat1s => Hx.
-  case: (in_list_inv Hx) => [<- x' y' H' y'_in_subgroup|Hgen x' y' Hx' y'_in_subgroup Hy'].
-    rewrite -H' => {H'}Hx'y'.
-    apply: in_subgroup_proper.
-      exact: Hx'y'.
-    unshelve eexists.
-      by exists y'.
-    done.
-  apply: in_subgroup_proper.
-    symmetry.
-    exact: Hx'.
-  unshelve eexists.
-    exists gen.
-    by apply: igs_gen; right.
-  done.
-- move=> ast_x IHx' ast_y IHy' x' y' Hlaw y'_in_subgroup Hy'.
-  apply: in_subgroup_proper.
-    symmetry.
-    exact: Hlaw.
-  case: (IHx' (interpret_subgroup_ast ast_x) y' (refl _) y'_in_subgroup Hy') => [[x Hx] /= eqx] {IHx'}.
-  case: (IHy' (interpret_subgroup_ast ast_y) y' (refl _) y'_in_subgroup Hy') => [[y Hy] /= eqy] {IHy'}.
-  unshelve eexists.
-    exists (x @ y).
-    exact: igs_law.
-  by rewrite /= eqx eqy.
-- move=> ast_x IH x' y' Hx' y'_in_subgroup Hy'.
-  case: (IH (interpret_subgroup_ast ast_x) y') => // [[x Hx] /= eqx].
-  apply: in_subgroup_proper.
-    symmetry.
-    exact: Hx'.
-  apply: in_subgroup_inv.
-  apply: in_subgroup_proper.
-    exact: eqx.
-  by unshelve eexists; first by exists x.
+move=> Heq; dependent induction Heq.
+- case: H0 => [[[p q] [p' q']]].
+  exact: transA_implies_conjugateT.
+- exists e => /=.
+  by rewrite inv_e neutral_left neutral_right.
+- case: IHHeq => // t_prod' x_prod.
+  exists (inv t_prod').
+  by rewrite x_prod !associativity inverse_right neutral_left -!associativity inverse_left neutral_right.
+- case: IHHeq1 => // t_prod1 u_eq.
+  case: IHHeq2 => // t_prod2 v0_eq.
+  exists (t_prod1 @ t_prod2).
+  rewrite [subgroup_inj (s:=T) (t_prod1 @ t_prod2)]morphism_preserve_law.
+  by rewrite inverse_law u_eq v0_eq !associativity.
 Qed.
-
-Lemma Hlike_symmetry o p:
-  (subgroup_inj (encoding o: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup (Hlike_gens p)) ->
-  (subgroup_inj (encoding p: HNNI_extension_base F2)) \insubgroup (finGeneratedSubgroup (Hlike_gens o)).
-Proof.
-case=> [[x [ast_x /=] ? ?]].
-
-have: interpret_subgroup_ast ast_x == subgroup_inj (encoding o: HNNI_extension_base F2).
-  transitivity x; last done.
-  by symmetry.
-(* more complicated than the proof attempted below: this is true only because encoding o and encoding p are free or = *)
-Admitted.
-(*
-move=> Henco.
-elim=> [||x y Hx IHx Hy IHy|x Hx IHx].
-- move=> x.
-  rewrite /Hlike_gens cat1s => Hx.
-  case: (List.in_inv Hx) => {Hx} [<-|]; last first.
-    unshelve eexists.
-      exists x.
-      exact /igs_gen /List.in_cons.
-    done.
-  admit.
-- unshelve eexists.
-    exists e.
-    exact: igs_e.
-  done.
-- case: IHx => [[x'' /=] Hx'' eq_x''].
-  case: IHy => [[y'' /=] Hy'' eq_y''].
-  unshelve eexists.
-    exists (x'' @ y'').
-    exact: igs_law.
-  by rewrite /= eq_x'' eq_y''.
-- case: IHx => [[x'' /=] Hx'' eq_x''].
-  unshelve eexists.
-    exists (inv x'').
-    exact: igs_inv.
-  by rewrite /= eq_x''.
-Admitted.
-*)
 
 Lemma equiv_x_y_implies_encoding_in_ts_subgroup x y:
   equivalence_problem A x y
     ->
   (subgroup_inj (s:=HNNI_extension_base F2) (encoding x)) \insubgroup (finGeneratedSubgroup (Hlike_gens y)).
 Proof.
-move=> E.
-dependent induction E.
-- case: H0 => [[[p q] [p' q']]].
-  exact: transA_implies_inHlike.
-- unshelve eexists.
-    exists (subgroup_inj (encoding x: HNNI_extension_base F2)).
-    apply /igs_gen.
-    rewrite /Hlike_gens cat1s.
-    exact: in_head.
-  done.
-- exact: Hlike_symmetry.
-- case: IHE1 => [[] x' x'_in_subgroup /= Heqx'].
-  case: IHE2 => [[] y' y'_in_subgroup /= Heqy'].
-  have := (Hlike_transitivity x'_in_subgroup y'_in_subgroup Heqy').
-  exact: in_subgroup_proper.
-Qed. 
+move=> /equiv_implies_conjugateT [prod eq].
+
+have ?: in_generated_subgroup (in_list^~ (Hlike_gens y)) (subgroup_inj (s:=T) prod).
+  clear eq.
+  case: prod => [t [ast]] /=.
+  elim: ast t => /= [t ?|gen gen_in_gens t ?|ast1 IH1 ast2 IH2 prod|ast IH inv].
+  - by exists (sa_e _).
+  - unshelve eexists.
+      apply /sa_gen /in_tail.
+        exact: gen_in_gens.
+      done.
+  - case: (IH1 (interpret_subgroup_ast ast1)) => // ast1' eq1.
+    case: (IH2 (interpret_subgroup_ast ast2)) => // ast2' eq2.
+    exists (sa_law ast1' ast2').
+    by rewrite /= -eq1 -eq2.
+  - case: (IH (interpret_subgroup_ast ast)) => // ast' eq.
+    exists (sa_inv ast').
+    by rewrite /= -eq.
+
+unshelve eexists.
+  exists (((subgroup_inj (s:=T) prod) @ subgroup_inj (s:=HNNI_extension_base F2) (encoding y)) @ inv (subgroup_inj (s:=T) prod)).
+  apply /igs_law.
+    apply /igs_law => //.
+    exact /igs_gen /in_head.
+  exact /igs_inv.
+by rewrite eq.
+Qed.
 
 Lemma encoding_inH_if_inK (k: int):
   ((encoding k) \insubgroup K)

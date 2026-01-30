@@ -292,6 +292,7 @@ exists (power (`[b]: F2) s.2).
 by apply: igs_gen; right; left.
 Defined.  
 
+(* TODO: move to EquivalenceAlgebra.v *)
 Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
   in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power x k)).
@@ -335,7 +336,12 @@ rewrite /encoding power_inv /encoding_state_k/= !morphism_preserve_power /=.
 by rewrite addrC !poweradd !powermul inverse_law -!power_inv !associativity.
 Qed.
 
+(* TODO: move to F2.v *)
 Definition F2_dec_eq: F2 -> F2 -> bool.
+Admitted.
+
+Lemma encoding_free: forall k,
+  ~ (encoding k) \insubgroup (generatedSubgroup (fun x => exists k', (k != k') /\ (x == encoding k'))).
 Admitted.
 
 Definition iso_of_transition_gens (t: Transition) (w: F2) :=

@@ -338,7 +338,10 @@ Qed.
 
 (* TODO: move to F2.v *)
 Definition F2_dec_eq: F2 -> F2 -> bool.
-Admitted.
+Admitted. (* sweat only but its properties will govern thr proofs below *)
+
+Lemma F2_refl p: F2_dec_eq p p.
+Admitted. 
 
 Lemma encoding_free: forall k,
   ~ (encoding k) \insubgroup (generatedSubgroup (fun x => exists k', (k != k') /\ (x == encoding k'))).
@@ -392,7 +395,7 @@ Lemma encoding_in_encset_char P k:
     ->
   P k.
 Proof.
-Admitted.
+Admitted. (* independence + injectivity of encoding *)
 
 Let K := encoding_set (fun k => equivalence_problem A k m).
 
@@ -419,7 +422,7 @@ Lemma H'_invariance: forall i: 'I_(size transitions_isos),
     is_subgroup_stable (HNNI_nth_iso _ transitions_isos i) K.
 Proof.
 move=> i x Hx.
-(* TODO: propriété "<a_p, b^q> inter [ZZ] = [p + qZ]" *)
+(* TODO: propriété "<a_p, b^q> inter [ZZ] = [p + qZ]" *) (* arith + properties of norma forms *)
 Admitted.
 
 (* K_extended = <K, t1, ..., tn> *)
@@ -495,13 +498,11 @@ Lemma encoding_state_k_value_subgroup s k:
 Proof. by rewrite /encoding_state_k/= /eq/=/subgroupby_eq/=. Qed.
 
 Lemma power_neq_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (encoding p).
-Admitted.
+Admitted. (* normal forms *)
 
 Lemma power_neq_inv_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (inv (encoding p)).
-Admitted.
+Admitted.  (* normal forms *)
 
-Lemma F2_refl p: F2_dec_eq p p.
-Admitted.
 
 Lemma iso_of_transition_image_power s1 s2:
   iso_of_transition (s1, s2) (power_b_state_encoding s1) == power_b_state_encoding s2.

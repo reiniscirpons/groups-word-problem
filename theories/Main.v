@@ -8,252 +8,30 @@ Import GRing.Theory.
 
 From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equivalence HNN Utils.
 
-Section NormalizeSubgroupAST.
-Variable G: deceqGroupType.
-Variable P: G -> Type.
-
-Record subgroupBase := {
-  gen: G;
-  Pgen: P gen;
-  inverted: bool;
-}.
-Definition comb := list subgroupBase.
-
-Definition invert_base (b: subgroupBase): subgroupBase := {|
-  gen := gen b;
-  Pgen := Pgen b;
-  inverted := negb (inverted b);
-|}.
-
-Fixpoint comb_ast (ast: subgroup_ast P): comb :=
-  match ast with
-  | sa_e => [::]
-  | sa_gen gen Pgen => [:: {| Pgen := Pgen; inverted := false |}]
-  | sa_inv ast => rev (map invert_base (comb_ast ast))
-  | sa_law ast1 ast2 => (comb_ast ast1) ++ (comb_ast ast2)
-  end.
-
-Definition subgroup_base_to_ast (b: subgroupBase): subgroup_ast P :=
-  match inverted b with
-  | true => sa_inv (sa_gen (gen b) (Pgen b))
-  | false => sa_gen (gen b) (Pgen b)
-  end.
-
-Fixpoint comb_to_ast (c: comb): subgroup_ast P := match c with
-  | [::] => sa_e P
-  | base::rest => sa_law (subgroup_base_to_ast base) (comb_to_ast rest)
-  end.
-
-Definition invertible_base (b1 b2: subgroupBase): bool :=
-  ((gen b1) == (gen b2)) && (inverted b1 != inverted b2).
-
-Fixpoint simplify_comb (c: comb): comb := match c with
-  | [::] => [::]
-  | h::c => match c with
-     | [::] => [:: h]
-     | h'::c => if invertible_base h h' then simplify_comb c else h::h'::(simplify_comb c)
-     end
-  end.
-
-Definition normalize_ast (ast: subgroup_ast P): subgroup_ast P :=
-  comb_to_ast (simplify_comb (comb_ast ast)).
-
-Lemma ast_combing_correct ast:
-  interpret_subgroup_ast ast == interpret_subgroup_ast (comb_to_ast (comb_ast ast)).
-Proof.
-elim: ast => //= [gen _|ast1 IH1 ast2 IH2|ast IH].
-- by rewrite neutral_right.
-- rewrite {}IH1 {}IH2.
-  set l1 := comb_ast ast1.
-  set l2 := comb_ast ast2.
-  elim: l1 => /= [|b1 l1 IH].
-  + by rewrite neutral_left.
-  + by rewrite -IH associativity.
-- rewrite {}IH.
-  set l := comb_ast ast.
-  elim/last_ind: l => //= [|l1 b1 IH].
-    by rewrite inv_e.
-  rewrite map_rcons rev_rcons /= -{}IH.
-  elim: l1 => //= [|b2 l1 IH]; last first.
-    by rewrite !inverse_law {}IH associativity.
-  rewrite inverse_law inv_e neutral_left neutral_right.
-  case: b1 => gen Pgen [] //=.
-  by rewrite inv_involutive.
-Qed.
-
-Lemma normalize_ast_correct (ast: subgroup_ast P):
-  interpret_subgroup_ast ast == interpret_subgroup_ast (normalize_ast ast).
-Proof.
-rewrite ast_combing_correct /normalize_ast.
-set c := comb_ast ast.
-elim: c => //= base l ->.
-elim: l base => //= base' l IH base.
-rewrite -{}IH.
-have /orP [/[dup] H ->|/negbTE -> //] := orbN (invertible_base base base').
-rewrite associativity.
-move: H=> /andP /= [/eqP H].
-rewrite /subgroup_base_to_ast /=.
-case: (inverted base); case: (inverted base') => //= _;
-by rewrite H ?inverse_left ?inverse_right neutral_left.
-Qed.
-
-Lemma normalize_inv_inv (ast: subgroup_ast P):
-  normalize_ast (sa_inv (sa_inv ast)) = normalize_ast ast.
-Proof. by rewrite /normalize_ast/= map_rev revK mapK // => [[gen Pgen []]]. Qed.
-
-Lemma normalize_distr_inv_law (ast1 ast2: subgroup_ast P):
-  normalize_ast (sa_inv (sa_law ast1 ast2)) = normalize_ast (sa_law (sa_inv ast2) (sa_inv ast1)).
-Proof. by rewrite /normalize_ast/= map_cat rev_cat. Qed.
-
-Lemma normalize_law_associativity (ast1 ast2 ast3: subgroup_ast P):
-  normalize_ast (sa_law (sa_law ast1 ast2) ast3) = normalize_ast (sa_law ast1 (sa_law ast2 ast3)).
-Proof. by rewrite /normalize_ast/= catA. Qed.
-
-Lemma simplify_comb_cons b1 (c: comb):
-  simplify_comb (b1::c) =
-  match simplify_comb c with
-  | nil => [::b1]
-  | b2::simplified =>
-      if invertible_base b1 b2
-      then simplified
-      else b1::b2::simplified
-  end.
+(* TODO: move to F2.v *)
+(* sweat only but its properties will govern the proofs below *)
+Definition F2_norm: F2 -> F2.
 Admitted.
 
-Lemma unique_comb_simplification_e c:
-  interpret_subgroup_ast (comb_to_ast c) == e ->
-  simplify_comb c = [::].
-Proof.
+Lemma F2_norm_e:
+  F2_norm e = e.
 Admitted.
 
-Lemma unique_comb_simplification c c':
-  interpret_subgroup_ast (comb_to_ast c) == interpret_subgroup_ast (comb_to_ast c') ->
-  simplify_comb c = simplify_comb c'.
-Proof.
-elim: c' c => [c|b' c' IH c].
-  exact: unique_comb_simplification_e.
-move=> Heq.
-have /IH {Heq IH}: interpret_subgroup_ast (comb_to_ast (invert_base b' :: c)) == interpret_subgroup_ast (comb_to_ast c').
-  rewrite /= {}Heq /= associativity.
-  case: b' => [gen Pgen []] /=;
-  by rewrite ?inverse_right ?inverse_left neutral_left.
+Lemma F2_norm_unique: forall w w',
+  w == w' -> F2_norm w = F2_norm w'.
 Admitted.
 
-Lemma unique_normalization (ast ast': subgroup_ast P):
-  interpret_subgroup_ast ast == interpret_subgroup_ast ast' ->
-  normalize_ast ast = normalize_ast ast'.
-Proof.
-move=> H.
-rewrite /normalize_ast.
-rewrite (@unique_comb_simplification (comb_ast ast) (comb_ast ast')) //.
-by rewrite -!ast_combing_correct.
-Qed.
+Definition F2_dec_eq (w w': F2): bool :=
+  (F2_norm w) == (F2_norm w').
 
-End NormalizeSubgroupAST.
+Lemma F2_refl p: F2_dec_eq p p.
+Proof. by rewrite /F2_dec_eq. Qed.
+
+Lemma F2_dec_eq_reflect: forall w w',
+  reflect (w == w') (F2_dec_eq w w').
+Admitted.
 
 
-Section MapSubgroupGens.
-Variable G: deceqGroupType.
-Variable gens gens': seq G.
-
-Variable map: G -> G.
-Hypothesis map_preserve_gen: forall x, in_list x gens -> in_list (map x) gens'.
-
-Let H := finGeneratedSubgroup gens.
-Let H' := finGeneratedSubgroup gens'.
-
-Let H_char := (fun x => in_list x gens).
-Let H'_char := (fun x => in_list x gens').
-
-Fixpoint extend_ast (ast: subgroup_ast H_char): subgroup_ast H'_char :=
-  match ast with
-  | sa_e => sa_e H'_char
-  | sa_law ast_l ast_r => sa_law (extend_ast ast_l) (extend_ast ast_r)
-  | sa_inv ast => sa_inv (extend_ast ast)
-  | sa_gen gen Pgen => sa_gen (map gen) (map_preserve_gen Pgen)
-  end.
-
-Definition map_extended (x: H): H'.
-Proof.
-case: x => [x]; elim=> [ast Hx].
-have@ ast' := extend_ast (normalize_ast ast).
-exists (interpret_subgroup_ast ast').
-by exists ast'.
-Defined.
-
-Lemma extension_preserve_e: map_extended e == e.
-Proof. done. Qed.
-
-Lemma interpret_extend_comb_cas b c:
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb (b::c)))) ==
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb [::b]))) @
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c))).
-Proof.
-elim: c b => [/= b|a c IH b].
-  by rewrite !neutral_right.
-rewrite IH.
-rewrite /=.
-have /orP [/[dup] Hinv ->|/negbTE -> /=] := orbN (invertible_base b a); last first.
-  by rewrite !neutral_right.
-rewrite !neutral_right.
-move: Hinv => /andP [/eqP Heq].
-rewrite /subgroup_base_to_ast.
-case: (inverted b); case: (inverted a) => //= _;
-by rewrite !associativity Heq ?inverse_left ?inverse_right neutral_left.
-Qed.
-
-Lemma interpret_extend_comb_cat c1 c2:
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb (c1 ++ c2)))) ==
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c1))) @
-  interpret_subgroup_ast (extend_ast (comb_to_ast (simplify_comb c2))).
-Proof.
-elim: c1 c2 => // [c2|b1 c1 IH c2].
-  by rewrite neutral_left.
-rewrite -cat1s -catA !cat1s.
-rewrite interpret_extend_comb_cas (interpret_extend_comb_cas b1 c1).
-by rewrite IH !associativity.
-Qed.
-
-Lemma interpret_extend_ast_law ast_x ast_y:
-  interpret_subgroup_ast (extend_ast (normalize_ast (sa_law ast_x ast_y))) ==
-  interpret_subgroup_ast (extend_ast (normalize_ast ast_x)) @
-  interpret_subgroup_ast (extend_ast (normalize_ast ast_y)).
-Proof. by rewrite /normalize_ast/= interpret_extend_comb_cat. Qed.
-
-Lemma extension_preserve_law x y: map_extended (x @ y) == (map_extended x) @ (map_extended y).
-Proof. 
-case: x => [x [ast_x eqx]].
-case: y => [y [ast_y eqy]].
-rewrite /eq/=/subgroupby_eq/=.
-exact: interpret_extend_ast_law.
-Qed.
-
-Lemma extension_preserve_inv x: inv (map_extended x) == map_extended (inv x).
-Proof.
-case: x => [x [ast_x]].
-rewrite /eq/=/subgroupby_eq/= => _.
-elim: ast_x => [|gen Pgen /=|ast1 IH1 ast2 IH2|ast Hast].
-- by rewrite inv_e.
-- by rewrite !neutral_right.
-- by rewrite normalize_distr_inv_law !interpret_extend_ast_law inverse_law IH1 IH2.
-- by rewrite normalize_inv_inv -Hast inv_involutive.
-Qed.
-
-Lemma extension_preserve_equiv x y:
-  x == y -> map_extended x == map_extended y.
-Proof.
-case: x => [x [ast_x Hx]].
-case: y => [y [ast_y Hy]].
-rewrite /eq/=/subgroupby_eq/= => Heq.
-have /unique_normalization -> //: interpret_subgroup_ast ast_x == interpret_subgroup_ast ast_y.
-transitivity x; first by symmetry.
-transitivity y => //.
-Qed.
-
-HB.instance Definition _ := isMonoidMorphism.Build H H' map_extended extension_preserve_equiv extension_preserve_e extension_preserve_law.
-HB.instance Definition _ := isInvMorphism.Build H H' map_extended extension_preserve_inv.
-
-End MapSubgroupGens.
 
 Record GWPArguments := {
   P : invertiblePresentationType;
@@ -274,100 +52,118 @@ Import intZmod.
 (* `encoding k` is `a_k = b^k a b^-k` *)
 Definition encoding (k: int) : F2 := (power (`[b]: F2) k) @ `[a] @ (power (`[b]: F2) (oppz k)).
 
-Definition affine_state_encoding_gens (s: State) := [::
-    (encoding s.1);
-    (power (`[b]: F2) s.2)
-  ].
-Definition affine_state_encoding (s: State) := finGeneratedSubgroup (affine_state_encoding_gens s).
+(* affine_state_encoding will be defined as `affine_state_encoding': group` later. *)
+Definition affine_state_encoding' (s: State) := F2.
+
+Section AffineStateEncoding.
+Variable s: State.
+
+Let affine_state_encoding' := affine_state_encoding' s.
+
+HB.instance Definition _ := EqProp.copy affine_state_encoding' F2.
+HB.instance Definition _ := Monoid.copy affine_state_encoding' F2.
+HB.instance Definition _ := Group.copy affine_state_encoding' F2.
+
+Definition affine_state_encoding_inj (w: affine_state_encoding'): F2 :=
+  flatten (map (fun l => match l with
+  | a => encoding s.1
+  | a_inv => inv (encoding s.2)
+  | b => power (`[b]: F2) s.2
+  | b_inv => inv (power (`[b]: F2) s.2)
+  end) (F2_norm w)).
+
+Lemma affine_state_encoding_inj_injectivity: forall (w w': affine_state_encoding'),
+  affine_state_encoding_inj w == affine_state_encoding_inj w' ->
+  w == w'.
+Proof.
+move=> w w'.
+Admitted.
+
+HB.instance Definition _ := isInjective.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_injectivity.
+
+Lemma affine_state_encoding_inj_preserve_equiv: forall w w',
+  w == w' ->
+  affine_state_encoding_inj w == affine_state_encoding_inj w'.
+Proof.
+move=> w w' /F2_dec_eq_reflect /eqP.
+by rewrite /affine_state_encoding_inj => ->.
+Qed.
+
+Lemma affine_state_encoding_inj_preserve_e:
+  affine_state_encoding_inj e == e.
+Proof. by rewrite /affine_state_encoding_inj F2_norm_e. Qed.
+
+Lemma affine_state_encoding_inj_preserve_law: forall w w',
+  affine_state_encoding_inj (w @ w') == (affine_state_encoding_inj w) @ (affine_state_encoding_inj w').
+Proof.
+move=> w w'.
+Admitted.
+
+HB.instance Definition _ := isMonoidMorphism.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_preserve_equiv affine_state_encoding_inj_preserve_e affine_state_encoding_inj_preserve_law.
+
+Lemma affine_state_encoding_inj_preserve_inv: forall w,
+  inv (affine_state_encoding_inj w) == affine_state_encoding_inj (inv w).
+Proof.
+move=> w.
+Admitted.
+
+HB.instance Definition _ := isInvMorphism.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_preserve_inv.
+
+(* I don't really understand what's going on, but without these definitions the instance can't be defined. Weird.
+  *)
+Definition affine_state_encoding := affine_state_encoding': group.
+Definition affine_state_encoding_inj' := affine_state_encoding_inj: injectiveMorphism affine_state_encoding F2.
+HB.instance Definition _ := isSubgroup.Build F2 affine_state_encoding affine_state_encoding_inj'.
+
+Check affine_state_encoding: subgroup F2.
+
+End AffineStateEncoding.
 
 Definition encoding_p_state_encoding (s: State): affine_state_encoding s.
-Proof.
-exists (encoding s.1).
-by apply: igs_gen; left.
-Defined.
+Proof. exact (`[a]: F2). Defined.
 
 Definition power_b_state_encoding (s: State): affine_state_encoding s.
-Proof.
-exists (power (`[b]: F2) s.2).
-by apply: igs_gen; right; left.
-Defined.  
-
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma power_subgroup_in_generated_subgroup {G: group} (P: G -> Type) (x: generatedSubgroup P) (k: int):
-  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) x) ->
-  in_generated_subgroup P (subgroup_inj (s:=generatedSubgroup P) (power x k)).
-Proof.
-case: k; elim=> [/= Px|k IH Px].
-- exact: igs_e.
-- move: (IH Px) => {IH} Hx.
-  rewrite powerS.
-  exact: igs_law.
-- exact /igs_inv /Px.
-- move: (IH Px) => {IH}.
-  have ->: Negz k = - (k.+1)%:Z by done.
-  have ->: Negz k.+1 = - (k.+2)%:Z by done.
-  case=> [ast H].
-  case: Px => [ast_x Hx].
-  exists (sa_law (sa_inv ast_x) ast).
-  simpl interpret_subgroup_ast.
-  by rewrite -H -Hx powerP.
-Qed.
+Proof. exact (`[b]: F2). Defined.
 
 Definition encoding_state_k (s: State) (k: int) : affine_state_encoding s.
 Proof.
-exists (
+exact: (
     subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) k) @
       subgroup_inj (s:=affine_state_encoding s) (encoding_p_state_encoding s) @
     subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) (-k))
 ).
-apply: igs_law; do [apply: igs_law|simpl].
-- apply: power_subgroup_in_generated_subgroup => /=.
-  by apply: igs_gen; right; left.
-- by apply: igs_gen; left.
-- apply: power_subgroup_in_generated_subgroup => /=.
-  by apply: igs_gen; right; left.
 Defined.
 
 Lemma encoding_state_k_value: forall s k,
   subgroup_inj (s:=(affine_state_encoding s)) (encoding_state_k s k) == encoding (s.1 + (s.2: int) * k).
 Proof.
-move=> s k.
-rewrite /encoding power_inv /encoding_state_k/= !morphism_preserve_power /=.
-by rewrite addrC !poweradd !powermul inverse_law -!power_inv !associativity.
-Qed.
-
-(* TODO: move to F2.v *)
-Definition F2_dec_eq: F2 -> F2 -> bool.
-Admitted. (* sweat only but its properties will govern thr proofs below *)
-
-Lemma F2_refl p: F2_dec_eq p p.
-Admitted. 
+move=> s k /=.
+Admitted.
 
 Lemma encoding_free: forall k,
   ~ (encoding k) \insubgroup (generatedSubgroup (fun x => exists k', (k != k') /\ (x == encoding k'))).
 Admitted.
 
-Definition iso_of_transition_gens (t: Transition) (w: F2) :=
-       if F2_dec_eq w (encoding t.1.1)       then encoding t.2.1
-  else if F2_dec_eq w (inv (encoding t.1.1)) then inv (encoding t.2.1)
-  else if F2_dec_eq w (power (`[b]: F2) t.1.2) then power (`[b]: F2) t.2.2
-  else if F2_dec_eq w (inv (power (`[b]: F2) t.1.2)) then inv (power (`[b]: F2) t.2.2)
-  else w (* whatever but using w allows more general lemma to be stated below *).
+Section IsoOfTransition.
+Variable t: Transition.
 
-Lemma iso_of_transition_gens_preserve_gen t: forall w,
-  in_list w (affine_state_encoding_gens t.1) -> in_list (iso_of_transition_gens t w) (affine_state_encoding_gens t.2).
-Admitted.
+(* the canonical morphism <a_p, b^q> -> <a_p', b^q'> *)
+Definition iso_of_transition: (affine_state_encoding t.1) -> affine_state_encoding t.2 :=
+  (* thanks to the well-chosen definition of `affine_state_encoding s` as F2, this is free *)
+  id.
 
-Lemma iso_of_transition_gens_preserve_eq t: forall x y,
-  x == y -> iso_of_transition_gens t x == iso_of_transition_gens t y.
-Admitted.
+Lemma iot_preserve_equiv: forall x y, x == y -> iso_of_transition x == iso_of_transition y.
+Proof. done. Qed.
+Lemma iot_preserve_e: iso_of_transition e == e.
+Proof. done. Qed.
+Lemma iot_preserve_law: forall x y, iso_of_transition (x @ y) == (iso_of_transition x) @ (iso_of_transition y).
+Proof. done. Qed.
+Lemma iot_preserve_inv: forall x, iso_of_transition (inv x) == inv (iso_of_transition x).
+Proof. done. Qed.
 
-Lemma iso_of_transition_gens_preserve_e t:
-  iso_of_transition_gens t e == e.
-Admitted.
-
-Definition iso_of_transition (t: Transition): morphism (affine_state_encoding t.1) (affine_state_encoding t.2) :=
-  map_extended (@iso_of_transition_gens_preserve_gen t).
+HB.instance Definition _ := isMonoidMorphism.Build _ _ iso_of_transition iot_preserve_equiv iot_preserve_e iot_preserve_law.
+HB.instance Definition _ := isInvMorphism.Build _ _ iso_of_transition iot_preserve_inv.
+End IsoOfTransition.
 Arguments iso_of_transition: clear implicits.
 
 Definition iso_of_transition_lm (t: Transition): local_morphism F2 :=
@@ -495,27 +291,18 @@ Lemma encoding_state_k_value_subgroup s k:
   encoding_state_k s k
     ==
   (power (power_b_state_encoding s) k) @ (encoding_p_state_encoding s) @ (power (power_b_state_encoding s) (-k)).
-Proof. by rewrite /encoding_state_k/= /eq/=/subgroupby_eq/=. Qed.
-
-Lemma power_neq_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (encoding p).
-Admitted. (* normal forms *)
-
-Lemma power_neq_inv_encoding p q: ~~ F2_dec_eq (power ([:: b]: F2) q) (inv (encoding p)).
-Admitted.  (* normal forms *)
-
+Proof.
+rewrite /encoding_state_k !morphism_preserve_power.
+rewrite /power_b_state_encoding/encoding_p_state_encoding.
+Admitted.
 
 Lemma iso_of_transition_image_power s1 s2:
   iso_of_transition (s1, s2) (power_b_state_encoding s1) == power_b_state_encoding s2.
-Proof.
-rewrite /eq/=/subgroupby_eq/= neutral_right /iso_of_transition_gens.
-rewrite (negbTE (power_neq_encoding s1.1 s1.2)).
-rewrite (negbTE (power_neq_inv_encoding s1.1 s1.2)).
-by rewrite F2_refl.
-Qed.
+Proof. done. Qed.
 
 Lemma iso_of_transition_image_encoding_p s1 s2:
   iso_of_transition (s1, s2) (encoding_p_state_encoding s1) == encoding_p_state_encoding s2.
-Proof. by rewrite /eq/=/subgroupby_eq/= neutral_right /iso_of_transition_gens F2_refl. Qed.
+Proof. done. Qed.
 
 Lemma iso_of_transition_image_encoding s1 s2 k:
   iso_of_transition (s1, s2) (encoding_state_k s1 k) == encoding_state_k s2 k.
@@ -568,6 +355,8 @@ unshelve eexists.
   by rewrite size_tuple.
 simpl.
 move: Heq.
+have ->: iso_of_transition_lm (p, q, (p', q')) (encoding_state_k (p, q) k) =
+         iso_of_transition (p, q, (p', q')) (encoding_state_k (p, q) k) by done.
 rewrite iso_of_transition_image_encoding !encoding_state_k_value /= => ->.
 by rewrite !associativity inverse_right neutral_left -!associativity inverse_left neutral_right.
 Qed.

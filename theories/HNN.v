@@ -50,7 +50,7 @@ Variable isos: seq (local_morphism G).
 Let isos_count := size isos.
 
 Definition HNNI_nth_iso (i: 'I_isos_count): local_morphism G :=
-  nth (morphism_to_local_morphism (identity_morphism G)) isos i.
+  nth (morphism_to_local_morphism (singleton_morphism G: morphism (singleton_subgroup G) (singleton_subgroup G))) isos i.
 
 Definition HNNI_extension: group.
 Admitted.

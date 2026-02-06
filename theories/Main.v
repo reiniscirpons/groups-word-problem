@@ -10,16 +10,88 @@ From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equiva
 
 (* TODO: move to F2.v *)
 (* sweat only but its properties will govern the proofs below *)
-Definition F2_norm: F2 -> F2.
-Admitted.
+Fixpoint F2_norm (w: F2): F2 := match w with
+  | [::] => [::]
+  | c::w => match c, F2_norm w with
+      | a, a_inv::n => n
+      | b, b_inv::n => n
+      | a_inv, a::n => n
+      | b_inv, b::n => n
+      | c, w => c::w
+      end
+  end.
+
+Eval compute in F2_norm nil.
+Eval compute in F2_norm ([:: a; b]: F2).
+Eval compute in F2_norm ([:: a; b; b_inv]: F2).
+Eval compute in F2_norm ([:: a; b; b; b_inv; a_inv]: F2).
 
 Lemma F2_norm_e:
   F2_norm e = e.
+Proof. done. Qed.
+
+Lemma F2_norm_rev w:
+  F2_norm (rev w) = rev (F2_norm w).
+Proof.
 Admitted.
 
-Lemma F2_norm_unique: forall w w',
+Lemma F2_norm_map_invl w:
+  F2_norm (map invl w) = map invl (F2_norm w).
+Proof.
+elim: w => // c w /= ->.
+case: c => /=;
+case: (F2_norm w) => // c' w' /=;
+by case: c'.
+Qed.
+
+Lemma F2_norm_inv w:
+  F2_norm (inv w) = inv (F2_norm w).
+Proof. by rewrite /inv/=/inv_word/= -F2_norm_rev F2_norm_map_invl. Qed.
+
+Lemma F2_norm_cat_back w1 w2 w3:
+  F2_norm w1 = F2_norm w2 -> F2_norm (w3 @ w1) = F2_norm (w3 @ w2).
+Proof.
+move=> H.
+elim: w3 => // c w3.
+by case: c => /= ->.
+Qed.
+
+Lemma F2_norm_cat w1 w2 w3:
+  F2_norm w1 = F2_norm w2 -> F2_norm (w1 @ w3) = F2_norm (w2 @ w3).
+Proof.
+rewrite -[w1 @ w3]revK -[w2 @ w3]revK.
+rewrite ![F2_norm (rev (rev _))]F2_norm_rev => eq.
+have -> //: F2_norm (rev (w1 @ w3)) = F2_norm (rev (w2 @ w3)).
+rewrite /law/= !rev_cat; apply /F2_norm_cat_back.
+by rewrite !F2_norm_rev eq.
+Qed.
+
+Lemma F2_norm_unique w w':
   w == w' -> F2_norm w = F2_norm w'.
-Admitted.
+Proof.
+elim=> [[r1 r2] w1 w2|//|? ? _ -> //|? ? ? _ -> _ -> //].
+rewrite /relations/= !inE => /orP [/eqP [-> ->]|/orP [/eqP [-> ->]|/orP [/eqP [-> ->]|/eqP [-> ->]]]];
+exact /F2_norm_cat /F2_norm_cat_back.
+Qed.
+
+Lemma F2_norm_correct w:
+  F2_norm w == w.
+Proof.
+elim: w => // c w /=.
+case: (F2_norm w) => [eq|c' n eq].
+  transitivity (([:: c]: F2) @ w); last done;
+  by case: c; rewrite -eq.
+transitivity (([:: c]: F2) @ w); last done.
+case: c eq; case: c' => <- //.
+- transitivity (([::a]: F2) @ (([::a_inv]: F2) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+- transitivity (([::a_inv]: F2) @ (([::a]: F2) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+- transitivity (([::b]: F2) @ (([::b_inv]: F2) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+- transitivity (([::b_inv]: F2) @ (([::b]: F2) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+Qed.
 
 Definition F2_dec_eq (w w': F2): bool :=
   (F2_norm w) == (F2_norm w').
@@ -27,10 +99,13 @@ Definition F2_dec_eq (w w': F2): bool :=
 Lemma F2_refl p: F2_dec_eq p p.
 Proof. by rewrite /F2_dec_eq. Qed.
 
-Lemma F2_dec_eq_reflect: forall w w',
+Lemma F2_dec_eq_reflect w w':
   reflect (w == w') (F2_dec_eq w w').
-Admitted.
-
+Proof.
+apply /(iffP idP) => eq.
+- by rewrite -[w]F2_norm_correct -[w']F2_norm_correct (eqP eq).
+- exact /eqP /F2_norm_unique.
+Qed.
 
 
 Record GWPArguments := {
@@ -64,19 +139,30 @@ HB.instance Definition _ := EqProp.copy affine_state_encoding' F2.
 HB.instance Definition _ := Monoid.copy affine_state_encoding' F2.
 HB.instance Definition _ := Group.copy affine_state_encoding' F2.
 
-Definition affine_state_encoding_inj (w: affine_state_encoding'): F2 :=
-  flatten (map (fun l => match l with
+Definition affine_state_encoding_inj_letter (l: F2_sigma): F2 := match l with
   | a => encoding s.1
-  | a_inv => inv (encoding s.2)
+  | a_inv => inv (encoding s.1)
   | b => power (`[b]: F2) s.2
   | b_inv => inv (power (`[b]: F2) s.2)
-  end) (F2_norm w)).
+  end.
+
+Definition affine_state_encoding_inj (w: affine_state_encoding'): F2 :=
+  prod (map affine_state_encoding_inj_letter (F2_norm w)).
+
+Lemma affine_state_encoding_inj_injectivity_e (w: affine_state_encoding'):
+  affine_state_encoding_inj w == e ->
+  w == e.
+Proof.
+Admitted.
 
 Lemma affine_state_encoding_inj_injectivity: forall (w w': affine_state_encoding'),
   affine_state_encoding_inj w == affine_state_encoding_inj w' ->
   w == w'.
 Proof.
 move=> w w'.
+move=> /F2_dec_eq_reflect /eqP.
+rewrite /affine_state_encoding_inj => eq.
+apply /F2_dec_eq_reflect /eqP.
 Admitted.
 
 HB.instance Definition _ := isInjective.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_injectivity.
@@ -93,19 +179,63 @@ Lemma affine_state_encoding_inj_preserve_e:
   affine_state_encoding_inj e == e.
 Proof. by rewrite /affine_state_encoding_inj F2_norm_e. Qed.
 
-Lemma affine_state_encoding_inj_preserve_law: forall w w',
-  affine_state_encoding_inj (w @ w') == (affine_state_encoding_inj w) @ (affine_state_encoding_inj w').
+Lemma F2_norm1 c:
+  F2_norm ([:: c]: F2) = ([:: c]: F2).
+Proof. by case: c. Qed.
+
+Lemma prod_affine_state_encoding_inj_F2_norm w:
+  prod [seq affine_state_encoding_inj_letter i | i <- F2_norm w] ==
+  prod [seq affine_state_encoding_inj_letter i | i <- w].
 Proof.
-move=> w w'.
-Admitted.
+elim: w => // c w /=.
+set norm := F2_norm w.
+case: c => <-;
+case: norm => // c w' /=;
+case: c => //=;
+by rewrite associativity ?inverse_left ?inverse_right.
+Qed.
+
+Lemma affine_state_encoding_inj_preserve_law w w':
+  affine_state_encoding_inj (w @ w') == (affine_state_encoding_inj w) @ (affine_state_encoding_inj w').
+Proof. by rewrite /affine_state_encoding_inj !prod_affine_state_encoding_inj_F2_norm /law/= map_cat prod_cat. Qed.
 
 HB.instance Definition _ := isMonoidMorphism.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_preserve_equiv affine_state_encoding_inj_preserve_e affine_state_encoding_inj_preserve_law.
 
-Lemma affine_state_encoding_inj_preserve_inv: forall w,
+(* TODO: move to EquivalenceAlgebra.v *)
+Lemma prod_inv {G: group} (l: seq G):
+  inv (prod l) == prod (map inv (rev l)).
+Proof.
+elim: l => [/=|c l].
+  by rewrite inv_e.
+rewrite -cat1s rev_cat map_cat !prod_cat inverse_law => ->.
+by rewrite /= !neutral_right.
+Qed.
+
+Lemma prod_rcons (l: seq F2) (c: F2):
+  prod (rcons l c) == (prod l) @ c.
+Proof.
+elim: l => /= [|a l ->].
+  by rewrite neutral_left neutral_right.
+by rewrite associativity.
+Qed.
+
+Lemma affine_state_encoding_inj_inv (c: F2_sigma):
+  (affine_state_encoding_inj_letter \o F2_invl) c ==
+  (inv \o affine_state_encoding_inj_letter) c.
+Proof.
+case: c => // /=;
+by rewrite inv_involutive.
+Qed.
+
+Lemma affine_state_encoding_inj_preserve_inv w:
   inv (affine_state_encoding_inj w) == affine_state_encoding_inj (inv w).
 Proof.
-move=> w.
-Admitted.
+rewrite /affine_state_encoding_inj prod_inv F2_norm_inv -map_comp !map_rev -map_comp.
+set norm := F2_norm w.
+elim: norm => // c norm /=.
+rewrite !rev_cons !prod_rcons => ->.
+by have /= <- := affine_state_encoding_inj_inv c.
+Qed.
 
 HB.instance Definition _ := isInvMorphism.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_preserve_inv.
 
@@ -114,8 +244,6 @@ HB.instance Definition _ := isInvMorphism.Build _ _ affine_state_encoding_inj af
 Definition affine_state_encoding := affine_state_encoding': group.
 Definition affine_state_encoding_inj' := affine_state_encoding_inj: injectiveMorphism affine_state_encoding F2.
 HB.instance Definition _ := isSubgroup.Build F2 affine_state_encoding affine_state_encoding_inj'.
-
-Check affine_state_encoding: subgroup F2.
 
 End AffineStateEncoding.
 
@@ -128,9 +256,9 @@ Proof. exact (`[b]: F2). Defined.
 Definition encoding_state_k (s: State) (k: int) : affine_state_encoding s.
 Proof.
 exact: (
-    subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) k) @
-      subgroup_inj (s:=affine_state_encoding s) (encoding_p_state_encoding s) @
-    subgroup_inj (s:=affine_state_encoding s) (power (power_b_state_encoding s) (-k))
+  (power (power_b_state_encoding s) k) @
+  (encoding_p_state_encoding s) @
+  (power (power_b_state_encoding s) (-k))
 ).
 Defined.
 
@@ -138,10 +266,22 @@ Lemma encoding_state_k_value: forall s k,
   subgroup_inj (s:=(affine_state_encoding s)) (encoding_state_k s k) == encoding (s.1 + (s.2: int) * k).
 Proof.
 move=> s k /=.
-Admitted.
+rewrite /encoding.
+have ->: oppz (s.1 + (s.2: int) * k) = -s.1 + (s.2: int) * (-k) by lia.
+rewrite /encoding_state_k -[s.1 + _]addrC !poweradd !powermul.
+rewrite !morphism_preserve_law/=.
+transitivity (
+  power (power ([:: b]: F2) s.2) k @ (encoding s.1) @ power (power ([:: b]: F2) s.2) (- k)
+); last first.
+  by rewrite !associativity.
+rewrite !morphism_preserve_power.
+rewrite /encoding_p_state_encoding /power_b_state_encoding /=.
+by rewrite /affine_state_encoding_inj/= /law/= !cats0.
+Qed.
 
-Lemma encoding_free: forall k,
+Lemma encoding_free k:
   ~ (encoding k) \insubgroup (generatedSubgroup (fun x => exists k', (k != k') /\ (x == encoding k'))).
+Proof.
 Admitted.
 
 Section IsoOfTransition.
@@ -291,10 +431,7 @@ Lemma encoding_state_k_value_subgroup s k:
   encoding_state_k s k
     ==
   (power (power_b_state_encoding s) k) @ (encoding_p_state_encoding s) @ (power (power_b_state_encoding s) (-k)).
-Proof.
-rewrite /encoding_state_k !morphism_preserve_power.
-rewrite /power_b_state_encoding/encoding_p_state_encoding.
-Admitted.
+Proof. done. Qed.
 
 Lemma iso_of_transition_image_power s1 s2:
   iso_of_transition (s1, s2) (power_b_state_encoding s1) == power_b_state_encoding s2.

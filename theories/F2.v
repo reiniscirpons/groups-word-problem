@@ -1,229 +1,214 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import eqtype seq.
+From mathcomp Require Import eqtype seq fintype.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 
 Import PresentationNotations.
 
-Inductive F2_sigma : Type := a | a_inv | b | b_inv.
+Section InverseAlphabet.
+Variable (Sigma: eqType).
 
-Definition F2_sigma_eq (u v: F2_sigma) := match (u, v) with
-  | (a, a) | (a_inv, a_inv) | (b, b) | (b_inv, b_inv) => true
+Inductive InverseAlphabet {Sigma: eqType} :=
+  | Base: Sigma -> InverseAlphabet
+  | Inverse: Sigma -> InverseAlphabet.
+
+Definition InverseAlphabet_eq {Sigma: eqType} (u v: @InverseAlphabet Sigma) :=
+  match (u, v) with
+  (* TODO(reiniscirpons): how do I use the usual == notation here? *)
+  | (Base a, Base b) => (eq_op a b)
+  | (Inverse a, Inverse b) => (eq_op a b)
   | _ => false
   end.
-Lemma F2_sigma_eqP : eq_axiom F2_sigma_eq.
-Proof. by elim=> [] []; apply: (iffP idP). Qed.
-HB.instance Definition _ := hasDecEq.Build F2_sigma F2_sigma_eqP.
 
-HB.instance Definition _ := isPresentation.Build F2_sigma [::
-    (pair [:: a; a_inv] [::]);
-    (pair [:: b; b_inv] [::]);
-    (pair [:: a_inv; a] [::]);
-    (pair [:: b_inv; b] [::])
-  ].
-
-Notation F2 := (presented F2_sigma).
-
-Definition F2_invl (c: F2_sigma) := match c with
-  | a => a_inv
-  | a_inv => a
-  | b => b_inv
-  | b_inv => b
-  end.
-
-Lemma F2_invl_left : forall c: F2_sigma, `[c; F2_invl c] == `[].
-Proof. move=> c; apply: reduction_rule; by case: c. Qed.
-
-Lemma F2_invl_right : forall c: F2_sigma, `[F2_invl c; c] == `[].
-Proof. move=> c; apply: reduction_rule; by case: c. Qed.
-
-HB.instance Definition _ := hasInvertibleLetters.Build F2_sigma F2_invl F2_invl_left F2_invl_right.
-
-Fixpoint F2_norm (w: F2): F2 := match w with
-  | [::] => [::]
-  | c::w => match c, F2_norm w with
-      | a, a_inv::n => n
-      | b, b_inv::n => n
-      | a_inv, a::n => n
-      | b_inv, b::n => n
-      | c, w => c::w
-      end
-  end.
-
-Lemma F2_norm_e:
-  F2_norm e = e.
-Proof. done. Qed.
-
-Lemma F2_norm_correct w:
-  F2_norm w == w.
+Lemma InverseAlphabet_eqP: eq_axiom (@InverseAlphabet_eq Sigma).
 Proof.
-elim: w => // c w /=.
-case: (F2_norm w) => [eq|c' n eq].
-  transitivity (([:: c]: F2) @ w); last done;
-  by case: c; rewrite -eq.
-transitivity (([:: c]: F2) @ w); last done.
-case: c eq; case: c' => <- //.
-- transitivity (([::a]: F2) @ (([::a_inv]: F2) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
-- transitivity (([::a_inv]: F2) @ (([::a]: F2) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
-- transitivity (([::b]: F2) @ (([::b_inv]: F2) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
-- transitivity (([::b_inv]: F2) @ (([::b]: F2) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
+(* TODO(reiniscirpons): how do I make this proof nicer? *)
+unfold InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
+- move/eqP => H; by rewrite H.
+- case => H; by rewrite H.
+- move/eqP => H; by rewrite H.
+- case => H; by rewrite H.
 Qed.
 
-Definition F2_dec_eq (w w': F2): bool :=
-  (F2_norm w) == (F2_norm w').
+HB.instance Definition _ := hasDecEq.Build InverseAlphabet InverseAlphabet_eqP.
+End InverseAlphabet.
 
-Lemma F2_refl p: F2_dec_eq p p.
-Proof. by rewrite /F2_dec_eq. Qed.
+Section FreeGroup.
 
-Lemma F2_dec_eq_to_eqprop w w':
-  (F2_dec_eq w w') -> (w == w').
-Proof. by move=> eq; rewrite -[w]F2_norm_correct -[w']F2_norm_correct (eqP eq). Qed.
+(* NOTE(reiniscirpons): Only finitely generated free groups are formalized. *)
+Variable (Sigma: finType).
 
-Lemma F2_norm_cat_back w1 w2 w3:
-  F2_norm w1 = F2_norm w2 -> F2_norm (w3 @ w1) = F2_norm (w3 @ w2).
+Definition free_group_relations:
+  seq ((seq (@InverseAlphabet Sigma)) * (seq (@InverseAlphabet Sigma))) :=
+  [seq pair [:: Base a; Inverse a] [::] | a: Sigma] ++
+  [seq pair [:: Inverse a; Base a] [::] | a: Sigma].
+
+HB.instance Definition _ :=
+  isPresentation.Build InverseAlphabet free_group_relations.
+
+Notation FreeGroup := (presented InverseAlphabet).
+
+Definition FreeGroup_invl (c: (@InverseAlphabet Sigma)) :=
+  match c with
+  | Base a => Inverse a
+  | Inverse a => Base a
+  end.
+
+Lemma FreeGroup_invl_left : forall c: InverseAlphabet,
+  `[c; FreeGroup_invl c] == `[].
+Proof.
+(*move=> c; apply: reduction_rule; case: c => a; unfold relations => /=;*)
+(*unfold free_group_relations; rewrite mem_cat; apply /orP.*)
+(*- left. apply/mapP; exists a => [|//].*)
+(*(* TODO (reiniscirpons): ask Assia *)*)
+(*Abort.*)
+Admitted.
+
+Lemma FreeGroup_invl_right : forall c: InverseAlphabet,
+  `[FreeGroup_invl c; c] == `[].
+(* TODO(reiniscirpons): fix *)
+Admitted.
+
+HB.instance Definition _ :=
+  hasInvertibleLetters.Build
+    InverseAlphabet
+    FreeGroup_invl
+    FreeGroup_invl_left
+    FreeGroup_invl_right.
+
+
+(* NOTE(reiniscirpons): in theory we could do this more efficiently with the
+ complete rewriting system *)
+Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
+  | [::] => [::]
+  | c::w => match c, FreeGroup_norm w with
+    | Base a, Inverse b::n => 
+      if a == b then n else (Base a)::(Inverse b)::n
+    | Inverse a, Base b::n =>
+      if a == b then n else (Inverse a)::(Base b)::n
+    | c, w => c::w
+    end
+  end.
+
+
+Lemma FreeGroup_norm_e:
+  FreeGroup_norm e = e.
+Proof. done. Qed.
+
+Lemma FreeGroup_norm_correct w:
+  FreeGroup_norm w == w.
+Proof.
+elim: w => // c w /=.
+case: (FreeGroup_norm w) => [eq|c' n eq].
+  transitivity (([:: c]: FreeGroup) @ w); last done;
+  case: c => s; by rewrite -eq neutral_right.
+transitivity (([:: c]: FreeGroup) @ w); last done.
+case: c eq => s; case: c' => s' <- //;
+case Heq: (eq_op s s').
+- move: Heq; move/eqP => <-. 
+  transitivity (([:: Base s]: FreeGroup) @ (([::Inverse s]: FreeGroup) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+- by transitivity (([:: Base s]: FreeGroup) @ (([::Inverse s']: FreeGroup) @ n)); last done.
+- move: Heq; move/eqP => <-. 
+  transitivity (([:: Inverse s]: FreeGroup) @ (([::Base s]: FreeGroup) @ n)); last done.
+  by rewrite associativity inverse_left neutral_left.
+- by transitivity (([:: Inverse s]: FreeGroup) @ (([::Base s']: FreeGroup) @ n)); last done.
+Qed.
+
+Definition FreeGroup_dec_eq (w w': FreeGroup): bool :=
+  (FreeGroup_norm w) == (FreeGroup_norm w').
+
+Lemma FreeGroup_refl p: FreeGroup_dec_eq p p.
+Proof. by rewrite /FreeGroup_dec_eq. Qed.
+
+Lemma FreeGroup_dec_eq_to_eqprop w w':
+  (FreeGroup_dec_eq w w') -> (w == w').
+Proof. 
+  by move=> eq;
+  rewrite -[w]FreeGroup_norm_correct -[w']FreeGroup_norm_correct (eqP eq).
+Qed.
+
+Lemma FreeGroup_norm_cat_back w1 w2 w3:
+  FreeGroup_norm w1 = FreeGroup_norm w2 ->
+    FreeGroup_norm (w3 @ w1) = FreeGroup_norm (w3 @ w2).
 Proof.
 move=> H.
 elim: w3 => // c w3.
-by case: c => /= ->.
+by case: c => s /= ->.
 Qed.
 
-Lemma F2_norm_rcons_a w:
-  F2_norm (rcons w a) = match rev (F2_norm w) with
-  | a_inv :: n => rev n
-  | n => rcons (rev n) a
+Lemma FreeGroup_norm_rcons w c:
+  FreeGroup_norm (rcons w c) = match c, rev (FreeGroup_norm w) with
+  | Base a, Inverse b :: n =>
+      if a == b then rev n else rcons (rcons (rev n) (Inverse b)) (Base a)
+  | Inverse a, Base b :: n =>
+      if a == b then rev n else rcons (rcons (rev n) (Base b)) (Inverse a)
+  | c, n => rcons (rev n) c
   end.
-Proof.
-elim: w => // c w.
-rewrite rcons_cons /= => ->.
-case: c;
-case: (F2_norm w) => //;
-case=> n;
-rewrite !rev_cons;
-case: (rev n) => // c m /=;
-rewrite -!rcons_cons;
-by case: c; rewrite !rev_rcons // !rcons_cons.
-Qed.
+(* TODO(reiniscirpons): Do this*)
+Admitted.
 
-Lemma F2_norm_rcons_a_inv w:
-  F2_norm (rcons w a_inv) = match rev (F2_norm w) with
-  | a :: n => rev n
-  | n => rcons (rev n) a_inv
-  end.
-Proof.
-elim: w => // c w.
-rewrite rcons_cons /= => ->.
-case: c;
-case: (F2_norm w) => //;
-case=> n;
-rewrite !rev_cons;
-case: (rev n) => // c m /=;
-rewrite -!rcons_cons;
-by case: c; rewrite !rev_rcons // !rcons_cons.
-Qed.
 
-Lemma F2_norm_rcons_b w:
-  F2_norm (rcons w b) = match rev (F2_norm w) with
-  | b_inv :: n => rev n
-  | n => rcons (rev n) b
-  end.
-Proof.
-elim: w => // c w.
-rewrite rcons_cons /= => ->.
-case: c;
-case: (F2_norm w) => //;
-case=> n;
-rewrite !rev_cons;
-case: (rev n) => // c m /=;
-rewrite -!rcons_cons;
-by case: c; rewrite !rev_rcons // !rcons_cons.
-Qed.
-
-Lemma F2_norm_rcons_b_inv w:
-  F2_norm (rcons w b_inv) = match rev (F2_norm w) with
-  | b :: n => rev n
-  | n => rcons (rev n) b_inv
-  end.
-Proof.
-elim: w => // c w.
-rewrite rcons_cons /= => ->.
-case: c;
-case: (F2_norm w) => //;
-case=> n;
-rewrite !rev_cons;
-case: (rev n) => // c m /=;
-rewrite -!rcons_cons;
-by case: c; rewrite !rev_rcons // !rcons_cons.
-Qed.
-
-Lemma F2_norm_rev w:
-  F2_norm (rev w) = rev (F2_norm w).
+Lemma FreeGroup_norm_rev w:
+  FreeGroup_norm (rev w) = rev (FreeGroup_norm w).
 Proof.
 elim: w => // c w /= eq.
-have <-: rev (F2_norm (rev w)) = F2_norm w.
+have <-: rev (FreeGroup_norm (rev w)) = FreeGroup_norm w.
   by rewrite eq revK.
-case: c => {eq}.
-- rewrite rev_cons F2_norm_rcons_a.
-  case: (rev (F2_norm (rev w))) => [//|c l].
-  case: c => //;
-  by rewrite !rev_cons.
-- rewrite rev_cons F2_norm_rcons_a_inv.
-  case: (rev (F2_norm (rev w))) => [//|c l].
-  case: c => //;
-  by rewrite !rev_cons.
-- rewrite rev_cons F2_norm_rcons_b.
-  case: (rev (F2_norm (rev w))) => [//|c l].
-  case: c => //;
-  by rewrite !rev_cons.
-- rewrite rev_cons F2_norm_rcons_b_inv.
-  case: (rev (F2_norm (rev w))) => [//|c l].
-  case: c => //;
-  by rewrite !rev_cons.
+  rewrite rev_cons FreeGroup_norm_rcons; case: c => {eq} a;
+  case: (rev (FreeGroup_norm (rev w))) => [//|c l];
+  case: c => // b.
+- by rewrite !rev_cons.
+- case: (a == b)%B; first done; by rewrite !rev_cons.
+- case: (a == b)%B; first done; by rewrite !rev_cons.
+- by rewrite !rev_cons.
 Qed.
 
-Lemma F2_norm_map_invl w:
-  F2_norm (map invl w) = map invl (F2_norm w).
+Lemma FreeGroup_norm_map_invl w:
+  FreeGroup_norm (map invl w) = map invl (FreeGroup_norm w).
 Proof.
 elim: w => // c w /= ->.
-case: c => /=;
-case: (F2_norm w) => // c' w' /=;
-by case: c'.
+case: c => /= a;
+case: (FreeGroup_norm w) => // c' w' /=;
+case: c' => b //;
+case H: (a == b)%B; move => /=; by rewrite H.
 Qed.
 
-Lemma F2_norm_inv w:
-  F2_norm (inv w) = inv (F2_norm w).
-Proof. by rewrite /inv/=/inv_word/= -F2_norm_rev F2_norm_map_invl. Qed.
+Lemma FreeGroup_norm_inv w:
+  FreeGroup_norm (inv w) = inv (FreeGroup_norm w).
+Proof. by rewrite /inv/=/inv_word/= -FreeGroup_norm_rev FreeGroup_norm_map_invl. Qed.
 
-Lemma F2_norm_cat w1 w2 w3:
-  F2_norm w1 = F2_norm w2 -> F2_norm (w1 @ w3) = F2_norm (w2 @ w3).
+Lemma FreeGroup_norm_cat w1 w2 w3:
+  FreeGroup_norm w1 = FreeGroup_norm w2 -> FreeGroup_norm (w1 @ w3) = FreeGroup_norm (w2 @ w3).
 Proof.
 rewrite -[w1 @ w3]revK -[w2 @ w3]revK.
-rewrite ![F2_norm (rev (rev _))]F2_norm_rev => eq.
-have -> //: F2_norm (rev (w1 @ w3)) = F2_norm (rev (w2 @ w3)).
-rewrite /law/= !rev_cat; apply /F2_norm_cat_back.
-by rewrite !F2_norm_rev eq.
+rewrite ![FreeGroup_norm (rev (rev _))]FreeGroup_norm_rev => eq.
+have -> //: FreeGroup_norm (rev (w1 @ w3)) = FreeGroup_norm (rev (w2 @ w3)).
+rewrite /law/= !rev_cat; apply /FreeGroup_norm_cat_back.
+by rewrite !FreeGroup_norm_rev eq.
 Qed.
 
-Lemma F2_norm_unique w w':
-  w == w' -> F2_norm w = F2_norm w'.
+Lemma FreeGroup_norm_unique w w':
+  w == w' -> FreeGroup_norm w = FreeGroup_norm w'.
 Proof.
 elim=> [[r1 r2] w1 w2|//|? ? _ -> //|? ? ? _ -> _ -> //].
-rewrite /relations/= !inE => /orP [/eqP [-> ->]|/orP [/eqP [-> ->]|/orP [/eqP [-> ->]|/eqP [-> ->]]]];
-exact /F2_norm_cat /F2_norm_cat_back.
+rewrite /relations/=; unfold free_group_relations;
+rewrite mem_cat => /orP []; move/mapP => [a Henum [-> ->]];
+apply /FreeGroup_norm_cat /FreeGroup_norm_cat_back => /=;
+by rewrite eq_refl.
 Qed.
 
-Lemma eqprop_to_F2_dec_eq w w':
-  (w == w') -> (F2_dec_eq w w').
-Proof. by move=> eq; exact /eqP /F2_norm_unique. Qed.
+Lemma eqprop_to_FreeGroup_dec_eq w w':
+  (w == w') -> (FreeGroup_dec_eq w w').
+Proof. by move=> eq; exact /eqP /FreeGroup_norm_unique. Qed.
 
-Lemma F2_dec_eq_reflect w w':
-  reflect (w == w') (F2_dec_eq w w').
+Lemma FreeGroup_dec_eq_reflect w w':
+  reflect (w == w') (FreeGroup_dec_eq w w').
 Proof.
 apply /(iffP idP) => eq.
-- exact: F2_dec_eq_to_eqprop.
-- exact: eqprop_to_F2_dec_eq.
+- exact: FreeGroup_dec_eq_to_eqprop.
+- exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
+
+End FreeGroup.

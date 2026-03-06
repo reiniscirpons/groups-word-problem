@@ -102,24 +102,6 @@ Proof. by rewrite /affine_state_encoding_inj !prod_affine_state_encoding_inj_F2_
 
 HB.instance Definition _ := isMonoidMorphism.Build _ _ affine_state_encoding_inj affine_state_encoding_inj_preserve_equiv affine_state_encoding_inj_preserve_e affine_state_encoding_inj_preserve_law.
 
-(* TODO: move to EquivalenceAlgebra.v *)
-Lemma prod_inv {G: group} (l: seq G):
-  inv (prod l) == prod (map inv (rev l)).
-Proof.
-elim: l => [/=|c l].
-  by rewrite inv_e.
-rewrite -cat1s rev_cat map_cat !prod_cat inverse_law => ->.
-by rewrite /= !neutral_right.
-Qed.
-
-Lemma prod_rcons (l: seq F2) (c: F2):
-  prod (rcons l c) == (prod l) @ c.
-Proof.
-elim: l => /= [|a l ->].
-  by rewrite neutral_left neutral_right.
-by rewrite associativity.
-Qed.
-
 Lemma affine_state_encoding_inj_inv (c: F2_sigma):
   (affine_state_encoding_inj_letter \o F2_invl) c ==
   (inv \o affine_state_encoding_inj_letter) c.

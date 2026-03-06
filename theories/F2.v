@@ -9,11 +9,12 @@ Import PresentationNotations.
 Section InverseAlphabet.
 Variable (Sigma: eqType).
 
-Inductive InverseAlphabet {Sigma: eqType} :=
-  | Base: Sigma -> InverseAlphabet
-  | Inverse: Sigma -> InverseAlphabet.
+Inductive InverseAlphabet (Sigma: eqType) :=
+  | Base: Sigma -> InverseAlphabet Sigma
+  | Inverse: Sigma -> InverseAlphabet Sigma.
 
-Definition InverseAlphabet_eq {Sigma: eqType} (u v: @InverseAlphabet Sigma) :=
+
+Definition InverseAlphabet_eq {Sigma: eqType} (u v: InverseAlphabet Sigma) :=
   match (u, v) with
   (* TODO(reiniscirpons): how do I use the usual == notation here? *)
   | (Base a, Base b) => (eq_op a b)
@@ -31,8 +32,10 @@ unfold InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
 - case => H; by rewrite H.
 Qed.
 
-HB.instance Definition _ := hasDecEq.Build InverseAlphabet InverseAlphabet_eqP.
+HB.instance Definition _ := hasDecEq.Build (InverseAlphabet Sigma) InverseAlphabet_eqP.
 End InverseAlphabet.
+Arguments Base {_}.
+Arguments Inverse {_}.
 
 Section FreeGroup.
 
@@ -40,22 +43,22 @@ Section FreeGroup.
 Variable (Sigma: finType).
 
 Definition free_group_relations:
-  seq ((seq (@InverseAlphabet Sigma)) * (seq (@InverseAlphabet Sigma))) :=
+  seq ((seq (InverseAlphabet Sigma)) * (seq (InverseAlphabet Sigma))) :=
   [seq pair [:: Base a; Inverse a] [::] | a: Sigma] ++
   [seq pair [:: Inverse a; Base a] [::] | a: Sigma].
 
 HB.instance Definition _ :=
-  isPresentation.Build InverseAlphabet free_group_relations.
+  isPresentation.Build (InverseAlphabet Sigma) free_group_relations.
 
-Notation FreeGroup := (presented InverseAlphabet).
+Definition FreeGroup := (presented (InverseAlphabet Sigma)).
 
-Definition FreeGroup_invl (c: (@InverseAlphabet Sigma)) :=
+Definition FreeGroup_invl (c: InverseAlphabet Sigma) :=
   match c with
   | Base a => Inverse a
   | Inverse a => Base a
   end.
 
-Lemma FreeGroup_invl_left : forall c: InverseAlphabet,
+Lemma FreeGroup_invl_left : forall c: InverseAlphabet Sigma,
   `[c; FreeGroup_invl c] == `[].
 Proof.
 (*move=> c; apply: reduction_rule; case: c => a; unfold relations => /=;*)
@@ -65,14 +68,14 @@ Proof.
 (*Abort.*)
 Admitted.
 
-Lemma FreeGroup_invl_right : forall c: InverseAlphabet,
+Lemma FreeGroup_invl_right : forall c: InverseAlphabet Sigma,
   `[FreeGroup_invl c; c] == `[].
 (* TODO(reiniscirpons): fix *)
 Admitted.
 
 HB.instance Definition _ :=
   hasInvertibleLetters.Build
-    InverseAlphabet
+    (InverseAlphabet Sigma)
     FreeGroup_invl
     FreeGroup_invl_left
     FreeGroup_invl_right.
@@ -210,5 +213,46 @@ apply /(iffP idP) => eq.
 - exact: FreeGroup_dec_eq_to_eqprop.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
-
 End FreeGroup.
+
+Section FreeGroupUniversal.
+
+Definition FreeGroup_alphabet_extension
+  {Sigma: finType} {G: group} (f: Sigma -> G): InverseAlphabet Sigma -> G :=
+    fun c =>
+      match c with
+      | Base a => f a
+      | Inverse a => inv (f a)
+      end.
+
+Lemma FreeGroup_alphabet_extension_preserves_inv_on_sigma:
+  forall (Sigma: finType) (G: group)
+(* TODO(reiniscirpons): Why cant I just say a: InverseAlphabet Sigma ?*)
+         (f: Sigma -> G) (a: sigma (InverseAlphabet Sigma)),
+    inv (FreeGroup_alphabet_extension f a) == 
+    (FreeGroup_alphabet_extension f) (invl a).
+Proof.
+  move => Sigma G f; case => [//|a].
+  - by apply inv_involutive.
+Qed.
+
+Definition FreeGroup_universal_extension
+  (* TODO(reiniscirpons): Why can't I type it as a morphism? *)
+  {Sigma: finType} {G: group} (f: Sigma -> G): (FreeGroup Sigma) -> G :=
+      extension (FreeGroup_alphabet_extension f).
+
+Lemma FreeGroup_universal: forall {Sigma: finType} {G: group} (f: Sigma -> G),
+  exists (varphi: morphism (FreeGroup Sigma) G), 
+    forall a: Sigma, f a == varphi `[Base a].
+(*Proof.*)
+(*  move => G f.*)
+(*  exists (FreeGroup_universal_extension f).*)
+(*  move => a.*)
+(*  by [].*)
+(*  (* TODO(reiniscirpons): Why are we not done by computation?*) *)
+(*Qed.*)
+Admitted.
+End FreeGroupUniversal.
+
+Notation "\hat f" := (FreeGroup_universal_extension f) (at level 5). 
+

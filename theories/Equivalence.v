@@ -1,6 +1,8 @@
 From HB Require Import structures.
 Require Import ssreflect RelationClasses.
 
+(* TODO(reiniscirpons): How does this differ from eqType? *)
+
 (* Types with an equality, noted `==`.
    
    All types have an equality in Rocq: `eq`.

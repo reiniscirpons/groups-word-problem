@@ -156,12 +156,100 @@ End PresentationNotations.
 
 Import PresentationNotations.
 
+(** In this section we define the notion of a natural extension of a function
+  * to a monoid homomorphism, under certain conditions. *)
+Section MonoidNaturalExtension.
+
+(* TODO(reiniscirpons): Ask Assia if this is a sensible way to do
+ * this *)
+(* NOTE(reiniscirpons): Probably not sensible. Might be better to add another
+ * mixin which requires that relations are preserved and register it as
+   another builder? *)
+Variable P: presentationType.
+Variable M: monoid.
+Variable f: sigma P -> M.
+
+Definition extension: presented P -> M :=
+    fun l => prod (map f l).
+
+Lemma extension_universality:
+  forall (varphi: monoidMorphism (presented P) M),
+    (forall a: sigma P, varphi `[a] == f a) -> 
+    (forall w: presented P, 
+      varphi w == extension w).
+Proof.
+  move => varphi Heq; unfold extension; elim => [|a w' IH] /=.
+  - exact morphism_preserve_e.
+  - have H: a :: w' = `[a] @ w' => [//|];
+    by rewrite H morphism_preserve_law IH Heq.
+Qed.
+
+Lemma extension_preserve_e: extension e == e.
+Proof. by []. Qed.
+
+Lemma extension_preserve_law: forall (x y: presented P),
+  extension (x @ y) == (extension x) @ (extension y).
+Proof.
+  move => x y; unfold extension; by rewrite -prod_cat map_cat.
+Qed.
+
+
+(* NOTE(reiniscirpons): Need to assume relations are preserved, otherwise
+   the extension is not a monoid morphism. *)
+Variable preserves_relations: forall (u v: presented P),
+  (u, v) \in relations -> extension u == extension v.
+
+Lemma extension_preserve_equiv: forall (x y: presented P),
+  x == y -> extension x == extension y.
+Proof.
+  move => x y; elim => [[u v] p s |//||] /=.
+  - move/preserves_relations;
+    unfold extension => H;
+    by rewrite !map_cat !prod_cat H. 
+  - move => u v _ H; by apply symm.
+  - move => u v w _ H1 _ H2; by apply trans with (extension v).
+Qed.
+
+HB.instance Definition extension_isMonoidMorphism := 
+  isMonoidMorphism.Build
+    (presented P)
+    M
+    extension
+    extension_preserve_equiv
+    extension_preserve_e
+    extension_preserve_law.
+
+End MonoidNaturalExtension.
+
+Arguments extension {_ _}.
+
+Theorem monoidVonDycksTheorem:
+  forall (P: presentationType) (M: monoid) (f: sigma P -> M),
+    (exists (varphi: monoidMorphism (presented P) M),
+      (forall a: sigma P, varphi `[a] == f a)) <->
+      (forall (u v: presented P), 
+        (u, v) \in relations -> 
+          (extension f) u ==
+          (extension f) v).
+(*Proof.*)
+(*  split.*)
+(*  - move => [varphi Hsigma] u v; move/(reduction `[] `[]);*)
+(*    rewrite !neutral_left !neutral_right => Huv.*)
+(*    rewrite -!(extension_universality _ _ _ varphi) => [|//|//].*)
+(*    by apply morphism_preserve_equiv.*)
+(*  - move => preserves_relations; exists (extension f) => a.*)
+(*    by [].*)
+(*  (* TODO: Why are we not done? I.e. how come we cant just apply monoid_extionsion f? *)*)
+(*Qed.*)
+Admitted.
+
 HB.mixin Record hasInvertibleLetters (P: presentationType) := {
   invl : (sigma P) -> (sigma P);
   invl_left : forall c, `[c] @ `[invl c] == e;
   invl_right : forall c, `[invl c] @ `[c] == e;
 }.
 #[short(type="invertiblePresentationType")]
+(* TODO(reiniscirpons): Rename to GroupPresentation? *)
 HB.structure Definition InvertiblePresentation := { P & hasInvertibleLetters P }.
 
 Section InvertiblePresentedGroup.
@@ -218,3 +306,34 @@ Qed.
 End Cancelation.
 Arguments cancel_left {_}.
 Arguments cancel_right {_}.
+
+Section GroupNaturalExtension.
+
+(* TODO(reiniscirpons): Ask Assia if this is a sensible way to do this *)
+Variable P: invertiblePresentationType.
+Variable G: group.
+Variable f: sigma P -> G.
+
+(* NOTE(reiniscirpons): Need to assume involution is preserved on
+   the generating set, otherwise extension f is not a group homomorphism. *)
+Variable preserves_inv_on_sigma: forall (a: sigma P),
+  inv (f a) == f (invl a). 
+Lemma extension_preserve_inv: forall (x: presented P),
+  inv (extension f x) == extension f (inv x).
+(*Proof.*)
+(*  unfold extension; elim => [|a w' IH] /=.*)
+(*  - by exact inv_e.*)
+(*  - rewrite inverse_law preserves_inv_on_sigma IH *)
+(*            -prod_rcons -map_rcons.*)
+(*    (* TODO(reiniscirpons): Why do we get type errors here? *)*)
+(*    have H: rcons (inv w') (invl a) = inv (a :: w').*)
+(*Qed.*)
+Admitted.
+
+HB.instance Definition extension_isInvMorphism := 
+  isInvMorphism.Build
+    (presented P)
+    G
+    (extension f)
+    extension_preserve_inv.
+End GroupNaturalExtension.

@@ -1,5 +1,5 @@
 From HB Require Import structures.
-Require Import ssreflect RelationClasses.
+Require Import ssreflect RelationClasses Setoid Morphisms.
 
 (* TODO(reiniscirpons): How does this differ from eqType? *)
 
@@ -42,3 +42,18 @@ Existing Instance EqReflexivity.
 Existing Instance EqSymmetry.
 Existing Instance EqTransitivity.
 Existing Instance EqEquivalence.
+
+(* TODO(reiniscirpons): Is this already part of the library? *)
+HB.mixin Record isSetoidMorphism (S T: equivType) (f: S -> T) := {
+  morphism_preserve_equiv: forall x y, x == y -> f x == f y;
+}.
+#[short(type="setoidMorphism")]
+HB.structure Definition SetoidMorphism (G H: equivType) := { f of isSetoidMorphism G H f }.
+
+Section ProperMorphism.
+Variable S T: equivType.
+Variable f: setoidMorphism S T.
+
+Global Instance : Proper (eq ==> eq) f.
+Proof. exact: morphism_preserve_equiv. Qed.
+End ProperMorphism.

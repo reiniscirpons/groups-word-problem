@@ -51,31 +51,29 @@ by rewrite associativity.
 Qed.
 
 HB.mixin Record isMonoidMorphism (G H: monoid) (f: G -> H) := {
-  morphism_preserve_equiv: forall x y, x == y -> f x == f y;
   morphism_preserve_e: f e == e;
   morphism_preserve_law: forall x y, f (x @ y) == (f x) @ (f y);
 }.
 #[short(type="monoidMorphism")]
-HB.structure Definition MonoidMorphism (G H: monoid) := { f of isMonoidMorphism G H f }.
+HB.structure Definition MonoidMorphism (G H: monoid) :=
+  { f of isSetoidMorphism G H f 
+       & isMonoidMorphism G H f}.
 
-Section ProperMorphism.
-Variable G H: monoid.
-Variable f: monoidMorphism G H.
-
-Global Instance : Proper (eq ==> eq) f.
-Proof. exact: morphism_preserve_equiv. Qed.
-
-End ProperMorphism.
 
 HB.mixin Record isInjective (A B: equivType) (f: A -> B) := {
   injectivity_property: forall x y, f x == f y -> x == y;
 }.
 
 #[short(type="injectiveFunType")]
-HB.structure Definition Injective (A B: equivType) := { f of isInjective A B f }.
+HB.structure Definition Injective (A B: equivType) :=
+  { f of isInjective A B f
+       & isSetoidMorphism A B f}.
 
 #[short(type="injectiveMonoidMorphism")]
-HB.structure Definition InjectiveMonoidMorphism (G H: monoid) := { f of isInjective G H f & isMonoidMorphism G H f }.
+HB.structure Definition InjectiveMonoidMorphism (G H: monoid) :=
+  { f of isInjective G H f
+       & isSetoidMorphism G H f
+       & isMonoidMorphism G H f }.
 
 HB.mixin Record isGroup G of hasEq G & isMonoid G := {
   inv : G -> G;
@@ -133,13 +131,19 @@ HB.mixin Record isInvMorphism (G H: group) (f: G -> H) := {
   morphism_preserve_inv: forall x, inv (f x) == f (inv x);
 }.
 #[short(type="morphism")]
-HB.structure Definition Morphism (G H: group) := { f of isMonoidMorphism G H f & isInvMorphism G H f }.
+HB.structure Definition Morphism (G H: group) := 
+  { f of isSetoidMorphism G H f
+       & isMonoidMorphism G H f 
+       & isInvMorphism G H f }.
 
 (** Every monoid morphism of a group preserves inverses.
  *)
-Lemma isMonoidMorphismImpliesIsInvMorphism: forall (G H: group) f, isMonoidMorphism G H f -> isInvMorphism G H f.
+Lemma isMonoidMorphismImpliesIsInvMorphism: forall (G H: group) f,
+  isSetoidMorphism G H f -> 
+  isMonoidMorphism G H f -> 
+  isInvMorphism G H f.
 Proof.
-  move => G H f [Heq He Hlaw]; split => x.
+  move => G H f [Heq] [He Hlaw]; split => x.
   have H1: (f x) @ (f (inv x)) == e.
   - rewrite -Hlaw -He; apply Heq; by rewrite inverse_left.
   - by rewrite -(neutral_left (f (inv x))) -(inverse_right (f x))
@@ -147,7 +151,11 @@ Proof.
 Qed.
 
 #[short(type="injectiveMorphism")]
-HB.structure Definition InjectiveMorphism (G H: group) := { f of isInjective G H f & isInvMorphism G H f & isMonoidMorphism G H f }.
+HB.structure Definition InjectiveMorphism (G H: group) :=
+  { f of isInjective G H f
+       & isInvMorphism G H f
+       & isSetoidMorphism G H f
+       & isMonoidMorphism G H f }.
 
 Definition power {G: group} (w: G) (k: int) : G :=
   match k with
@@ -523,13 +531,22 @@ Proof. move=> x; by rewrite /subgroupby_inv/=/law/=/subgroupby_law/=/eq/=/subgro
 
 HB.instance Definition _ := isGroup.Build subgroup_by subgroupby_inv subgroupby_inverse_law subgroupby_inverse_left subgroupby_inverse_right.
 
+Lemma subgroupby_inj_preserve_equiv: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
+Proof. done. Qed.
+
+HB.instance Definition _ := 
+  isSetoidMorphism.Build _ _ 
+    subgroupby_inj 
+    subgroupby_inj_preserve_equiv.
+
 Lemma subgroupby_inj_injectivity: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
 Proof. done. Qed.
 
-HB.instance Definition _ := isInjective.Build _ _ subgroupby_inj subgroupby_inj_injectivity.
+HB.instance Definition _ := 
+  isInjective.Build _ _ 
+    subgroupby_inj 
+    subgroupby_inj_injectivity.
 
-Lemma subgroupby_inj_preserve_equiv: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
-Proof. done. Qed.
 Lemma subgroupby_inj_preserve_e: subgroupby_inj e == e.
 Proof. done. Qed.
 Lemma subgroupby_inj_preserve_law: forall x y, subgroupby_inj (law x y) == law (subgroupby_inj x) (subgroupby_inj y).
@@ -537,10 +554,18 @@ Proof. done. Qed.
 Lemma subgroupby_inj_preserve_inv: forall x, inv (subgroupby_inj x) == subgroupby_inj (inv x).
 Proof. done. Qed.
 
-HB.instance Definition _ := isMonoidMorphism.Build _ _ subgroupby_inj subgroupby_inj_preserve_equiv subgroupby_inj_preserve_e subgroupby_inj_preserve_law.
-HB.instance Definition _ := isInvMorphism.Build _ _ subgroupby_inj subgroupby_inj_preserve_inv.
+HB.instance Definition _ := 
+  isMonoidMorphism.Build _ _
+    subgroupby_inj 
+    subgroupby_inj_preserve_e 
+    subgroupby_inj_preserve_law.
+HB.instance Definition _ :=
+  isInvMorphism.Build _ _
+    subgroupby_inj
+    subgroupby_inj_preserve_inv.
 
-HB.instance Definition _ := isSubgroup.Build G subgroup_by subgroupby_inj.
+HB.instance Definition _ :=
+  isSubgroup.Build G subgroup_by subgroupby_inj.
 
 End SubgroupByCharacterization.
 Arguments subgroup_by {_}.
@@ -577,8 +602,19 @@ Proof. done. Qed.
 Lemma sm_preserve_inv: forall x, singleton_morphism (inv x) == inv (singleton_morphism x).
 Proof. done. Qed.
 
-HB.instance Definition _ := isMonoidMorphism.Build singleton_subgroup singleton_subgroup singleton_morphism sm_preserve_equiv sm_preserve_e sm_preserve_law.
-HB.instance Definition _ := isInvMorphism.Build singleton_subgroup singleton_subgroup singleton_morphism sm_preserve_inv.
+HB.instance Definition _ :=
+  isSetoidMorphism.Build singleton_subgroup singleton_subgroup
+    singleton_morphism
+    sm_preserve_equiv.
+HB.instance Definition _ :=
+  isMonoidMorphism.Build singleton_subgroup singleton_subgroup
+    singleton_morphism
+    sm_preserve_e
+    sm_preserve_law.
+HB.instance Definition _ :=
+  isInvMorphism.Build singleton_subgroup singleton_subgroup
+    singleton_morphism
+    sm_preserve_inv.
 
 End SingletonSubgroup.
 

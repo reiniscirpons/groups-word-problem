@@ -330,13 +330,25 @@ Qed.
 Definition FreeGroup_universal_extension: (FreeGroup Sigma) -> G :=
       extension FreeGroup_alphabet_extension.
 
-(* TODO(reiniscirpons): Why does this give some crazy type error? *)
-(*Lemma FreeGroup_alphabet_extension_preserve_relations:*)
-(*  forall u v,*)
-(*    (u, v) \in relations (FreeGroup_presentation Sigma) ->*)
-(*    FreeGroup_alphabet_extension u == FreeGroup_universal_extension v.*)
-(*Proof.*)
-(*Qed.*)
+Lemma FreeGroup_alphabet_extension_preserve_relations:
+  forall u v,
+    (u, v) \in relations (FreeGroup_presentation Sigma) ->
+    FreeGroup_universal_extension u == FreeGroup_universal_extension v.
+Proof.
+  move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]];
+  unfold FreeGroup_universal_extension;
+  unfold extension; unfold FreeGroup_alphabet_extension;
+  move => /=; rewrite associativity neutral_right.
+  - by rewrite inverse_left; reflexivity.
+  - by rewrite inverse_right; reflexivity.
+Qed.
+
+HB.instance Definition _ := isRelationPreservingMorphism.Build
+  (FreeGroup_presentation Sigma) G
+  FreeGroup_universal_extension
+  FreeGroup_alphabet_extension_preserve_relations
+  (extension_preserve_e _ _ FreeGroup_alphabet_extension)
+  (extension_preserve_law _ _ FreeGroup_alphabet_extension).
 
 (* TODO(reiniscirpons): Is it possible to make Rocq treat sigma
   (FreeGroup_presentation Sigma) and InverseAlphabet Sigma as the same? *)

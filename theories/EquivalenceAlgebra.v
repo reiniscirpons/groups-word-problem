@@ -588,3 +588,38 @@ HB.instance Definition _ :=
 
 End SingletonSubgroup.
 
+(* TODO(reiniscirpons): Do we need this? *)
+(* Intersection of subgroups *)
+Section SubgroupIntersection.
+Variable G: group.
+Variable (H1 H2: subgroup G).
+
+Record is_in_intersection (x: G) : Prop := {
+  intersection_in_left: x \insubgroup H1;
+  intersection_in_right: x \insubgroup H2;
+}.
+
+Definition iii_P_law : forall (x y: G), is_in_intersection x -> is_in_intersection y -> is_in_intersection (x @ y).
+Proof.
+move=> x y [[x1 x1_eq] [x2 x2_eq]] [[y1 y1_eq] [y2 y2_eq]]; eexists.
+- by exists (x1 @ y1); rewrite morphism_preserve_law -x1_eq -y1_eq.
+- by exists (x2 @ y2); rewrite morphism_preserve_law -x2_eq -y2_eq.
+Qed.
+
+Definition iii_P_neutral : is_in_intersection e.
+Proof. by eexists; exists e; rewrite morphism_preserve_e. Qed.
+
+Definition iii_P_inv : forall (x: G), is_in_intersection x -> is_in_intersection (inv x).
+Proof.
+move=> x [[x1 x1_eq] [x2 x2_eq]]; eexists.
+- by exists (inv x1); rewrite -morphism_preserve_inv -x1_eq.
+- by exists (inv x2); rewrite -morphism_preserve_inv -x2_eq.
+Qed.
+
+HB.instance Definition _ := isSubgroupCharacterizer.Build G is_in_intersection iii_P_law iii_P_neutral iii_P_inv.
+
+(* we could also prove that H1 /\ H2 is a subgroup of H1 and H2 *)
+
+Definition intersection := subgroup_by is_in_intersection.
+
+End SubgroupIntersection.

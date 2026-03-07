@@ -364,6 +364,6 @@ HB.instance Definition _ := isRelationPreservingMorphism.Build
 (*Qed.*)
 (*Admitted.*)
 End FreeGroupUniversal.
-
+Arguments FreeGroup_universal_extension {_ _}.
 Notation "\hat f" := (FreeGroup_universal_extension f) (at level 5). 
 

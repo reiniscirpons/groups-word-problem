@@ -2,38 +2,35 @@ From HB Require Import structures.
 Require Import RelationClasses.
 Require Import Setoid Morphisms.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import seq eqtype.
+From mathcomp Require Import seq eqtype fintype.
 
 From GWP Require Import Equivalence EquivalenceAlgebra.
+
 
 (* a rewriting rule u -> v *)
 Definition relation (Sigma: Type) := ((seq Sigma) * (seq Sigma)) % type.
 
-HB.mixin Record isPresentation (Sigma: Type) := {
-  (* TODO: it would be cool to do as follow instead of the `sigma` hack below.
-     But HB doesn't implement it. *)
-  (* sigma := Sigma; *)
-  relations: seq (relation Sigma);
+(* NOTE(reiniscirpons): Instead of using hierarchy builder to define a
+   presentation, we instead define it using a Structure like its done in
+   MonoidPresentation. I think this is mathematically cleaner, and we 
+   can now have the same alphabet used for different presentations. *)
+(* NOTE(reiniscirpons): We only consider finitely presented monoids
+   and groups, so the finType restriction is ok. *)
+Structure presentation := Pres {
+  sigma: finType;
+  relations: seq (relation sigma);
 }.
-
-#[short(type="presentationType")]
-HB.structure Definition Presentation := { Sigma of hasDecEq Sigma & isPresentation Sigma }.
-
-(* The alphabet of a `P: presentationType` is `P` itself.
-   Quantifying over `P` is conceptually a bit weird because it doesn't match the mathematical intuition.
-   To make things a little simply presented, we defined `sigma P` as just `P`. *)
-Definition sigma (P: presentationType) : Type := P.
 
 Section WordProblem.
 Local Infix "@" := cat (at level 50).
 
-Variable P: presentationType.
+Variable P: presentation.
 
 Let word := (seq (sigma P)).
 Let relation := (relation (sigma P)).
 
 (* Whether a rewriting relation `r` is a part of the presentation. *)
-Let isRelationOf (r: relation) := r \in relations.
+Let isRelationOf (r: relation) := r \in relations P.
 
 Let initialWord (r: relation) : word := fst r.
 Let finalWord (r: relation) : word := snd r.
@@ -55,16 +52,17 @@ End WordProblem.
 
 (* `presented P` is the structure associated to the presentation `P := (Sigma; R)`.
    ie. `presented P` is Sigma^* quotiented by the smallest equivalence relation compatible with R *)
-Definition presented P := (list (sigma P)).
+Definition presented P := (seq (sigma P)).
 
+(* TODO(reiniscirpons): Do we need this still? *)
 Section InstancesFromList.
-Variable P: presentationType.
+Variable P: presentation.
 HB.instance Definition _ := Equality.copy (presented P) (list (sigma P)).
 End InstancesFromList.
 
 (* In a presented structure, equality is given as whether two words are derived. *)
 Section PresentedEq.
-Variable P: presentationType.
+Variable P: presentation.
 
 (* Note: a Notation must be used here otherwise HB declares the mixin on the constant M. *)
 Local Notation M := (presented P).
@@ -85,12 +83,12 @@ End PresentedEq.
 (* All presented structures have a monoid structure *)
 Section PresentedMonoid.
 
-Variable P: presentationType.
+Variable P: presentation.
 
 Local Notation M := (presented P).
 
-Let concat := @cat P.
-Let epsilon : seq P := nil.
+Let concat := @cat (sigma P).
+Let epsilon : seq (sigma P) := nil.
 
 Infix ".@" := (concat: M -> M -> M) (at level 50).
 
@@ -130,14 +128,14 @@ Qed.
 HB.instance Definition _ := isMonoid.Build M concat epsilon associativity neutral_left neutral_right congruent_left congruent_right.
 End PresentedMonoid.
 
-Lemma reduction {P: presentationType}:
+Lemma reduction {P: presentation}:
   forall (a b u v: presented P),
-  (u, v) \in relations -> a @ u @ b == a @ v @ b.
+  (u, v) \in relations P -> a @ u @ b == a @ v @ b.
 Proof. by move=> a b u v H; apply: (Derivation_reduction _ (u, v)); done. Qed.
 
-Lemma reduction_rule {P: presentationType}:
+Lemma reduction_rule {P: presentation}:
   forall (u v: presented P),
-  (u, v) \in relations -> u == v.
+  (u, v) \in relations P -> u == v.
 Proof.
 move=> u v Hin.
 transitivity (e @ u @ e).
@@ -160,19 +158,19 @@ Import PresentationNotations.
    monoid morphism out of presented monoid. *)
 (* TODO(reiniscirpons): How can reuse the IsMonoidMorphism axioms here? *)
 HB.factory Record isRelationPreservingMorphism
-  (P: presentationType) (B: monoid) (f: presented P -> B)
+  (P: presentation) (B: monoid) (f: presented P -> B)
     (* TODO(reiniscirpons): Why does this caause a bug?*)
     (* & isMonoidMorphism (presented P) B f*)
     := {
     morphism_preserve_relations: 
-      forall u v, (u, v) \in relations -> f u == f v;
+      forall u v, (u, v) \in relations P -> f u == f v;
     morphism_preserve_e:
       f e == e;
     morphism_preserve_law:
       forall x y, f (x @ y) == (f x) @ (f y);
 }.
 
-HB.builders Context (P: presentationType) (M: monoid) f of 
+HB.builders Context (P: presentation) (M: monoid) f of 
   isRelationPreservingMorphism P M f.
 
   Fact f_preserve_equiv: forall x y, x == y -> f x == f y.
@@ -193,18 +191,15 @@ HB.end.
 
 Section ExtensionToMonoidMorphism.
 
-Variable P: presentationType.
+Variable P: presentation.
 Variable M: monoid.
-(* NOTE(reiniscirpons):
-   Don't need sigma P here because of how presentationType is defined
-*)
-Variable f: P -> M.
+Variable f: sigma P -> M.
 
 Definition extension: presented P -> M :=
   fun l => prod (map f l).
 
 Lemma extension_universality:
-  forall (varphi: monoidMorphism (presented P) M),
+  forall (varphi: morphism (presented P) M),
     (forall a: sigma P, varphi `[a] == f a) -> 
     (forall w: presented P, 
       varphi w == extension w).
@@ -236,8 +231,8 @@ HB.instance Definition _ :=
 End ExtensionToMonoidMorphism.
 Arguments extension {_ _}.
 
-HB.mixin Record hasInvertibleLetters (P: presentationType) := {
-  invl : (sigma P) -> (sigma P);
+HB.mixin Record hasInvertibleLetters (P: presentation) := {
+  invl : sigma P -> sigma P;
   invl_left : forall c, `[c] @ `[invl c] == e;
   invl_right : forall c, `[invl c] @ `[c] == e;
 }.

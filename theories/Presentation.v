@@ -145,6 +145,7 @@ transitivity (e @ v @ e); last first.
 exact: (reduction e e).
 Qed.
 
+
 Module PresentationNotations.
 Notation "`[ ]_ P" := ([::] : presented P)
   (at level 10, format "`[  ]_ P").
@@ -156,6 +157,20 @@ Notation "`[ x ; y ; .. ; z ]_ P" :=
 End PresentationNotations.
 
 Import PresentationNotations.
+
+(* NOTE(reiniscirpons): Declaring cat and cons to multiplication
+   law conversions to simplify future lemmas. *)
+Lemma cat_law: forall P (x y: presented P),
+    (x ++ y: presented P) = x @ y.
+Proof. by []. Qed.
+
+Lemma cons_law: forall P (a: sigma P) (x: presented P),
+    (a :: x: presented P) = `[a]_P @ x.
+Proof. by []. Qed.
+
+Lemma rcons_law: forall P (a: sigma P) (x: presented P),
+    (rcons x a: presented P) = x @ `[a]_P.
+Proof. move => P a; by elim => [//|b w /= ->]. Qed.
 
 (* Show that preserving relations and multiplication is enough to define
    monoid morphism out of presented monoid. *)
@@ -236,11 +251,18 @@ Arguments extension {_ _}.
 
 HB.mixin Record hasInvertibleLetters (P: presentation) := {
   invl : sigma P -> sigma P;
+  invlK : forall c, invl (invl c) = c;
   invl_left : forall c, `[c]_P @ `[invl c]_P == e;
   invl_right : forall c, `[invl c]_P @ `[c]_P == e;
 }.
 #[short(type="invertiblePresentationType")]
 HB.structure Definition InvertiblePresentation := { P & hasInvertibleLetters P }.
+
+Lemma invl_inj: forall (P: invertiblePresentationType) (x y: sigma P),
+  invl x = invl y <-> x = y.
+Proof.
+  split => [H|-> //]; by rewrite -(invlK x) -(invlK y) H.
+Qed.
 
 Section InvertiblePresentedGroup.
 

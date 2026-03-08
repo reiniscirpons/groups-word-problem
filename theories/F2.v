@@ -1,6 +1,7 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import eqtype seq fintype choice ssrnat.
+Require Import Setoid Morphisms.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 
@@ -142,6 +143,10 @@ Definition FreeGroup_invl (c: sigma FGP): sigma FGP :=
   | Inverse a => Base a
   end.
 
+Lemma FreeGroup_invlK : forall c: sigma FGP,
+  FreeGroup_invl (FreeGroup_invl c) = c.
+Proof. by case. Qed.
+
 Lemma FreeGroup_invl_left : forall c: sigma FGP,
   `[c; FreeGroup_invl c]_FGP == `[]_FGP.
 Proof.
@@ -166,6 +171,7 @@ HB.instance Definition _ :=
   hasInvertibleLetters.Build
     FGP
     FreeGroup_invl
+    FreeGroup_invlK
     FreeGroup_invl_left
     FreeGroup_invl_right.
 
@@ -173,16 +179,14 @@ HB.instance Definition _ :=
 (* NOTE(reiniscirpons): in theory we could do this more efficiently with the
  complete rewriting system *)
 Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
-  | [::] => [::]
-  | c::w => match c, FreeGroup_norm w with
-    | Base a, Inverse b::n => 
-      if a == b then n else (Base a)::(Inverse b)::n
-    | Inverse a, Base b::n =>
-      if a == b then n else (Inverse a)::(Base b)::n
-    | c, w => c::w
+  | [::] => `[]_FGP
+  | c::w' => match (FreeGroup_norm w') with
+    | [::] => `[c]_FGP
+    | d::n =>
+      if (c == invl d)%B then n
+      else c::(d::n)
     end
   end.
-
 
 Lemma FreeGroup_norm_e:
   FreeGroup_norm e = e.
@@ -197,32 +201,24 @@ Qed.
 Lemma FreeGroup_norm_correct w:
   FreeGroup_norm w == w.
 Proof.
-elim: w => // c w /=.
-case: (FreeGroup_norm w) => [eq|c' n eq].
-  transitivity (([:: c]: FreeGroup) @ w); last done;
-  case: c => s; by rewrite -eq neutral_right.
-transitivity (([:: c]: FreeGroup) @ w); last done.
-case: c eq => s; case: c' => s' <- //;
-case Heq: (eq_op s s').
-- move: Heq; move/eqP => <-. 
-  transitivity (([:: Base s]: FreeGroup) @ (([::Inverse s]: FreeGroup) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
-- by transitivity (([:: Base s]: FreeGroup) @ (([::Inverse s']: FreeGroup) @ n)); last done.
-- move: Heq; move/eqP => <-. 
-  transitivity (([:: Inverse s]: FreeGroup) @ (([::Base s]: FreeGroup) @ n)); last done.
-  by rewrite associativity inverse_left neutral_left.
-- by transitivity (([:: Inverse s]: FreeGroup) @ (([::Base s']: FreeGroup) @ n)); last done.
+  elim: w => [//|c w IH /=]; rewrite (cons_law _ c w).
+  case Hn: (FreeGroup_norm w) => [//|d w']; rewrite -IH Hn.
+  - by rewrite -cons_law.
+  case Heq: (c == invl d)%B; last first.
+  - by rewrite -cons_law.
+  move/eqP: Heq => ->;
+  by rewrite (cons_law _ d) associativity invl_right.
 Qed.
 
 Definition FreeGroup_dec_eq (w w': FreeGroup): bool :=
-  (FreeGroup_norm w) == (FreeGroup_norm w').
+  ((FreeGroup_norm w) == (FreeGroup_norm w'))%B.
 
 Lemma FreeGroup_refl p: FreeGroup_dec_eq p p.
 Proof. by rewrite /FreeGroup_dec_eq. Qed.
 
 Lemma FreeGroup_dec_eq_to_eqprop w w':
   (FreeGroup_dec_eq w w') -> (w == w').
-Proof. 
+Proof.
   by move=> eq;
   rewrite -[w]FreeGroup_norm_correct -[w']FreeGroup_norm_correct (eqP eq).
 Qed.
@@ -231,22 +227,42 @@ Lemma FreeGroup_norm_cat_back w1 w2 w3:
   FreeGroup_norm w1 = FreeGroup_norm w2 ->
     FreeGroup_norm (w3 @ w1) = FreeGroup_norm (w3 @ w2).
 Proof.
-move=> H.
-elim: w3 => // c w3.
-by case: c => s /= ->.
+  move=> H; by elim: w3 => [//|c w3 /= ->].
 Qed.
 
 Lemma FreeGroup_norm_rcons w c:
-  FreeGroup_norm (rcons w c) = match c, rev (FreeGroup_norm w) with
-  | Base a, Inverse b :: n =>
-      if a == b then rev n else rcons (rcons (rev n) (Inverse b)) (Base a)
-  | Inverse a, Base b :: n =>
-      if a == b then rev n else rcons (rcons (rev n) (Base b)) (Inverse a)
-  | c, n => rcons (rev n) c
+  FreeGroup_norm (rcons w c) =
+  match rev (FreeGroup_norm w) with
+  | [::] => `[c]_FGP
+  | d :: n => 
+      if (c == invl d)%B then rev n
+      else rcons (rcons (rev n) d) c
   end.
-(* TODO(reiniscirpons): Do this*)
-Admitted.
-
+Proof.
+  elim: w => [//|d w].
+  rewrite rcons_cons /= => ->.
+  case: (FreeGroup_norm w) => [| e n] /=.
+  - case H1: (c == invl d)%B;
+    case H2: (d == invl c)%B => //; exfalso;
+    move/eqP: H1 => H1; move/eqP: H2 => H2.
+  -- apply H2; by rewrite H1 invlK.
+  -- apply H1; by rewrite H2 invlK.
+  rewrite !rev_cons;
+  case Hrev: (rev n) => [|f n'] /=.
+  - case H1: (c == invl e)%B;
+    case H2: (d == invl e)%B => /=.
+  -- by rewrite Hrev; move/eqP: H1 => ->; move/eqP: H2 => ->.
+  -- by rewrite !rev_cons Hrev /= H1.
+  -- by rewrite Hrev.
+  -- by rewrite !rev_cons Hrev /= H1.
+  rewrite rev_rcons.
+  - case H1: (c == invl f)%B;
+    case H2: (d == invl e)%B => /=.
+  -- by rewrite Hrev H1.
+  -- by rewrite !rev_cons Hrev !rcons_cons H1 !rev_rcons.
+  -- by rewrite H2 Hrev H1.
+  -- by rewrite H2 !rev_cons Hrev !rcons_cons H1 !rev_rcons.
+Qed.
 
 Lemma FreeGroup_norm_rev w:
   FreeGroup_norm (rev w) = rev (FreeGroup_norm w).
@@ -254,28 +270,28 @@ Proof.
 elim: w => // c w /= eq.
 have <-: rev (FreeGroup_norm (rev w)) = FreeGroup_norm w.
   by rewrite eq revK.
-  rewrite rev_cons FreeGroup_norm_rcons; case: c => {eq} a;
-  case: (rev (FreeGroup_norm (rev w))) => [//|c l];
-  case: c => // b.
-- by rewrite !rev_cons.
-- case: (a == b)%B; first done; by rewrite !rev_cons.
-- case: (a == b)%B; first done; by rewrite !rev_cons.
-- by rewrite !rev_cons.
+rewrite rev_cons FreeGroup_norm_rcons eq !revK;
+case: (FreeGroup_norm w) => [//|d l].
+case: (c == invl d)%B; first done; by rewrite !rev_cons.
 Qed.
 
 Lemma FreeGroup_norm_map_invl w:
   FreeGroup_norm (map invl w) = map invl (FreeGroup_norm w).
 Proof.
-elim: w => // c w /= ->.
-case: c => /= a;
-case: (FreeGroup_norm w) => // c' w' /=;
-case: c' => b //;
-case H: (a == b)%B; move => /=; by rewrite H.
+  elim: w => [//|c w /= ->].
+  case: (FreeGroup_norm w) => {w} [//|d w /=].
+  rewrite invlK; case H1: (invl c == d)%B;
+  case H2: (c == invl d)%B => //; exfalso;
+  move/eqP: H1 => H1; move/eqP: H2 => H2.
+  - apply H2; by rewrite -(invlK c) invl_inj.
+  - apply H1; by rewrite -(invlK d) invl_inj.
 Qed.
 
 Lemma FreeGroup_norm_inv w:
   FreeGroup_norm (inv w) = inv (FreeGroup_norm w).
-Proof. by rewrite /inv/=/inv_word/= -FreeGroup_norm_rev FreeGroup_norm_map_invl. Qed.
+Proof. 
+  by rewrite /inv/=/inv_word/= -FreeGroup_norm_rev FreeGroup_norm_map_invl.
+Qed.
 
 Lemma FreeGroup_norm_cat w1 w2 w3:
   FreeGroup_norm w1 = FreeGroup_norm w2 -> FreeGroup_norm (w1 @ w3) = FreeGroup_norm (w2 @ w3).

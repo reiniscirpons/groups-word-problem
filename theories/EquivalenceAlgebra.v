@@ -50,6 +50,8 @@ elim: l1 => [|a l1 /= ->]; first by rewrite /= neutral_left.
 by rewrite associativity.
 Qed.
 
+(** Some theory about morphisms *)
+
 HB.mixin Record isMonoidMorphism (G H: monoid) (f: G -> H) := {
   morphism_preserve_e: f e == e;
   morphism_preserve_law: forall x y, f (x @ y) == (f x) @ (f y);
@@ -74,6 +76,126 @@ HB.structure Definition InjectiveMorphism (G H: monoid) :=
   { f of isInjective G H f
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
+
+HB.mixin Record isSurjective (A B: equivType) (f: A -> B) := {
+  surjectivity_property: forall y, exists x, f x == y;
+}.
+
+#[short(type="surjectiveFunType")]
+HB.structure Definition Surjective (A B: equivType) :=
+  { f of isSurjective A B f
+       & isSetoidMorphism A B f}.
+
+#[short(type="surjectiveMorphism")]
+HB.structure Definition SurjectiveMorphism (G H: monoid) :=
+  { f of isSurjective G H f
+       & isSetoidMorphism G H f
+       & isMonoidMorphism G H f }.
+
+#[short(type="bijectiveFunType")]
+HB.structure Definition Bijective (A B: equivType) :=
+  { f of isInjective A B f
+       & isSurjective A B f
+       & isSetoidMorphism A B f}.
+
+#[short(type="isomorphism")]
+HB.structure Definition Isomorphism (G H: monoid) :=
+  { f of isInjective G H f
+       & isSurjective G H f
+       & isSetoidMorphism G H f
+       & isMonoidMorphism G H f }.
+
+HB.factory Record isBijectionInverse (A B: equivType)
+  (f: bijectiveFunType A B) (g: B -> A) := {
+    morphism_preserve_equiv':
+      forall x y, x == y -> g x == g y;
+    cancel_left: forall x, g (f x) == x;
+    cancel_right: forall x, f (g x) == x;
+}.
+
+HB.builders Context 
+  (A B: equivType) (f: bijectiveFunType A B) g of 
+    isBijectionInverse A B f g.
+
+  HB.instance Definition _ :=
+    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+
+  Fact surjectivity_property': forall y, exists x, g x == y.
+  Proof.
+    move => y; exists (f y); by apply cancel_left.
+  Qed.
+
+  HB.instance Definition _ :=
+    isSurjective.Build _ _ g surjectivity_property'.
+  
+  Fact injectivity_property': forall x y, g x == g y -> x == y.
+  Proof.
+    move => x y Hg; have Hf: f (g x) == f (g y).
+    - by apply morphism_preserve_equiv.
+    by rewrite !cancel_right in Hf.
+  Qed.
+
+  HB.instance Definition _ :=
+    isInjective.Build _ _ g injectivity_property'.
+HB.end.
+
+HB.factory Record isBijectionLeftInverse (A B: equivType)
+  (f: bijectiveFunType A B) (g: B -> A) := {
+    morphism_preserve_equiv':
+      forall x y, x == y -> g x == g y;
+    cancel_left: forall x, g (f x) == x;
+}.
+
+HB.builders Context 
+  (A B: equivType) (f: bijectiveFunType A B) g of 
+    isBijectionLeftInverse A B f g.
+
+  HB.instance Definition _ :=
+    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+
+  Fact cancel_right': forall y, f (g y) == y.
+  Proof.
+    move => y; have H: exists x, f x == y.
+    - by apply surjectivity_property.
+    case: H => x <-; apply morphism_preserve_equiv.
+    by apply cancel_left.
+  Qed.
+  
+  HB.instance Definition _ :=
+    isBijectionInverse.Build _ _ f g
+      morphism_preserve_equiv'
+      cancel_left
+      cancel_right'.
+HB.end.
+
+HB.factory Record isBijectionRightInverse (A B: equivType)
+  (f: bijectiveFunType A B) (g: B -> A) := {
+    morphism_preserve_equiv':
+      forall x y, x == y -> g x == g y;
+    cancel_right: forall x, f (g x) == x;
+}.
+
+HB.builders Context 
+  (A B: equivType) (f: bijectiveFunType A B) g of 
+    isBijectionRightInverse A B f g.
+
+  HB.instance Definition _ :=
+    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+
+  Fact cancel_left': forall x, g (f x) == x.
+  Proof.
+    move => x; apply (@injectivity_property _ _ f).
+    by apply cancel_right.
+  Qed.
+  
+  HB.instance Definition _ :=
+    isBijectionInverse.Build _ _ f g
+      morphism_preserve_equiv'
+      cancel_left'
+      cancel_right.
+HB.end.
+
+(** Theory of groups *)
 
 HB.mixin Record isGroup G of hasEq G & isMonoid G := {
   inv : G -> G;

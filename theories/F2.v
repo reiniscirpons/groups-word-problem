@@ -129,22 +129,21 @@ Definition free_group_relations:
   [seq pair [:: Base a; Inverse a] [::] | a: Sigma] ++
   [seq pair [:: Inverse a; Base a] [::] | a: Sigma].
 
-Definition FreeGroup_presentation :=
+Definition FGP :=
   Pres (InverseAlphabet Sigma) free_group_relations.
 
-Definition FreeGroup := (presented FreeGroup_presentation).
+Definition FreeGroup := (presented FGP).
 
 (* NOTE(reiniscirpons): Need to use the sigma here instead of
    InverseAlphabet Sigma because of technical reasons. *)
-Definition FreeGroup_invl (c: sigma FreeGroup_presentation):
-  sigma FreeGroup_presentation :=
+Definition FreeGroup_invl (c: sigma FGP): sigma FGP :=
   match c with
   | Base a => Inverse a
   | Inverse a => Base a
   end.
 
-Lemma FreeGroup_invl_left : forall c: sigma FreeGroup_presentation,
-  `[c; FreeGroup_invl c] == `[].
+Lemma FreeGroup_invl_left : forall c: sigma FGP,
+  `[c; FreeGroup_invl c]_FGP == `[]_FGP.
 Proof.
   move=> c; apply: reduction_rule; case: c => a; unfold relations => /=;
   unfold free_group_relations; rewrite mem_cat; apply /orP.
@@ -152,8 +151,8 @@ Proof.
   - right; apply/mapP; exists a => [|//]; by apply mem_enum.
 Qed.
 
-Lemma FreeGroup_invl_right : forall c: sigma FreeGroup_presentation,
-  `[FreeGroup_invl c; c] == `[].
+Lemma FreeGroup_invl_right : forall c: sigma FGP,
+  `[FreeGroup_invl c; c]_FGP == `[]_FGP.
 (* TODO(reiniscirpons): fix *)
 Proof.
   case => a /=.
@@ -165,7 +164,7 @@ Qed.
 
 HB.instance Definition _ :=
   hasInvertibleLetters.Build
-    FreeGroup_presentation
+    FGP
     FreeGroup_invl
     FreeGroup_invl_left
     FreeGroup_invl_right.
@@ -188,6 +187,12 @@ Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
 Lemma FreeGroup_norm_e:
   FreeGroup_norm e = e.
 Proof. done. Qed.
+
+Lemma FreeGroup_norm_1: forall (c: sigma FGP),
+  FreeGroup_norm (`[c]_FGP) = (`[c]_FGP).
+Proof.
+  by case => c.
+Qed.
 
 Lemma FreeGroup_norm_correct w:
   FreeGroup_norm w == w.
@@ -304,6 +309,7 @@ apply /(iffP idP) => eq.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
 End FreeGroup.
+Arguments FreeGroup_norm {_}.
 
 Section FreeGroupUniversal.
 
@@ -312,7 +318,7 @@ Variable (G: group).
 Variable (f: Sigma -> G).
 
 Definition FreeGroup_alphabet_extension:
-  sigma (FreeGroup_presentation Sigma) -> G :=
+  sigma (FGP Sigma) -> G :=
     fun c =>
       match c with
       | Base a => f a
@@ -320,7 +326,7 @@ Definition FreeGroup_alphabet_extension:
       end.
 
 Lemma FreeGroup_alphabet_extension_preserve_inv_on_sigma:
-  forall (a: sigma (FreeGroup_presentation Sigma)),
+  forall (a: sigma (FGP Sigma)),
     inv (FreeGroup_alphabet_extension a) == 
     (FreeGroup_alphabet_extension) (invl a).
 Proof.
@@ -332,7 +338,7 @@ Definition FreeGroup_universal_extension: (FreeGroup Sigma) -> G :=
 
 Lemma FreeGroup_alphabet_extension_preserve_relations:
   forall u v,
-    (u, v) \in relations (FreeGroup_presentation Sigma) ->
+    (u, v) \in relations (FGP Sigma) ->
     FreeGroup_universal_extension u == FreeGroup_universal_extension v.
 Proof.
   move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]];
@@ -344,7 +350,7 @@ Proof.
 Qed.
 
 HB.instance Definition _ := isRelationPreservingMorphism.Build
-  (FreeGroup_presentation Sigma) G
+  (FGP Sigma) G
   FreeGroup_universal_extension
   FreeGroup_alphabet_extension_preserve_relations
   (extension_preserve_e _ _ FreeGroup_alphabet_extension)

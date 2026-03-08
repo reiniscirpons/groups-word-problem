@@ -57,7 +57,7 @@ Definition presented P := (seq (sigma P)).
 (* TODO(reiniscirpons): Do we need this still? *)
 Section InstancesFromList.
 Variable P: presentation.
-HB.instance Definition _ := Equality.copy (presented P) (list (sigma P)).
+HB.instance Definition _ := Equality.copy (presented P) (seq (sigma P)).
 End InstancesFromList.
 
 (* In a presented structure, equality is given as whether two words are derived. *)
@@ -146,10 +146,13 @@ exact: (reduction e e).
 Qed.
 
 Module PresentationNotations.
-Notation "`[ ]" := ([::] : presented _) (format "`[ ]").
-Notation "'`[' x ']'" := ([:: x] : presented _).
-Notation "`[ x ; y ; .. ; z ]" := ((x :: (cons y .. [:: z] ..)) : presented _)
-  (format "`[ '[' x ; '/' y ; '/' .. ; '/' z ']' ]").
+Notation "`[ ]_ P" := ([::] : presented P)
+  (at level 10, format "`[  ]_ P").
+Notation "`[ x ]_ P" := ([:: x] : presented P)
+  (at level 10, format "`[ x ]_ P").
+Notation "`[ x ; y ; .. ; z ]_ P" :=
+  ((x :: (cons y .. [:: z] ..)) : presented P)
+  (format "`[ '[' x ; '/' y ; '/' .. ; '/' z ']' ]_ P").
 End PresentationNotations.
 
 Import PresentationNotations.
@@ -200,13 +203,13 @@ Definition extension: presented P -> M :=
 
 Lemma extension_universality:
   forall (varphi: morphism (presented P) M),
-    (forall a: sigma P, varphi `[a] == f a) -> 
+    (forall a: sigma P, varphi (`[a]_P) == f a) -> 
     (forall w: presented P, 
       varphi w == extension w).
 Proof.
   move => varphi Heq; unfold extension; elim => [|a w' IH] /=.
   - exact morphism_preserve_e.
-  - have H: a :: w' = `[a] @ w' => [//|];
+  - have H: a :: w' = `[a]_P @ w' => [//|];
     by rewrite H morphism_preserve_law IH Heq.
 Qed.
 
@@ -233,11 +236,10 @@ Arguments extension {_ _}.
 
 HB.mixin Record hasInvertibleLetters (P: presentation) := {
   invl : sigma P -> sigma P;
-  invl_left : forall c, `[c] @ `[invl c] == e;
-  invl_right : forall c, `[invl c] @ `[c] == e;
+  invl_left : forall c, `[c]_P @ `[invl c]_P == e;
+  invl_right : forall c, `[invl c]_P @ `[c]_P == e;
 }.
 #[short(type="invertiblePresentationType")]
-(* TODO(reiniscirpons): Rename to GroupPresentation? *)
 HB.structure Definition InvertiblePresentation := { P & hasInvertibleLetters P }.
 
 Section InvertiblePresentedGroup.
@@ -254,7 +256,8 @@ Lemma inv_word_left : forall w: G, w @ (inv_word w) == e.
 Proof.
 elim=> [|a w IH]; first exact: neutral_left.
 rewrite /inv_word/law/= rev_cons map_rcons -rcons_cat -cats1 -cat1s.
-have: `[a] @ ((w: presented P) @ inv_word w) @ `[invl a] == e; last by done.
+have: `[a]_P @ ((w: presented P) @ inv_word w) @ `[invl a]_P == e;
+  last by done.
 rewrite IH invl_left; reflexivity.
 Qed.
 
@@ -262,7 +265,7 @@ Lemma inv_word_right : forall w: G, (inv_word w) @ w == e.
 Proof.
 elim=> [|a w IH]; first exact: neutral_left.
 rewrite /inv_word/law/= rev_cons map_rcons cat_rcons -cat1s -(cat1s a) !(catA _ _ w).
-have: (inv_word w) @ (`[invl a] @ `[a]) @ w == e; last by done.
+have: (inv_word w) @ (`[invl a]_P @ `[a]_P) @ w == e; last by done.
 rewrite invl_right neutral_right IH; reflexivity.
 Qed.
 

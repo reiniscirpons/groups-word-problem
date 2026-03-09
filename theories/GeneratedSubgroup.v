@@ -233,8 +233,11 @@ match word with
     end
 end.
 
+(* TODO(reiniscirpns):
+   - try removing state < q assumption from induction
+   - use a better < function?
+   - factor out the proof for c::w for each possible c. *)
 Lemma Stallings_automaton_product: forall (state: nat) (w: F2),
-  freely_reduced w ->
   lt state q ->
   inv (power b state) @
   (apbq_projection (Stallings_automaton_quotient state w) @ 
@@ -248,11 +251,11 @@ Proof.
      (* TODO(reiniscirpons): this feels wrong. *)
   -- by apply PeanoNat.Nat.lt_0_succ.
 
-  move => state w; elim: w state => [state _ _ /=|c w IH state].
+  move => state w; elim: w state => [state _ /=|c w IH state].
   (* TODO(reiniscirpons): Why are we not done by computation? *)
   - by rewrite associativity /(\hat _) /extension /prod /=
                neutral_right inverse_right.
-  move/freely_reduced_behead => Hred Hstate.
+  move => Hstate.
   case: c; case.
   - case => [|[|//]] Hc /=.
   -- case Hs: (state == p)%B.
@@ -262,7 +265,7 @@ Proof.
       by rewrite morphism_preserve_law /= -associativity
       {1}/(\hat _) {1}/extension {1}/prod /= neutral_right
       !associativity /= -Hs inverse_right neutral_left
-      -!associativity (IH state Hred Hstate) /law /=
+      -!associativity (IH state Hstate) /law /=
       (* TODO(reiniscirpons): Why oh why does it not automatically
          figure this out? *)
       (bool_irrelevance Hc (ltn_ord 0)).
@@ -272,7 +275,7 @@ Proof.
   --- move/eqP: Hs => Hs.
       rewrite morphism_preserve_law /=
       {1}/(\hat _) {1}/extension {1}/prod /=
-      -!associativity (IH 0 Hred Hq) Hs /b_encoding
+      -!associativity (IH 0 Hq) Hs /b_encoding
       -power_inv !associativity -poweradd.
       move: Hq; case: q => [H|m _ /=]; first by inversion H.
       (* TODO(reiniscirpons): Is this ok? *) 
@@ -289,7 +292,7 @@ Proof.
       {1}/(\hat _) {1}/extension {1}/prod /=
       neutral_left -(neutral_left (inv _))
       -(inverse_left b) !associativity -(associativity _ (inv _) (inv _))
-      -inverse_law -powerS -!associativity (IH state.+1 Hred HSs)
+      -inverse_law -powerS -!associativity (IH state.+1 HSs)
       (bool_irrelevance Hc (ltn_ord 1)).
   - case => [|[|//]] Hc /=.
   (* TODO(reiniscirpons): The inverse case overlaps a lot with the
@@ -300,7 +303,7 @@ Proof.
       {1}/(\hat _) {1}/extension {1}/prod /= neutral_right /a_encoding
       /= -Hs !inverse_law inv_involutive !associativity
       inverse_right neutral_left
-      -!associativity (IH state Hred Hstate) /law /=
+      -!associativity (IH state Hstate) /law /=
       (bool_irrelevance Hc (ltn_ord 0)).
   --- by rewrite /(\hat _) /extension /prod /= neutral_left
       associativity inverse_right neutral_left.
@@ -315,7 +318,7 @@ Proof.
   ---- move => _. rewrite powerS inverse_law -!associativity.
        have Hm: (m < m.+1)%coq_nat; first by apply le_n.
        rewrite -Hmq in Hm.
-       by rewrite (IH m Hred Hm) /inv /= /inv_word /= /invl /=
+       by rewrite (IH m Hm) /inv /= /inv_word /= /invl /=
        (bool_irrelevance Hc (ltn_ord 1)).
   --- move/eqP: Hs => Hs. have HPs: (state.-1 < q)%coq_nat.
   ---- apply PeanoNat.Nat.lt_succ_l; by case: state Hstate Hs.
@@ -328,7 +331,7 @@ Proof.
       (* TODO(reiniscirpons): Again, why? *)
       rewrite -powerP' /=; have: (state.+1: int) - 1 = state => [|->];
       first by ring.
-      by rewrite -!associativity (IH state Hred HPs)
+      by rewrite -!associativity (IH state HPs)
       inv_involutive /inv /= /inv_word /= /invl /=
       (bool_irrelevance Hc (ltn_ord 1)).
 Qed.

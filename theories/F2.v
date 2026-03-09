@@ -8,7 +8,7 @@ From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 Import PresentationNotations.
 
 Inductive InverseAlphabet (Sigma: eqType) :=
-  | Base: Sigma -> InverseAlphabet Sigma
+| Base: Sigma -> InverseAlphabet Sigma
   | Inverse: Sigma -> InverseAlphabet Sigma.
 Arguments Base {_}.
 Arguments Inverse {_}.
@@ -313,6 +313,44 @@ apply /FreeGroup_norm_cat /FreeGroup_norm_cat_back => /=;
 by rewrite eq_refl.
 Qed.
 
+Lemma FreeGroup_norm_involutive:
+  forall w, FreeGroup_norm (FreeGroup_norm w) = FreeGroup_norm w.
+Proof.
+  move => w; apply FreeGroup_norm_unique; by rewrite FreeGroup_norm_correct.
+Qed.
+
+Lemma FreeGroup_norm_cons_invl: forall c (w: FreeGroup),
+  FreeGroup_norm ([:: c, invl c & w]) = FreeGroup_norm w.
+Proof.
+  move => c w; apply FreeGroup_norm_unique;
+  by rewrite cons_law (cons_law _ _ w) associativity invl_left neutral_left.
+Qed.
+
+Lemma FreeGroup_norm_subseq: forall (w: FreeGroup),
+  subseq (FreeGroup_norm w) w.
+Proof.
+  elim => [//|c w /=].
+  case: (FreeGroup_norm w) => [_|d n /=].
+  - have: (c == c)%B => [//|->]; by apply sub0seq.
+  case: (c == invl d)%B => [|IH]; last first.
+  - by have: (c == c)%B => [//|->].
+  case: n => [//|e n IH].
+  case: (e == c)%B.
+  - by apply cons_subseq with e; apply cons_subseq with d.
+  - by apply cons_subseq with d.
+Qed.
+
+Lemma FreeGroup_norm_minimality: forall (w: FreeGroup),
+  (forall x, w == x -> subseq w x) <-> w = FreeGroup_norm w.
+Proof.
+  move => w; split.
+  - move => H; apply /subseq_anti /andP; split.
+  -- by apply H; rewrite FreeGroup_norm_correct.
+  -- by apply FreeGroup_norm_subseq.
+  - move => {2} -> x; move/FreeGroup_norm_unique => ->.
+    by apply FreeGroup_norm_subseq.
+Qed.
+
 Lemma eqprop_to_FreeGroup_dec_eq w w':
   (w == w') -> (FreeGroup_dec_eq w w').
 Proof. by move=> eq; exact /eqP /FreeGroup_norm_unique. Qed.
@@ -324,8 +362,61 @@ apply /(iffP idP) => eq.
 - exact: FreeGroup_dec_eq_to_eqprop.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
+
 End FreeGroup.
 Arguments FreeGroup_norm {_}.
+
+Section FreelyReduced.
+
+Variable Sigma: finType.
+
+Definition freely_reduced (w: FreeGroup Sigma): Prop :=
+  forall p s c, w <> p ++ [:: invl c; c] ++ s.
+
+Lemma freely_reduced_nil: freely_reduced [::].
+Proof. by case. Qed.
+
+Lemma freely_reduced_cons1: forall c, freely_reduced [::c].
+Proof. move => c; case => [//|d]; by case. Qed.
+
+Lemma freely_reduced_cons2: forall c d w,
+  c <> invl d -> freely_reduced (d::w) -> freely_reduced (c::(d::w)).
+Proof.
+  move => c d w Hcd Hw [|f s] p e /=.
+  - case => Hc Hd _; apply Hcd; by rewrite Hc Hd.
+  - case => _ H; by apply (Hw s p e).
+Qed.
+
+Lemma freely_reduced_behead:
+  forall c w, freely_reduced (c::w) -> freely_reduced w.
+Proof.
+  move => c w H p s d He.
+  apply (H (c::p) s d); by rewrite He.
+Qed.
+
+Lemma freely_reduced_correct:
+  forall w, freely_reduced w <-> w = FreeGroup_norm w.
+Proof.
+  move => w; split.
+  - elim: w => [//|c w IH Hcw].
+    have: (w = FreeGroup_norm w).
+      by apply /IH /freely_reduced_behead.
+    move => /= <-; case: w {IH} Hcw => [//|d w H].
+    case Hcd: (c == invl d)%B => [|//];
+    move/eqP: Hcd => -> in H; exfalso;
+    by apply (H [::] w d).
+  - move => H p s c Hps.
+    enough (Hfalse: (p++s) = w).
+  -- move: Hfalse; rewrite Hps => {}Hps.
+     have: subseq (p ++ [:: invl c; c] ++ s) (p++s).
+  --- by rewrite Hps.
+  --- by rewrite subseq_cat2l -{2}(cat0s s) subseq_cat2r.
+  -- apply /subseq_anti /andP; split.
+  --- rewrite Hps; apply cat_subseq => [//|]; by apply suffix_subseq.
+  --- apply FreeGroup_norm_minimality => [//|].
+      by rewrite Hps !cat_law cons_law invl_right neutral_left.
+Qed.
+End FreelyReduced.
 
 Section FreeGroupUniversal.
 

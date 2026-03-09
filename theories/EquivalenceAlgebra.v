@@ -569,6 +569,42 @@ Coercion morphism_to_local_morphism {G} {H1 H2: subgroup G}: morphism H1 H2 -> l
   fun f => {| lm_morphism := f |}.
 
 
+Section RightCoset.
+
+Variable G: group.
+Variable H: subgroup G.
+
+Definition right_coset_eq (x y: G): Prop := in_subgroup H (x @ inv y).
+
+Lemma right_coset_eq': forall x y,
+  right_coset_eq x y <-> (exists w: H, (subgroup_inj w) @ y == x).
+Proof.
+  move => x y; split.
+  - rewrite /right_coset_eq /in_subgroup.
+    case => w Hw; exists w;
+    by rewrite Hw -associativity inverse_right neutral_right.
+  - case => w Hw; exists w;
+    by rewrite -Hw -associativity inverse_left neutral_right.
+Qed.
+
+(* TODO(reiniscirpons): Prove coset relation is equivalence?. *)
+
+End RightCoset.
+Arguments right_coset_eq {_}.
+
+HB.mixin Record isRightCosetRep
+  (G: group) (H: subgroup G) (f: G -> G) := {
+  right_coset_rep_correct: forall (x: G),
+    right_coset_eq H x (f x);
+  right_coset_rep_unique: forall (x y: G),
+    right_coset_eq H x y -> f x = f y;
+}.
+
+#[short(type="righCosetRep")]
+HB.structure Definition RightCosetRep (G: group) (H: subgroup G) :=
+  { f of isRightCosetRep G H f }.
+
+(* TODO(reiniscirpons): Do we still need this? *)
 HB.mixin Record isSubgroupCharacterizer (G: group) (P: G -> Type) := {
   P_law: forall x y, P x -> P y -> P (x @ y);
   P_neutral: P e;

@@ -19,9 +19,8 @@ Section GeneratedSubgroup.
 Variable G: group.
 Variable gens: seq G.
 
-Let Sigma: finType := ordinal (length gens).
-Let nth_gen: Sigma -> G :=
-  fun n => nth e gens n.
+Notation Sigma := (ordinal (length gens)).
+Notation nth_gen := (fun (n: Sigma) => nth e gens n).
 
 Definition in_generated_subgroup (x: G): Prop :=
   exists (w: FreeGroup Sigma), \hat nth_gen w == x.
@@ -56,9 +55,8 @@ HB.instance Definition _ := isSubgroupCharacterizer.Build
 *)
 Lemma igs_gen (s: Sigma): in_generated_subgroup (nth_gen s).
 Proof.
-  exists `[Base s].
-  unfold FreeGroup_universal_extension; unfold extension => /=.
-  by rewrite neutral_right.
+  exists (`[Base s]_(FGP Sigma)).
+  by rewrite /(\hat _) /extension /prod /= neutral_right.
 Defined.
 
 Definition generatedSubgroup :=
@@ -125,11 +123,13 @@ Section NielsenSchreierStalling.
 Notation Sigma := (ordinal 2).
 Notation F2P := (FGP Sigma).
 Notation F2 := (FreeGroup Sigma).
-Notation a := (`[Base 0]_F2P).
-Notation b := (`[Base 1]_F2P).
+Notation o0 := (Ordinal (ltn_ord 0): Sigma).
+Notation o1 := (Ordinal (ltn_ord 1): Sigma).
+Notation a := (`[Base o0]_F2P).
+Notation b := (`[Base o1]_F2P).
 
 (* NOTE(reiniscirpons): a_p = b^p a b^{-p} *)
-Definition a_encoding (p: int): F2 := (power a p) @ b @ (power a (-p)).
+Definition a_encoding (p: int): F2 := (power b p) @ a @ inv (power b p).
 
 (* NOTE(reiniscirpons): b^q is the other generator *)
 Definition b_encoding (q: int): F2 := power b q.
@@ -155,11 +155,11 @@ Definition b_encoding (q: int): F2 := power b q.
 Variable p q: nat.
 Variable Hlt: lt p q.
 
-Definition apbq_letter_projection (letter: Sigma) :=
+Definition apbq_letter_projection (letter: Sigma): F2 :=
 match letter with
 | (Ordinal 0 _) => a_encoding p
 (* NOTE(reiniscirpons): we only have 2 cases, so this one codes for 1 *)
-| _ => b_encoding p
+| _ => b_encoding q
 end.
 
 (* NOTE(reiniscirpons): This is the map a -> a_p and b -> b^q,
@@ -173,13 +173,13 @@ match letter with
     (* NOTE(reiniscirpons): State p corresponds to prefix b^p, if we read a
      * here, then we need to use the first gen, hence we output an a too.
      * It is a loop since b^p a b^{-p}^k = b^p a^k b^{-p}. *)
-    if state == p then Some (state, `[Base 0]_F2P)
+    if state == p then Some (state, a)
     (* NOTE(reiniscirpons): Impossible to read anywhere else, so fall off. *)
     else None
 (* NOTE(reiniscirpons): a^{-1} is treated exactly the same, can only read it
  * after b^p, in which case we can read an arbitrary amount. *)
 | Inverse (Ordinal 0 _) =>
-    if state == p then Some (state, `[Inverse 0]_F2P)
+    if state == p then Some (state, inv a)
     else None
 (* NOTE(reiniscirpons): b's move the state around in a loop modulo q.
    b^{-1}'s do the same thing only in reverse. We count a b^q after
@@ -188,11 +188,11 @@ match letter with
    a techical requirement because of how we calculate the coset representative
    later on. *)
 | Base (Ordinal 1 _) =>
-    if state == (q.-1) then Some (0, `[Base 1]_F2P)
-    else Some (state.+1, `[]_F2P)
+    if state == (q.-1) then Some (0, b)
+    else Some (state.+1, e)
 | Inverse (Ordinal 1 _) =>
-    if state == 0 then Some (q.-1, `[Inverse 1]_F2P)
-    else Some (state.-1, `[]_F2P)
+    if state == 0 then Some (q.-1, inv b)
+    else Some (state.-1, e)
 | _ => None
 end.
 
@@ -208,10 +208,10 @@ end.
 Fixpoint Stallings_automaton_quotient
   (state: nat) (word: F2): F2 :=
 match word with
-| nil => `[]_F2P
+| nil => e
 | letter::word' =>
     match (Stallings_automaton_transition state letter) with
-    | None => `[]_F2P
+    | None => e
     | Some (state', output) =>
         output @ (Stallings_automaton_quotient state' word')
     end
@@ -234,14 +234,103 @@ match word with
 end.
 
 Lemma Stallings_automaton_product: forall (state: nat) (w: F2),
+  freely_reduced w ->
   lt state q ->
   inv (power b state) @
-  apbq_projection (Stallings_automaton_quotient state (FreeGroup_norm w)) @ 
-  (Stallings_automaton_remainder state (FreeGroup_norm w)) == w.
+  (apbq_projection (Stallings_automaton_quotient state w) @ 
+  (Stallings_automaton_remainder state w))
+  == w.
 Proof.
-  move => state w; elim: w state => [|letter1 word IH] state Hstate.
-  - by rewrite neutral_right /= inverse_right.
-  case: word IH => [_|letter2 word].
-  - rewrite FreeGroup_norm_1.
+  (* TODO(reiniscirpons): How can I avoid this super annoying arithmetic?*)
+  have Hq: (0 < q)%coq_nat.
+  - move: Hlt; case: q => [//|m _].
+  -- move => H; by inversion H.
+     (* TODO(reiniscirpons): this feels wrong. *)
+  -- by apply PeanoNat.Nat.lt_0_succ.
+
+  move => state w; elim: w state => [state _ _ /=|c w IH state].
+  (* TODO(reiniscirpons): Why are we not done by computation? *)
+  - by rewrite associativity /(\hat _) /extension /prod /=
+               neutral_right inverse_right.
+  move/freely_reduced_behead => Hred Hstate.
+  case: c; case.
+  - case => [|[|//]] Hc /=.
+  -- case Hs: (state == p)%B.
+  --- move/eqP: Hs => Hs.
+      (* TODO(reiniscirpons): Is there a better alternative to this
+         massive rewrite expression?*)
+      by rewrite morphism_preserve_law /= -associativity
+      {1}/(\hat _) {1}/extension {1}/prod /= neutral_right
+      !associativity /= -Hs inverse_right neutral_left
+      -!associativity (IH state Hred Hstate) /law /=
+      (* TODO(reiniscirpons): Why oh why does it not automatically
+         figure this out? *)
+      (bool_irrelevance Hc (ltn_ord 0)).
+  --- by rewrite /(\hat _) /extension /prod /= neutral_left
+      associativity inverse_right neutral_left.
+  -- case Hs: (state == q.-1)%B.
+  --- move/eqP: Hs => Hs.
+      rewrite morphism_preserve_law /=
+      {1}/(\hat _) {1}/extension {1}/prod /=
+      -!associativity (IH 0 Hred Hq) Hs /b_encoding
+      -power_inv !associativity -poweradd.
+      move: Hq; case: q => [H|m _ /=]; first by inversion H.
+      (* TODO(reiniscirpons): Is this ok? *) 
+      have: (- (m:int) + m.+1 = 1) => [|->]; first by ring.
+      by rewrite /power /= neutral_left -cons_law
+      (bool_irrelevance Hc (ltn_ord 1)).
+  (* TODO(reiniscirpons): How can I avoid having to do these calculations
+     by hand. It should be trivial to do from context. *)
+  --- move/eqP: Hs => Hs; have HSs: (state.+1 < q)%coq_nat.
+  ---- inversion Hstate.
+  ----- by exfalso; apply Hs; rewrite -H.
+  ----- by rewrite -PeanoNat.Nat.succ_lt_mono.
+  ---- by rewrite morphism_preserve_law /=
+      {1}/(\hat _) {1}/extension {1}/prod /=
+      neutral_left -(neutral_left (inv _))
+      -(inverse_left b) !associativity -(associativity _ (inv _) (inv _))
+      -inverse_law -powerS -!associativity (IH state.+1 Hred HSs)
+      (bool_irrelevance Hc (ltn_ord 1)).
+  - case => [|[|//]] Hc /=.
+  (* TODO(reiniscirpons): The inverse case overlaps a lot with the
+     other one, I wonder if there is some way to factor it out?*)
+  -- case Hs: (state == p)%B.
+  --- move/eqP: Hs => Hs.
+      by rewrite morphism_preserve_law /= -associativity
+      {1}/(\hat _) {1}/extension {1}/prod /= neutral_right /a_encoding
+      /= -Hs !inverse_law inv_involutive !associativity
+      inverse_right neutral_left
+      -!associativity (IH state Hred Hstate) /law /=
+      (bool_irrelevance Hc (ltn_ord 0)).
+  --- by rewrite /(\hat _) /extension /prod /= neutral_left
+      associativity inverse_right neutral_left.
+  -- case Hs: (state == 0)%B.
+  --- move/eqP: Hs => Hs.
+      rewrite morphism_preserve_law /=
+      {1}/(\hat _) {1}/extension {1}/prod /=
+      /b_encoding Hs power0 inverse_e -!associativity
+      !neutral_left.
+      case Hmq: q Hq => [|m].
+  ---- move=> H; by inversion H.
+  ---- move => _. rewrite powerS inverse_law -!associativity.
+       have Hm: (m < m.+1)%coq_nat; first by apply le_n.
+       rewrite -Hmq in Hm.
+       by rewrite (IH m Hred Hm) /inv /= /inv_word /= /invl /=
+       (bool_irrelevance Hc (ltn_ord 1)).
+  --- move/eqP: Hs => Hs. have HPs: (state.-1 < q)%coq_nat.
+  ---- apply PeanoNat.Nat.lt_succ_l; by case: state Hstate Hs.
+  ---- rewrite morphism_preserve_law /=
+      {1}/(\hat _) {1}/extension {1}/prod /=
+      neutral_left -(neutral_left (inv _))
+      -(inverse_right (inv (inv b))) !associativity -(associativity (inv _) _ (inv _))
+      -inverse_law powerC''.
+      case: state Hstate Hs HPs => [//|/= state _ _ HPs].
+      (* TODO(reiniscirpons): Again, why? *)
+      rewrite -powerP' /=; have: (state.+1: int) - 1 = state => [|->];
+      first by ring.
+      by rewrite -!associativity (IH state Hred HPs)
+      inv_involutive /inv /= /inv_word /= /invl /=
+      (bool_irrelevance Hc (ltn_ord 1)).
+Qed.
 
 End NielsenSchreierStalling.

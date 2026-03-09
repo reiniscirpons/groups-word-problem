@@ -27,7 +27,7 @@ Definition InverseAlphabet_eq (u v: InverseAlphabet Sigma) :=
 Lemma InverseAlphabet_eqP: eq_axiom InverseAlphabet_eq.
 Proof.
 (* TODO(reiniscirpons): how do I make this proof nicer? *)
-unfold InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
+rewrite /InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
 - move/eqP => H; by rewrite H.
 - case => H; by rewrite H.
 - move/eqP => H; by rewrite H.
@@ -58,7 +58,7 @@ Definition InverseAlphabet_unpickle (n: nat):
 Lemma InverseAlphabet_pickleK:
   pcancel InverseAlphabet_pickle InverseAlphabet_unpickle.
 Proof.
-  case => a /=; unfold InverseAlphabet_unpickle => /=.
+  case => a /=; rewrite /InverseAlphabet_unpickle /=.
   - by rewrite doubleK pickleK odd_double.
   - by rewrite uphalf_double pickleK odd_double.
 Qed.
@@ -81,7 +81,7 @@ Lemma InverseAlphabet_enum_in:
   forall (a: InverseAlphabet Sigma),
     a \in InverseAlphabet_enum.
 Proof.
-  move => a; unfold InverseAlphabet_enum; rewrite mem_cat.
+  move => a; rewrite /InverseAlphabet_enum mem_cat.
   apply/orP; case: a => a.
   - left; apply map_f; by rewrite mem_enum.
   - right; apply map_f; by rewrite mem_enum.
@@ -89,9 +89,7 @@ Qed.
 
 Lemma InverseAlphabet_enum_uniq: uniq InverseAlphabet_enum.
 Proof.
-  unfold InverseAlphabet_enum.
-  Search (uniq (_ ++ _)).
-  rewrite cat_uniq; apply /andP; split.
+  rewrite /InverseAlphabet_enum cat_uniq; apply /andP; split.
   - rewrite map_inj_uniq.
   -- by apply enum_uniq.
   -- move => x y; by case.
@@ -106,7 +104,7 @@ Qed.
 Lemma InverseAlphabet_enumP:
   Finite.axiom InverseAlphabet_enum.
 Proof.
-  move => a; unfold InverseAlphabet_enum.
+  move => a; rewrite /InverseAlphabet_enum.
   (* TODO(reiniscirpons): Should I import ssrnat? *)
   have H: ssrnat.nat_of_bool (a \in InverseAlphabet_enum) = 1.
   - by rewrite InverseAlphabet_enum_in.
@@ -150,8 +148,8 @@ Proof. by case. Qed.
 Lemma FreeGroup_invl_left : forall c: sigma FGP,
   `[c; FreeGroup_invl c]_FGP == `[]_FGP.
 Proof.
-  move=> c; apply: reduction_rule; case: c => a; unfold relations => /=;
-  unfold free_group_relations; rewrite mem_cat; apply /orP.
+  move=> c; apply: reduction_rule; case: c => a;
+  rewrite /relations /= /free_group_relations mem_cat; apply /orP.
   - left; apply/mapP; exists a => [|//]; by apply mem_enum.
   - right; apply/mapP; exists a => [|//]; by apply mem_enum.
 Qed.
@@ -307,7 +305,7 @@ Lemma FreeGroup_norm_unique w w':
   w == w' -> FreeGroup_norm w = FreeGroup_norm w'.
 Proof.
 elim=> [[r1 r2] w1 w2|//|? ? _ -> //|? ? ? _ -> _ -> //].
-rewrite /relations/=; unfold free_group_relations;
+rewrite /relations /= /free_group_relations;
 rewrite mem_cat => /orP []; move/mapP => [a Henum [-> ->]];
 apply /FreeGroup_norm_cat /FreeGroup_norm_cat_back => /=;
 by rewrite eq_refl.
@@ -417,6 +415,7 @@ Proof.
       by rewrite Hps !cat_law cons_law invl_right neutral_left.
 Qed.
 End FreelyReduced.
+Arguments freely_reduced {_}.
 
 Section FreeGroupUniversal.
 
@@ -449,9 +448,9 @@ Lemma FreeGroup_alphabet_extension_preserve_relations:
     FreeGroup_universal_extension u == FreeGroup_universal_extension v.
 Proof.
   move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]];
-  unfold FreeGroup_universal_extension;
-  unfold extension; unfold FreeGroup_alphabet_extension;
-  move => /=; rewrite associativity neutral_right.
+  rewrite/FreeGroup_universal_extension
+         /extension /FreeGroup_alphabet_extension /=
+         associativity neutral_right.
   - by rewrite inverse_left; reflexivity.
   - by rewrite inverse_right; reflexivity.
 Qed.

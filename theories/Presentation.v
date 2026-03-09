@@ -222,7 +222,7 @@ Lemma extension_universality:
     (forall w: presented P, 
       varphi w == extension w).
 Proof.
-  move => varphi Heq; unfold extension; elim => [|a w' IH] /=.
+  move => varphi Heq; rewrite /extension; elim => [|a w' IH] /=.
   - exact morphism_preserve_e.
   - have H: a :: w' = `[a]_P @ w' => [//|];
     by rewrite H morphism_preserve_law IH Heq.
@@ -231,10 +231,19 @@ Qed.
 Lemma extension_preserve_e: extension e == e.
 Proof. by []. Qed.
 
+Lemma extension_preserve_1: forall (c: sigma P), extension (`[c]_P) == f c.
+Proof.
+  (* TODO(reiniscirpons): Why did I need to unfold prod here in order
+     for simplification to work correctly? Can we make it automatically
+     unfold and simplify? I can't imagine when we would want to do anything
+     else. *)
+  by move => c; rewrite /extension /prod /= neutral_right.
+Qed.
+
 Lemma extension_preserve_law: forall (x y: presented P),
   extension (x @ y) == (extension x) @ (extension y).
 Proof.
-  move => x y; unfold extension; by rewrite -prod_cat map_cat.
+  move => x y; by rewrite /extension -prod_cat map_cat.
 Qed.
 
 (* TODO(reiniscirpons): No new instance was generated but thats ok,

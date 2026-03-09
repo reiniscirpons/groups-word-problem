@@ -36,7 +36,8 @@ Qed.
 End ProperMonoid.
 
 (* If `l = [a; b; c; ...; z]`, `prod l = a @ b @ ... @ z` *)
-Definition prod {M: monoid} (l: seq M) : M := foldr (fun y acc => y @ acc) e l.
+Definition prod {M: monoid} (l: seq M) : M :=
+  foldr (fun y acc => y @ acc) e l.
 
 Lemma prod0 {M: monoid} : @prod M nil = e.
 Proof. done. Qed.
@@ -213,6 +214,13 @@ have: (inv g) @ (inv (inv g)) == (inv g) @ g.
   by rewrite inverse_left inverse_right.
 move=> /(congruent_left g).
 by rewrite !associativity inverse_left !neutral_left.
+Qed.
+
+Lemma inverse_e: forall G: group, (@inv G e) == e.
+Proof.
+  move => G.
+  have: (@inv G e) @ e == e => [|{2}<-]; first by rewrite inverse_right.
+  by rewrite neutral_right.
 Qed.
 
 
@@ -469,6 +477,10 @@ have ->: Negz k = - (k.+1)%:Z by done.
 rewrite !power_inv -morphism_preserve_inv.
 by rewrite morphism_preserve_power_pos.
 Qed.
+
+(* TODO(reiniscirpons): I locked power here to avoid it being simplified
+   in contexts where we dont want it to be later on.*)
+Arguments power {_} _ _: simpl never.
 
 #[short(type="deceqGroupType")]
 HB.structure Definition DecEqGroup := { G of isGroup G & hasEq G & isMonoid G & hasDecEq G }.

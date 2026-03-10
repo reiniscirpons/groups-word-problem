@@ -1,5 +1,5 @@
 From HB Require Import structures.
-Require Import ssreflect RelationClasses Setoid Morphisms.
+Require Import ssreflect ssrfun RelationClasses Setoid Morphisms.
 
 (* TODO(reiniscirpons): How does this differ from eqType? *)
 
@@ -57,3 +57,20 @@ Variable f: setoidMorphism S T.
 Global Instance : Proper (eq ==> eq) f.
 Proof. exact: morphism_preserve_equiv. Qed.
 End ProperMorphism.
+
+Section SetoidMorphismComp.
+
+Variables (A B C: equivType).
+Variable (f: setoidMorphism A B).
+Variable (g: setoidMorphism B C).
+
+Lemma comp_preserve_equiv :
+  forall x y, x == y -> (g \o f) x == (g \o f) y.
+Proof.
+  move => x y H;
+  by apply /morphism_preserve_equiv /morphism_preserve_equiv.
+Qed.
+
+HB.instance Definition _ := isSetoidMorphism.Build A C (g \o f) comp_preserve_equiv.
+End SetoidMorphismComp.
+Arguments comp_preserve_equiv {_ _ _}.

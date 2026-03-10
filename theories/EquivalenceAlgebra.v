@@ -196,6 +196,26 @@ HB.builders Context
       cancel_right.
 HB.end.
 
+(** Composition of morphisms *)
+
+(* TODO(reiniscirpons): This feels like something that 
+   has already been done. *)
+Section MorphismComposition.
+
+Variables S T U: monoid.
+Variable f: morphism S T.
+Variable g: morphism T U.
+
+Lemma comp_preserve_e: (g \o f) e == e.
+Proof. by rewrite /comp !morphism_preserve_e. Qed.
+
+Lemma comp_preserve_law: forall x y,
+  (g \o f) (x @ y) == ((g \o f) x) @ ((g \o f) y).
+Proof. move => x y; by rewrite /comp !morphism_preserve_law. Qed.
+
+HB.instance Definition _ := isMonoidMorphism.Build S U (g \o f) comp_preserve_e comp_preserve_law.
+End MorphismComposition.
+
 (** Theory of groups *)
 
 HB.mixin Record isGroup G of hasEq G & isMonoid G := {
@@ -527,6 +547,10 @@ exists xS.
 by rewrite -Heq.
 Qed.
 
+Lemma in_subgroup_e {Group: group} {Subgroup: subgroup Group}:
+  e \insubgroup Subgroup.
+Proof. exists e; by rewrite morphism_preserve_e. Qed.
+
 Lemma in_subgroup_law {Group: group} {Subgroup: subgroup Group} (x y: Group):
   (x \insubgroup Subgroup) -> (y \insubgroup Subgroup) -> ((x @ y) \insubgroup Subgroup).
 Proof.
@@ -587,9 +611,29 @@ Proof.
     by rewrite -Hw -associativity inverse_left neutral_right.
 Qed.
 
-(* TODO(reiniscirpons): Prove coset relation is equivalence?. *)
-
+Instance RightCosetEqReflexivity : Reflexive right_coset_eq.
+Proof.
+  move => x; rewrite right_coset_eq'; exists e;
+  by rewrite morphism_preserve_e neutral_left.
+Qed.
+Instance RightCosetEqSymmetry : Symmetric right_coset_eq.
+Proof.
+  move => x y; rewrite !right_coset_eq'.
+  case => w Hw; exists (inv w).
+  by rewrite -morphism_preserve_inv -Hw associativity inverse_right neutral_left.
+Qed.
+Instance RightCosetEqTransitivity : Transitive right_coset_eq.
+Proof.
+  move => x y z; rewrite !right_coset_eq'.
+  move => [w1 H1] [w2 H2]; exists (w1 @ w2).
+  by rewrite morphism_preserve_law -associativity H2 H1.
+Qed.
+Instance RightCosetEqEquivalence : Equivalence right_coset_eq := {}.
 End RightCoset.
+Existing Instance RightCosetEqReflexivity.
+Existing Instance RightCosetEqSymmetry.
+Existing Instance RightCosetEqTransitivity.
+Existing Instance RightCosetEqEquivalence.
 Arguments right_coset_eq {_}.
 
 HB.mixin Record isRightCosetRep
@@ -600,11 +644,20 @@ HB.mixin Record isRightCosetRep
     right_coset_eq H x y -> f x = f y;
 }.
 
-#[short(type="righCosetRep")]
+#[short(type="rightCosetRep")]
 HB.structure Definition RightCosetRep (G: group) (H: subgroup G) :=
   { f of isRightCosetRep G H f }.
 
-(* TODO(reiniscirpons): Do we still need this? *)
+Lemma right_coset_eq_spec: forall G H (f: rightCosetRep G H) (x y: G),
+  (right_coset_eq H x y) <-> (f x = f y).
+Proof.
+  move => G H f x y; split.
+  - by apply right_coset_rep_unique.
+  move => Hf; transitivity (f x).
+  - by apply right_coset_rep_correct.
+  rewrite Hf; symmetry; by apply right_coset_rep_correct.
+Qed.
+
 HB.mixin Record isSubgroupCharacterizer (G: group) (P: G -> Type) := {
   P_law: forall x y, P x -> P y -> P (x @ y);
   P_neutral: P e;

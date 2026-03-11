@@ -291,176 +291,190 @@ Qed.
 
 Definition power {G: group} (w: G) (k: int) : G :=
   match k with
-  | Posz k => iter k (fun acc => acc @ w) e
-  | Negz k => inv (iter k (fun acc => acc @ w) w) (* Negx 0 is -1 *)
+  | Posz k => iter k (fun acc => w @ acc) e
+  | Negz k => iter k.+1 (fun acc => (inv w) @ acc) e (* Negx 0 is -1 *)
   end.
 
-Lemma power0 {G: group} (w: G) : power w 0 = e.
+Lemma power0 {G: group} (w: G): power w 0 = e.
 Proof. done. Qed.
+
+Lemma powerS {G: group} (w: G) (x: nat):
+  power w x.+1 = w @ (power w x).
+Proof. done. Qed.
+
+Lemma powerP {G: group} (w: G) (x: nat):
+  power w (- (x.+1: int)) = (inv w) @ (power w (- (x:int))).
+Proof. by case: x. Qed.
+
+(* TODO(reiniscirpons): I locked power here to avoid it being simplified
+   in contexts where we dont want it to be later on.
+   But now, it wont evaluate powers with a concrete, e.g.
+   power w (-1) is left unexpanded. Is there some intermediate that would
+   work? *)
+Arguments power {_} _ _: simpl never.
 
 Lemma power_e {G: group} (k: int) : power (e (s:=G)) k == (e (s:=G)).
 Proof.
-case: k => [k|k].
-- elim: k => [//|k /=].
-  by rewrite neutral_right.
-- elim: k => [/=|k /=]; first by rewrite inv_e.
-  by rewrite inverse_law inv_e neutral_left.
+  elim: k => [//||] k.
+  - by rewrite powerS => ->; rewrite neutral_left.
+  - by rewrite powerP => ->; rewrite neutral_right inv_e.
 Qed.
 
-Lemma powerS {G: group} (w: G) (x: nat) : power w x.+1 = (power w x) @ w.
-Proof. done. Qed.
-
-Lemma power_inv {G: group} (w: G) (x:int) : power w (- x) == inv (power w x).
+(* TODO(reiniscirpons): Should I be defining my own induction principles?*)
+Definition nat_pairs_ind: forall (P: nat -> Prop),
+  P 0 -> P 1 -> (forall n, P n -> P n.+1 -> P n.+2) ->
+  forall n, P n.
 Proof.
-elim: x => [|k|k /=].
-- by rewrite /= inv_e.
-- case: k => [_|k].
-    by rewrite /= inverse_law inv_e neutral_right.
-  by rewrite /= !inverse_law => ->.
-- case: k => [_|k].
-    by rewrite /= inv_involutive neutral_left.
-  by rewrite /= !inv_involutive => ->.
+  move => P H0 H1 HnSn n; enough (H: P n /\ P n.+1).
+  - by case: H.
+  elim: n => [//|n [Hn HSn]]; split => [//|].
+  by apply HnSn.
 Qed.
 
-Lemma powerP {G: group} (w: G) (x: nat) : power w (- x.+1%:Z) == (inv w) @ (power w (-x%:Z)).
-Proof. by rewrite power_inv powerS inverse_law power_inv. Qed.
-
-Lemma powerC' {G: group} (w: G) (x: int) : (power w x) @ w == w @ (power w x).
+Lemma power_inv {G: group} (w: G) (x:int):
+  power w (- x) == inv (power w x).
 Proof.
-elim: x => [|x /= eq|x].
+case: x; elim/nat_pairs_ind => [||k].
+- by rewrite /power /= inv_e.
+- by rewrite /power /= inverse_law neutral_right inv_e neutral_left.
+- rewrite !powerS !powerP !inverse_law => <- H.
+  by rewrite H -{2}H associativity.
+- by rewrite /power /= !neutral_right inv_involutive.
+- by rewrite /power /= !neutral_right inverse_law inv_involutive.
+- rewrite !powerS !powerP !inverse_law !inv_involutive => <- H.
+  by rewrite H -{2}H !associativity.
+Qed.
+
+Lemma powerC' {G: group} (w: G) (x: int):
+  (power w x) @ w == w @ (power w x).
+Proof.
+elim: x => [|x H|x].
 - by rewrite power0 neutral_left neutral_right.
-- by rewrite associativity -eq.
-- rewrite !power_inv /= inverse_law => eq.
-  rewrite -associativity eq.
-  by rewrite !associativity inverse_right inverse_left.
-Qed.
-
-Lemma powerC'' {G: group} (w: G) (x: int) : (power w x) @ (inv w) == (inv w) @ (power w x).
-Proof.
-elim: x => [|x eq|x].
-- by rewrite power0 neutral_left neutral_right.
-- rewrite powerS -associativity inverse_left neutral_right.
-  by rewrite powerC' associativity inverse_right neutral_left.
-- rewrite !power_inv => eq.
-  by rewrite powerS inverse_law -associativity eq.
-Qed.
-
-Lemma powerC {G: group} (w: G) (x y: int) : (power w x) @ (power w y) == (power w y) @ (power w x).
-Proof.
-elim: x.
-- by rewrite power0 neutral_left neutral_right.
-- move=> x /= eq.
+- by rewrite powerS -{2}H associativity.
+- rewrite !power_inv powerS /= inverse_law => eq.
   rewrite associativity -eq.
-  rewrite -!associativity.
-  by rewrite powerC'.
-- move=> x.
-  rewrite !power_inv powerS inverse_law => eq.
-  rewrite -associativity eq.
-  by rewrite !associativity powerC''.
+  by rewrite -!associativity inverse_left inverse_right neutral_right.
 Qed.
 
-Lemma powerS' {G: group} (w: G) (x: int) : power w (x + 1) == (power w x) @ w.
+Lemma powerC'' {G: group} (w: G) (x: int):
+  (power w x) @ (inv w) == (inv w) @ (power w x).
 Proof.
-elim: x => [//|x eq|x _].
-  by rewrite /= addn1.
-rewrite !power_inv powerS inverse_law -associativity.
-have ->: (- x.+1%:Z + 1) = (- x%:Z) by lia.
-rewrite associativity -inverse_law powerC' inverse_law.
-rewrite -associativity inverse_right neutral_right.
-by rewrite power_inv.
+  case: x.
+  - case => [|k].
+  -- by rewrite /power /= neutral_right neutral_left.
+  -- rewrite powerS -{1}powerC'.
+    by rewrite -associativity inverse_left associativity
+               inverse_right neutral_left neutral_right.
+  - elim => [|n H].
+  -- by rewrite /power /= neutral_right.
+  -- by rewrite powerP -{2}H associativity.
 Qed.
 
-Lemma powerP' {G: group} (w: G) (x: int) : power w (x - 1) == (inv w) @ (power w x).
+Lemma powerC {G: group} (w: G) (x y: int):
+  (power w x) @ (power w y) == (power w y) @ (power w x).
 Proof.
-elim: x => [|x eq|x eq].
-- by rewrite neutral_right.
-- have ->: x.+1%:Z - 1 = x by lia.
-  by rewrite powerS powerC' associativity inverse_right neutral_left.
-- have ->: - x.+1%:Z - 1 = - x.+2%:Z by lia.
-  by rewrite /= inverse_law.
+  elim: x => [|n IH|n IH].
+  - by rewrite power0 neutral_left neutral_right.
+  - by rewrite powerS -associativity IH associativity -powerC' associativity.
+  - by rewrite powerP -associativity IH associativity -powerC'' associativity.
 Qed.
 
-Lemma poweradd {G: group} (w: G) (x y: int) : power w (x + y) == (power w x) @ (power w y).
+Lemma powerS' {G: group} (w: G) (x: int):
+  power w (1 + x) == w @ (power w x).
 Proof.
-elim: x.
+  case: x => n /=.
+  - by rewrite /power /=.
+  - case: n => [|n].
+  -- by rewrite /power /= neutral_right inverse_left.
+  -- rewrite /power /= !associativity inverse_left neutral_left.
+     by have ->: (n.+1 - 1 = n)%N by case: n.
+Qed.
+
+Lemma powerP' {G: group} (w: G) (x: int):
+  power w (-1 + x) == (inv w) @ (power w x).
+Proof.
+  case: x => n /=.
+  - case: n => [|n].
+  -- by rewrite /power /= neutral_right.
+  -- rewrite /power /= associativity inverse_right neutral_left.
+     by have ->: (n.+1 - 1 = n)%N by case: n.
+  - by rewrite /power /=.
+Qed.
+
+Lemma power_add {G: group} (w: G) (x y: int):
+  power w (x + y) == (power w x) @ (power w y).
+Proof.
+elim: x => [|x H|x H].
 - by rewrite add0r power0 neutral_left.
-- move=> x eq.
-  rewrite powerS powerC' -associativity -eq -powerC'.
-  have ->: x.+1%:Z + y = (x%:Z + y) + 1 by lia.
-  by rewrite powerS'.
-- move=> x eq.
-  rewrite power_inv powerS inverse_law.
-  have ->: - x.+1%:Z + y = (- x%:Z + y) - 1 by lia.
-  by rewrite powerP' eq associativity power_inv.
+- have ->: x.+1%:Z + y = 1 + (x%:Z + y) by lia.
+  by rewrite powerS powerS' -associativity H.
+- have ->: - x.+1%:Z + y = -1 + (- x%:Z + y) by lia.
+  by rewrite powerP powerP' H associativity.
 Qed.
 
-Lemma power_switch_sign {G: group} (w: G) (x y: int): power (power w x) (- y) == power (power w (-x)) y.
+Lemma power_switch_sign {G: group} (w: G) (x y: int):
+  power (power w x) (- y) == power (power w (-x)) y.
 Proof.
 elim: y => [|y|y].
 - by rewrite oppr0 !power0.
 - rewrite powerP powerS => ->.
-  by rewrite -power_inv powerC'.
+  by rewrite -power_inv.
 - rewrite !opprK powerS powerP => ->.
-  by rewrite -powerC'' -power_inv opprK.
+  by rewrite -power_inv opprK.
 Qed.
 
-Lemma powerC'_tower {G: group} (w: G) (x y: int): power (power w x) y @ w == w @ power (power w x) y.
+Lemma powerC'_tower {G: group} (w: G) (x y: int):
+  power (power w x) y @ w == w @ power (power w x) y.
 Proof.
 elim: y => [|y|y].
 - by rewrite power0 neutral_left neutral_right.
-- rewrite powerS -associativity powerC' associativity => ->.
-  by rewrite associativity.
+- rewrite powerS -associativity => ->.
+  by rewrite associativity powerC' associativity.
 - rewrite powerP -associativity => ->.
   by rewrite associativity -power_inv powerC' associativity.
 Qed.
 
-Lemma powerC''_tower {G: group} (w: G) (x y: int): power (power w x) y @ (inv w) == (inv w) @ power (power w x) y.
+Lemma powerC''_tower {G: group} (w: G) (x y: int):
+  power (power w x) y @ (inv w) == (inv w) @ power (power w x) y.
 Proof.
 elim: y => [|y|y].
 - by rewrite power0 neutral_left neutral_right.
-- rewrite powerS -associativity powerC'' associativity => ->.
-  by rewrite associativity.
+- rewrite powerS -associativity => ->.
+  by rewrite associativity powerC'' associativity.
 - rewrite powerP -associativity => ->.
   by rewrite associativity -power_inv powerC'' associativity.
 Qed.
 
-Lemma powermul {G: group} (w: G) (x y: int) : power w (x * y) == power (power w x) y.
+Lemma power_mul {G: group} (w: G) (x y: int):
+  power w (x * y) == power (power w x) y.
 Proof.
 elim: x => [|x|x].
 - by rewrite mul0r !power0 power_e.
 - rewrite powerS.
   have ->: x.+1%:Z * y = x%:Z * y + y by lia.
-  rewrite poweradd => ->.
+  rewrite power_add => ->.
   elim: y => [|y|y].
   - by rewrite !power0 neutral_left.
   - rewrite !powerS => <-.
-    rewrite associativity -[(_ @ (power w x)) @ (power w y)]associativity.
-    by rewrite powerC associativity -associativity.
+    by rewrite !associativity -[w @ _]powerC' -![((_ @ w) @ _)]associativity
+            -powerC'_tower !associativity.
   - rewrite !power_switch_sign !powerP => <-.
-    rewrite powerS inverse_law.
-    rewrite associativity -[(_ @ _) @ inv w]associativity.
-    rewrite powerC'' associativity powerC''_tower.
-    rewrite associativity.
-    rewrite -[(_ @ (inv (power w x))) @ _]associativity.
-    rewrite -power_switch_sign -powerC'' associativity.
-    by rewrite !power_inv.
+    rewrite powerS inverse_law -power_inv.
+    by rewrite associativity -[(_ @ _) @ inv w]associativity
+            -associativity powerC''_tower !associativity.
 - have ->: - x.+1%:Z * y = - x%:Z*y + (-y) by lia.
-  rewrite poweradd => ->.
+  rewrite power_add => ->.
   elim: y => [|y|y].
   - by rewrite !power0 neutral_left.
-  - rewrite !powerS => <-.
-    rewrite -[(_ @ (power w (- y%:Z))) @ _]associativity powerC.
-    rewrite !powerP.
-    rewrite associativity -[(_ @ _) @ (inv w)]associativity.
-    by rewrite powerC'' -associativity.
+  - rewrite !powerS !powerP => <-.
+    by rewrite !associativity -[inv w @ _]powerC'' -![((_ @ inv w) @ _)]associativity
+            -powerC''_tower !associativity.
   - have ->: (- - y%:Z) = y%:Z by lia.
     have ->: (- - y.+1%:Z) = y.+1%:Z by lia.
-    rewrite powerS [power _ (- y.+1%:Z)]powerP.
-    rewrite associativity -[(_ @ _) @ power w y]associativity => ->.
-    rewrite -associativity.
-    rewrite powerC'_tower [power (power _ _) (- _.+1%:Z)]powerP.
-    rewrite !power_inv inv_involutive -!power_inv opprK.
-    by rewrite powerS associativity.
+    rewrite powerS ![power _ (- y.+1%:Z)]powerP => <-.
+    rewrite powerP inverse_law inv_involutive.
+    by rewrite !associativity -[(_ @ _) @ w]associativity
+            -associativity  powerC'_tower  !associativity.
 Qed.
 
 Lemma power_proper_pos {G: group} (x y: G) (k: nat):
@@ -498,9 +512,6 @@ rewrite !power_inv -morphism_preserve_inv.
 by rewrite morphism_preserve_power_pos.
 Qed.
 
-(* TODO(reiniscirpons): I locked power here to avoid it being simplified
-   in contexts where we dont want it to be later on.*)
-Arguments power {_} _ _: simpl never.
 
 #[short(type="deceqGroupType")]
 HB.structure Definition DecEqGroup := { G of isGroup G & hasEq G & isMonoid G & hasDecEq G }.

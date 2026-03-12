@@ -1,6 +1,6 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import eqtype seq fintype choice ssrnat.
+From mathcomp Require Import eqtype seq fintype choice ssrnat all_algebra.
 Require Import Setoid Morphisms.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
@@ -106,7 +106,7 @@ Lemma InverseAlphabet_enumP:
 Proof.
   move => a; rewrite /InverseAlphabet_enum.
   (* TODO(reiniscirpons): Should I import ssrnat? *)
-  have H: ssrnat.nat_of_bool (a \in InverseAlphabet_enum) = 1.
+  have H: ssrnat.nat_of_bool (a \in InverseAlphabet_enum) = 1%N.
   - by rewrite InverseAlphabet_enum_in.
   rewrite -H; apply count_uniq_mem.
   by exact InverseAlphabet_enum_uniq.
@@ -287,7 +287,7 @@ Qed.
 
 Lemma FreeGroup_norm_inv w:
   FreeGroup_norm (inv w) = inv (FreeGroup_norm w).
-Proof. 
+Proof.
   by rewrite /inv/=/inv_word/= -FreeGroup_norm_rev FreeGroup_norm_map_invl.
 Qed.
 
@@ -315,6 +315,12 @@ Lemma FreeGroup_norm_involutive:
   forall w, FreeGroup_norm (FreeGroup_norm w) = FreeGroup_norm w.
 Proof.
   move => w; apply FreeGroup_norm_unique; by rewrite FreeGroup_norm_correct.
+Qed.
+
+Lemma FreeGroup_norm_law:
+  forall x y, FreeGroup_norm (x @ y) = FreeGroup_norm(FreeGroup_norm x @ FreeGroup_norm y).
+Proof.
+  move => x y; apply FreeGroup_norm_unique; by rewrite !FreeGroup_norm_correct.
 Qed.
 
 Lemma FreeGroup_norm_cons_invl: forall c (w: FreeGroup),
@@ -353,13 +359,33 @@ Lemma eqprop_to_FreeGroup_dec_eq w w':
   (w == w') -> (FreeGroup_dec_eq w w').
 Proof. by move=> eq; exact /eqP /FreeGroup_norm_unique. Qed.
 
-Lemma FreeGroup_dec_eq_reflect w w':
+Lemma FreeGroup_dec_eqP w w':
   reflect (w == w') (FreeGroup_dec_eq w w').
 Proof.
 apply /(iffP idP) => eq.
 - exact: FreeGroup_dec_eq_to_eqprop.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
+
+Global Instance : Proper (eq ==> eq_op) FreeGroup_norm.
+Proof.
+  by move => x y; move/FreeGroup_norm_unique => ->.
+Qed.
+
+
+Lemma FreeGroup_norm_power1: forall c n,
+  FreeGroup_norm (power (`[c]_FGP) n) = power (`[c]_FGP) n.
+Proof.
+  (*move => c; elim => [//||] [//|n IH].*)
+  (* TODO: Why does it not allow me to do this rewrite despite FreeGroup_norm
+           being Proper? *)
+  (*- apply/eqP; rewrite {1}powerS powerC'.*)
+  move => c; case; elim/nat_pairs_ind => [//|//|n IH1 _].
+  - rewrite !powerS /= {}IH1; case: n; by case: c.
+  - by case: c.
+  - move: IH1; rewrite !powerP => /= -> /=; by case: c.
+Qed.
+
 
 End FreeGroup.
 Arguments FreeGroup_norm {_}.

@@ -372,21 +372,21 @@ Proof.
   rewrite [apbq_projection]lock /= -lock.
   case HsqP: (state == q.-1)%B.
   - rewrite morphism_preserve_law
-    {2}[apbq_projection]lock /= /(\hat_) /extension /prod /=.
+    {2}[apbq_projection]lock /= /(\hat_) /extension /prod /= /nth_gen /=.
     rewrite neutral_right -associativity -lock (H 0 H0q).
     move/eqP: HsqP => ->; rewrite /b_encoding/=.
     (* NOTE(reiniscirpons): by solve_group_powers *)
-    rewrite power0 neutral_left (cons_law _ _ w) associativity -powerS.
+    rewrite power0 neutral_left (cons_law _ _ w) associativity.
     (* TODO(reiniscirpons): slighly annoying to do casework here,
            can we do better? *)
-    by case: q H0q.
+    by case: q H0q => [//|n _ /=]; rewrite powerS powerC'.
   (* TODO(reiniscirpons): Is there a faster way to conclude this? *)
   - have HSsq: (state.+1 < q)%N.
   -- rewrite leq_eqVlt in Hsq; case/orP: Hsq HsqP => [|//];
      by move/eqP => <-; rewrite eq_refl.
   -- rewrite morphism_preserve_law /= {1}/(\hat _) /extension /prod /=.
      rewrite neutral_left (H state.+1 HSsq).
-     by rewrite (cons_law _ _ w) associativity -powerS.
+     by rewrite (cons_law _ _ w) associativity powerS powerC'.
 Qed.
 
 Local Lemma Stallings_automaton_product_invl_b: forall (w: F2),
@@ -397,22 +397,22 @@ Proof.
   rewrite [apbq_projection]lock /= -lock.
   case HsqP: (state == 0)%B.
   - rewrite morphism_preserve_law
-    {2}[apbq_projection]lock /= /(\hat_) /extension /prod /=.
+    {2}[apbq_projection]lock /= /(\hat_) /extension /prod /= /nth_gen /=.
     rewrite neutral_right -associativity -lock (H q.-1 HPqq).
     case: q H0q => [//|m _ /=].
     move/eqP: HsqP => ->; rewrite /b_encoding/=.
     (* NOTE(reiniscirpons): by solve_group_powers *)
-    by rewrite power0 neutral_left powerS inverse_law -associativity
+    by rewrite power0 neutral_left powerS -powerC' inverse_law -associativity
             (associativity (inv (power _ _))) inverse_right
             neutral_left.
   (* TODO(reiniscirpons): Is there a faster way to conclude this? *)
   - have HSsq: (state.-1 < q)%N.
   -- case: state Hsq HsqP => [//|state Hsq _ /=].
      by apply ltn_trans with state.+1.
-  -- rewrite morphism_preserve_law /= {1}/(\hat _) /extension /prod /=.
+  -- rewrite morphism_preserve_law /= {1}/(\hat _) /extension /prod /= /nth_gen /=.
      rewrite neutral_left (H state.-1 HSsq).
      case: state HsqP Hsq HSsq => [//|state _ _ _ /=].
-     by rewrite (cons_law _ _ w) powerS !associativity
+     by rewrite (cons_law _ _ w) powerS -powerC' !associativity
              -(associativity _ b) inverse_left neutral_right.
 Qed.
 
@@ -448,11 +448,22 @@ Proof.
 Qed.
 
 Lemma Stallings_automaton_remainder_subgroup:
-  forall (state: nat) (x w: F2),
-  (state < q)%N ->
-  freely_reduced x -> (power b state) @ x == apbq_projection w ->
-  Stallings_automaton_remainder state x = [::].
-(* TODO(reiniscirpons): Do this *)
+  forall (state: nat) (w: F2),
+  (* TODO(reiniscirpons): we have a bit of level switching here, since we are
+   * now working with words versus group elements. In theory this is
+   * distinguished by == versus =, but maybe there is a better way of
+   * distinguishing it?*)
+  Stallings_automaton_remainder
+    state
+    (power b (- (state: int)) @ apbq_projection w) = [::].
+  (* TODO(reiniscirpons): Do this *)
+Proof.
+  elim => [|state IH w]; last first.
+  (* NOTE(reiniscirpons): Wow, this just works! *)
+  - by rewrite powerP -cons_law -cat_law /= IH.
+  - elim => [//| [|] [] [| [|//]] Hc w];
+    rewrite power0 -!cat_law [apbq_projection]lock /= -lock => IH.
+  (* TODO(reiniscirpons): finish *)
 Admitted.
 
 Lemma Stallings_automaton_quotient_freely_reduced:
@@ -460,7 +471,7 @@ Lemma Stallings_automaton_quotient_freely_reduced:
   (state < q)%N ->
   freely_reduced x -> (power b state) @ x == apbq_projection w ->
   Stallings_automaton_quotient state x = FreeGroup_norm w.
-(* TODO(reiniscirpons): Do this *)
+  (* TODO(reiniscirpons): Do this *)
 Admitted.
 
 
@@ -471,7 +482,7 @@ Lemma Stallings_automaton_remainder_unique:
   (right_coset_eq H ((power b statex) @ x) ((power b statey) @ y)  ->
   Stallings_automaton_remainder statex x =
   Stallings_automaton_remainder statey y).
-(* TODO(reiniscirpons): Do this *)
+  (* TODO(reiniscirpons): Do this *)
 Admitted.
 
 

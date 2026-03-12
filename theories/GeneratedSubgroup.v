@@ -474,7 +474,6 @@ Lemma Stallings_automaton_quotient_freely_reduced:
   (* TODO(reiniscirpons): Do this *)
 Admitted.
 
-
 Lemma Stallings_automaton_remainder_unique:
   forall (statex statey: nat) (x y: F2),
   freely_reduced x ->
@@ -485,5 +484,34 @@ Lemma Stallings_automaton_remainder_unique:
   (* TODO(reiniscirpons): Do this *)
 Admitted.
 
+Definition apbq_coset_rep (w: F2) :=
+  Stallings_automaton_remainder 0 (FreeGroup_norm w).
+
+Lemma apbq_coset_rep_correct:
+  forall (x: F2), right_coset_eq H x (apbq_coset_rep x).
+Proof.
+  move => x; apply right_coset_eq'.
+  move/right_coset_eq':
+    (Stallings_automaton_remainder_correct (FreeGroup_norm x)) => [w Hw].
+  exists w; move: Hw; by rewrite -{4}[x]FreeGroup_norm_correct.
+Qed.
+
+Lemma apbq_coset_rep_unique:
+  forall (x y: F2),
+    right_coset_eq H x y -> apbq_coset_rep x = apbq_coset_rep y.
+Proof.
+  move => x y Hxy; move/right_coset_eq': Hxy => [w Hw].
+  apply Stallings_automaton_remainder_unique.
+  - by apply freely_reduced_correct; rewrite FreeGroup_norm_involutive.
+  - by apply freely_reduced_correct; rewrite FreeGroup_norm_involutive.
+  - rewrite power0; apply right_coset_eq'; exists w.
+    by rewrite !neutral_left !FreeGroup_norm_correct.
+Qed.
+
+HB.instance Definition _ :=
+  isRightCosetRep.Build _ _
+    apbq_coset_rep
+    apbq_coset_rep_correct
+    apbq_coset_rep_unique.
 
 End NielsenSchreierStalling.

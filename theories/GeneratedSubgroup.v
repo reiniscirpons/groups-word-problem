@@ -392,6 +392,7 @@ Qed.
     I guess I should implement it ... *)
 (* NOTE(reiniscirpons):
     group axioms -> dealt with by using free group normal forms, i.e.
+
     1. Use `rewrite !inverse_law` to move all inversions as low down
       in the term tree as possible, now all inverses should be at the
       bottom.

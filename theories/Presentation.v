@@ -93,21 +93,20 @@ Let epsilon : seq (sigma P) := nil.
 Infix ".@" := (concat: M -> M -> M) (at level 50).
 
 Let associativity : forall (x y z : M), x .@ (y .@ z) == (x .@ y) .@ z.
-Proof. move=> x y w; rewrite /concat catA; reflexivity. Qed.
+Proof. by move=> x y w; rewrite /concat catA. Qed.
 Let neutral_left : forall (x: M), epsilon .@ x == x.
-Proof. move=> x; rewrite /concat /=; reflexivity. Qed.
+Proof. by move=> x; rewrite /concat /=. Qed.
 Let neutral_right : forall (x: M), x .@ epsilon == x.
-Proof. move=> x; rewrite /concat cats0; reflexivity. Qed.
+Proof. by move=> x; rewrite /concat cats0. Qed.
 
 Lemma congruent_left: forall (a u v: M),
   u == v -> a .@ u == a .@ v.
 Proof.
-move=> a u v; elim.
+move=> a u v; elim => [|//||].
 - move=> r c b H.
   rewrite /concat -!(catA c) !(catA a) !(catA (a ++ c)).
   apply: (Derivation_reduction _ (r.1, r.2)).
   by move: H; case r.
-- reflexivity.
 - by symmetry.
 - by move=> ? v'; transitivity (a .@ v').
 Qed.
@@ -115,12 +114,11 @@ Qed.
 Lemma congruent_right: forall (b u v: M),
   u == v -> u .@ b == v .@ b.
 Proof.
-move=> b u v; elim.
+move=> b u v; elim => [|//||].
 - move=> r a c H.
   rewrite /concat -!(catA a) -!(catA _ _ b) !(catA a).
   apply: (Derivation_reduction _ (r.1, r.2)).
   by move: H; case r.
-- reflexivity.
 - by symmetry.
 - by move=> ? a; transitivity (a .@ b).
 Qed.
@@ -289,7 +287,7 @@ elim=> [|a w IH]; first exact: neutral_left.
 rewrite /inv_word/law/= rev_cons map_rcons -rcons_cat -cats1 -cat1s.
 have: `[a]_P @ ((w: presented P) @ inv_word w) @ `[invl a]_P == e;
   last by done.
-rewrite IH invl_left; reflexivity.
+by rewrite IH invl_left.
 Qed.
 
 Lemma inv_word_right : forall w: G, (inv_word w) @ w == e.
@@ -297,7 +295,7 @@ Proof.
 elim=> [|a w IH]; first exact: neutral_left.
 rewrite /inv_word/law/= rev_cons map_rcons cat_rcons -cat1s -(cat1s a) !(catA _ _ w).
 have: (inv_word w) @ (`[invl a]_P @ `[a]_P) @ w == e; last by done.
-rewrite invl_right neutral_right IH; reflexivity.
+by rewrite invl_right neutral_right IH.
 Qed.
 
 HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
@@ -315,14 +313,14 @@ Lemma cancel_left : a @ x == a @ y -> x == y.
 Proof.
 move=> H.
 rewrite -(neutral_left x) -(neutral_left y) -(inverse_right a) -!associativity.
-rewrite H; reflexivity.
+by rewrite H.
 Qed.
 
 Lemma cancel_right : x @ a == y @ a -> x == y.
 Proof.
 move=> H.
 rewrite -(neutral_right x) -(neutral_right y) -(inverse_left a) !associativity.
-rewrite H; reflexivity.
+by rewrite H.
 Qed.
 
 End Cancelation.

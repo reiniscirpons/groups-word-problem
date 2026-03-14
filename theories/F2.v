@@ -477,8 +477,8 @@ Proof.
   rewrite/FreeGroup_universal_extension
          /extension /FreeGroup_alphabet_extension /=
          associativity neutral_right.
-  - by rewrite inverse_left; reflexivity.
-  - by rewrite inverse_right; reflexivity.
+  - by rewrite inverse_left.
+  - by rewrite inverse_right.
 Qed.
 
 HB.instance Definition _ := isRelationPreservingMorphism.Build

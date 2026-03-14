@@ -43,7 +43,7 @@ Lemma prod0 {M: monoid} : @prod M nil = e.
 Proof. done. Qed.
 
 Lemma prod1s {M: monoid} (a: M) (l: seq M) : prod (a :: l) == a @ prod l.
-Proof. rewrite /prod/=; reflexivity. Qed.
+Proof. by rewrite /prod. Qed.
 
 Lemma prod_cat {M: monoid} (l1 l2: seq M): prod (l1 ++ l2) == (prod l1) @ (prod l2).
 Proof.
@@ -691,7 +691,7 @@ Definition subgroupby_inj (x: subgroup_by): G := x.(sb_point).
 
 Definition subgroupby_eq (x y: subgroup_by) := (subgroupby_inj x) == (subgroupby_inj y).
 Lemma subgroupby_eq_refl: forall x, subgroupby_eq x x.
-Proof. move=> x; rewrite /subgroupby_eq; reflexivity. Qed.
+Proof. by move=> x; rewrite /subgroupby_eq. Qed.
 Lemma subgroupby_eq_sym: forall x y, subgroupby_eq x y -> subgroupby_eq y x.
 Proof. move=> x y; rewrite /subgroupby_eq; by symmetry. Qed.
 Lemma subgroupby_eq_trans: forall x y z, subgroupby_eq x y -> subgroupby_eq y z -> subgroupby_eq x z.

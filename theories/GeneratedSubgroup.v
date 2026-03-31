@@ -125,16 +125,17 @@ Section NielsenSchreierStalling.
 Notation Sigma := (ordinal 2).
 Notation F2P := (FGP Sigma).
 Notation F2 := (FreeGroup Sigma).
-Notation o0 := (Ordinal (ltn_ord 0)).
-Notation o1 := (Ordinal (ltn_ord 1)).
-Notation a := (`[Base o0]_F2P).
-Notation b := (`[Base o1]_F2P).
+Notation a := (Base 0).
+Notation b := (Base 1).
+Notation "a^-1" := (Inverse 0).
+Notation "b^-1" := (Inverse 1).
 
 (* NOTE(reiniscirpons): a_p = b^p a b^{-p} *)
-Definition a_encoding (p: int): F2 := (power b p) @ a @ inv (power b p).
+Definition a_encoding (p: int): F2 :=
+  (power (`[b]_F2P) p) @ (`[a]_F2P) @ inv (power (`[b]_F2P) p).
 
 (* NOTE(reiniscirpons): b^q is the other generator *)
-Definition b_encoding (q: int): F2 := power b q.
+Definition b_encoding (q: int): F2 := power (`[b]_F2P) q.
 
 Variable p q: nat.
 
@@ -241,194 +242,203 @@ match stack with
        reductions yet. *)
 | [::] => 
   match letter with
-  | Base (Ordinal 0 _) =>
-    (* NOTE(reiniscirpons): State p corresponds to prefix b^p, if we read a
-    * here, then we need to use the first gen, hence we output an a too.
-    * It is a loop since b^p a b^{-p}^k = b^p a^k b^{-p}. *)
-    if state == p then (state, [::], a)
-    (* NOTE(reiniscirpons): Can't have a prefix of a_p or b^q anymore,
-           unless we can freely reduce it.*)
-    else (state, [:: letter], e)
-  (* NOTE(reiniscirpons): a^{-1} is treated exactly the same, can only read it
-  * after b^p, in which case we can read an arbitrary amount. *)
-  | Inverse (Ordinal 0 _) =>
-      if state == p then (state, [::], inv a)
-      else (state, [:: letter], e)
-  (* NOTE(reiniscirpons): b's move the state around in a loop modulo q.
-    b^{-1}'s do the same thing only in reverse. We count a b^q after
-    a full loop and emit a b when its done. For b^-q, we count
-    it immediately, as soon as the first b^{-1} is used. This is 
-    a techical requirement because of how we calculate the coset representative
-    later on. *)
-  | Base (Ordinal 1 _) =>
-      if state == (q.-1) then (0, [::], b)
-      else (state.+1, [::], e)
-  | Inverse (Ordinal 1 _) =>
-      if state == 0 then (q.-1, [::], inv b)
-      else (state.-1, [::], e)
-  (* NOTE(reiniscirpons): Because our alphabet only has 2 letters, this
-         match is unreachable. We make it a noop. *)
-  | _ => (state, stack, e)
+  | Base o =>
+    if o == 0 then
+      (* NOTE(reiniscirpons): State p corresponds to prefix b^p, if we
+         read "a" here, then we need to use the first gen, hence we output
+         an "a" too. It is a loop since b^p a b^{-p}^k = b^p a^k b^{-p}. *)
+      if state == p then (state, [::], [:: a])
+      (* NOTE(reiniscirpons): Can't have a prefix of a_p or b^q anymore,
+            unless we can freely reduce it.*)
+      else (state, [:: a], [::])
+    else
+      (* NOTE(reiniscirpons): Since F2 is 2-generated, these are
+         in this case we must have that o == 1. *)
+      (* NOTE(reiniscirpons): b's move the state around in a loop modulo q.
+        b^{-1}'s do the same thing only in reverse. We count a b^q after
+        a full loop and emit a b when its done. For b^-q, we count
+        it immediately, as soon as the first b^{-1} is used. This is 
+        a techical requirement because of how we calculate the coset representative
+        later on. *)
+      if state == (q.-1) then (0, [::], [:: b])
+      else (state.+1, [::], [::])
+  | Inverse o =>
+    if o == 0 then
+      (* NOTE(reiniscirpons): a^{-1} is treated exactly the same, can only
+         read it after b^p, in which case we can read an arbitrary amount. *)
+      if state == p then (state, [::], [:: a^-1])
+      else (state, [:: a^-1], [::])
+    else 
+      if state == 0 then (q.-1, [::], [:: b^-1])
+      else (state.-1, [::], [::])
   end
 (* NOTE(reiniscirpons): A non-empty stack means we need to do
        free reductions. *)
 | stack_head::stack_tail => 
-  if letter == invl stack_head then (state, stack_tail, e)
-  else (state, letter::stack, e)
+  if letter == invl stack_head then (state, stack_tail, [::])
+  else (state, letter::stack, [::])
 end.
 
-Lemma Stallings_automaton_transition_state_ltq:
-  forall state stack letter state' stack' output,
-    Stallings_automaton_transition state stack letter =
-    (state', stack', output) ->
-    (state < q)%N ->
-    (state' < q)%N.
+(* TODO(reiniscirpons): Is this the correct way to define
+   a sort-of induction principle for the transition system? *)
+Lemma Stallings_automaton_transition_invariant_ind:
+  forall P: nat -> F2 -> sigma F2P -> (nat * F2 * IndexFG) -> Prop,
+    P p [::] a (p, [::], [:: a]) ->
+    (forall state,
+      (state == p)%B = false ->
+      P state [::] a (state, [:: a], [::])) ->
+    P q.-1 [::] b (0, [::], [:: b]) ->
+    (forall state,
+      (state == q.-1)%B = false ->
+      P state [::] b (state.+1, [::], [::])) ->
+    P p [::] a^-1 (p, [::], [:: a^-1]) ->
+    (forall state,
+      (state == p)%B = false ->
+      P state [::] a^-1 (state, [:: a^-1], [::])) ->
+    P 0 [::] b^-1 (q.-1, [::], [:: b^-1]) ->
+    (forall state,
+      (state == 0)%B = false ->
+      P state [::] b^-1 (state.-1, [::], [::])) ->
+    (forall state stack_head stack_tail,
+      P state (stack_head::stack_tail) (invl stack_head)
+        (state, stack_tail, [::])
+    ) ->
+    (forall state stack_head stack_tail letter,
+      (letter == invl stack_head)%B = false ->
+      P state (stack_head::stack_tail) letter
+        (state, letter::stack_head::stack_tail, [::])
+    ) ->
+    (forall state stack letter,
+      P state stack letter
+      (Stallings_automaton_transition state stack letter)
+    ).
 Proof.
-  (* TODO(reiniscirpons): separate this out into an induction principle? *)
-  move => state [[] [] [|[|//]] Hc|stack_head stack_tail letter]
-          state' stack' output /=.
-  - case Hsp: (state == p)%B; by case => <- _ _.
-  - case Hsp: (state == q.-1)%B; by case => <- _ _ Hsq; lia.
-  - case Hsp: (state == p)%B; by case => <- _ _.
-  - case Hsp: (state == 0)%B; by case => <- _ _ Hsq; lia.
-  - case Hlh: (letter == invl stack_head)%B; by case => <- _ _.
+  assert (Hletter: forall letter: Sigma, 
+    (letter == 0)%B = false -> (letter == 1)%B).
+  - by move => [] [|[|]].
+  move => P Hnilap HnilapF Hnilbq HnilbqF
+          Hnilinvap HnilinvapF Hnilinvb0 Hnilinvb0F
+          Hbehead Hcons;
+  move => state [|stack_head stack_tail letter].
+  case => letter /=; case: ifP => [|/Hletter] /eqP ->;
+  case: ifP => [/eqP -> //|].
+  - by apply HnilapF.
+  - by apply HnilbqF.
+  - by apply HnilinvapF.
+  - by apply Hnilinvb0F.
+  rewrite /=; case: ifP => [/eqP ->|].
+  - by apply Hbehead.
+  - by apply Hcons.
 Qed.
-Arguments Stallings_automaton_transition_state_ltq {_ _ _ _ _ _}.
+
+Lemma Stallings_automaton_transition_state_ltq:
+  forall state stack letter,
+    (state < q)%N ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+      (state' < q)%N.
+Proof.
+  move => state stack letter.
+  apply Stallings_automaton_transition_invariant_ind => 
+    [//|//|||//|//|||//|//]; by lia.
+Qed.
+
+(* TODO(reiniscirpons): use the following for ternary casework on
+   a pair of naturals:
+    ltngtP: 3 case analysis*)
 
 Lemma Stallings_automaton_transition_product:
-  forall state stack letter state' stack' output,
-    Stallings_automaton_transition state stack letter =
-    (state', stack', output) ->
+  forall state stack letter,
     (state < q)%N ->
-    (power b state) @ (rev stack: F2) @ (`[letter]_F2P) ==
-    (apbq_projection output) @ (power b state') @ (rev stack': F2).
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+      (power (`[b]_F2P) state) @ (rev stack: F2) @ (`[letter]_F2P) ==
+      (apbq_projection output) @ (power (`[b]_F2P) state') @ (rev stack': F2).
 Proof.
-  move => state [[] [] [|[|//]] Hc|stack_head stack_tail letter]
-          state' stack' output Hstate Hq;
-  move: Hstate => /=.
-  (* TODO(reiniscirpons): Why does Rocq not figure this out by itself? *)
-  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
-    case Hsp: (state == p)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /nth_gen /rev /=.
-  -- move/eqP: Hsp => ->; rewrite /a_encoding.
-      (* TODO: by group *)
-      by rewrite -!associativity !neutral_left !neutral_right
+  move => state stack letter.
+  apply Stallings_automaton_transition_invariant_ind => 
+    [_|state' _ _|/=|state' _ _|/= _|state' _ _|/=|
+    |state' stack_head stack_tail _
+    |state' stack_head stack_tail letter' _ _].
+  (* TODO: by group *)
+  - by rewrite -!associativity !neutral_left !neutral_right
                 inverse_right neutral_right.
-     (* TODO: by group *)
-  -- by rewrite neutral_left neutral_right.
-  - rewrite (bool_irrelevance Hc (ltn_ord 1)).
-    case Hsq: (state == q.-1)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /= /nth_gen /= /rev /=.
-  -- move/eqP: Hsq => ->; rewrite /b_encoding.
-     rewrite !neutral_right; case: q H0q => [//|m _ /=].
-     by rewrite powerS powerC'.
-     (* TODO: by solve_group_powers *)
-  -- by rewrite !neutral_right neutral_left powerS powerC'.
-  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
-    case Hsp: (state == p)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /= /nth_gen /= /rev /=.
-  -- move/eqP: Hsp => ->; rewrite /a_encoding.
-      (* TODO: by group *)
-      by rewrite !inverse_law !inv_involutive -!associativity !neutral_left
+  (* TODO: by group *)
+  - by rewrite neutral_left neutral_right.
+  - case: q => [//|m _ /=].
+  (* TODO(reiniscirpons): Add lemma for doing this expansion. *)
+    rewrite /(\hat _) /extension /prod /nth_gen /b_encoding /=.
+  (* TODO: by group_powers *)
+    by rewrite !neutral_right powerS powerC'.
+  (* TODO: by group_powers *)
+  - by rewrite !neutral_right neutral_left powerS powerC'.
+  - rewrite /(\hat _) /extension /prod /nth_gen /=.
+  (* TODO: by group *)
+    by rewrite !inverse_law !inv_involutive -!associativity !neutral_left
               !neutral_right inverse_right neutral_right.
-     (* TODO: by group *)
-  -- by rewrite neutral_left neutral_right.
-  - rewrite (bool_irrelevance Hc (ltn_ord 1)).
-    case Hs0: (state == 0)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /= /nth_gen /= /rev /=.
-  -- move/eqP: Hs0 Hq => -> Hq; rewrite /b_encoding.
-     case: q Hq => [//|m _ /=].
+  (* TODO: by group *)
+  - by rewrite neutral_left neutral_right.
+  - case: q => [//|m _ /=].
+    rewrite /(\hat _) /extension /prod /nth_gen /b_encoding /=.
      (* TODO: by solve_group_powers *)
      by rewrite power0 !neutral_right !neutral_left powerS -powerC'
              inverse_law -associativity inverse_right neutral_right.
+  - case => [//|m _ _ /=].
      (* TODO: by solve_group_powers *)
-  -- case: state Hs0 Hq => [//|m _ _ /=].
-     by rewrite neutral_left neutral_right powerS -powerC' -associativity
+    by rewrite neutral_left neutral_right powerS -powerC' -associativity
              inverse_left neutral_right.
-  - case Hlh: (letter == invl stack_head)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /= /nth_gen /= /rev /= !catrevE
-     (* TODO(reiniscirpons): Why do I need to do the cast here? *)
-            !(cat_law _ (rev _: F2)).
-     (* TODO: by group *)
-  -- move/eqP: Hlh => ->.
-     by rewrite neutral_left neutral_right -!associativity inverse_left
+  - rewrite rev_cons rcons_law.
+    (* TODO: by group *)
+    by rewrite neutral_left -!associativity inverse_left
              neutral_right.
-     (* TODO: by group *)
-  -- by rewrite neutral_left -!associativity. 
+  - rewrite !rev_cons !rcons_law.
+    (* TODO: by group *)
+    by rewrite neutral_left -!associativity. 
 Qed.
-Arguments Stallings_automaton_transition_product {_ _ _ _ _ _}.
-
 
 Lemma Stallings_automaton_transition_stack_reduced:
-  forall state stack letter state' stack' output,
-    Stallings_automaton_transition state stack letter =
-    (state', stack', output) ->
+  forall state stack letter,
     freely_reduced stack ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
     freely_reduced stack'.
 Proof.
-  move => state [[] [] [|[|//]] Hc|stack_head stack_tail letter]
-          state' stack' output /=.
-  - case Hsp: (state == p)%B; case => _ <- _.
-  -- by [].
-  -- move => _; by apply freely_reduced_cons1.
-  - case Hsp: (state == q.-1)%B; by case => _ <- _.
-  - case Hsp: (state == p)%B; case => _ <- _.
-  -- by [].
-  -- move => _; by apply freely_reduced_cons1.
-  - case Hsp: (state == 0)%B; by case => _ <- _.
-  - case Hlh: (letter == invl stack_head)%B; case => _ <- _.
-  -- by apply freely_reduced_behead.
-  -- by move/eqP: Hlh; apply freely_reduced_cons2.
+  move => state stack letter;
+  apply Stallings_automaton_transition_invariant_ind =>
+    [//|_ _ _|//|//|//|_ _ _|//|//
+    |_ stack_head stack_tail|_ stack_head stack_tail letter' /eqP].
+  - apply freely_reduced_cons1.
+  - apply freely_reduced_cons1.
+  - apply freely_reduced_behead.
+  - apply freely_reduced_cons2.
 Qed.
 
-Search last.
-
 Lemma Stallings_automaton_transition_stack_last_a:
-  forall state stack letter state' stack' output,
-    Stallings_automaton_transition state stack letter =
-    (state', stack', output) ->
+  forall state stack letter,
     stack = [::] \/
-    (exists p, stack = rcons p (Base o0)) \/
-    (exists p, stack = rcons p (Inverse o0)) ->
-    stack' = [::] \/
-    (exists p, stack' = rcons p (Base o0)) \/
-    (exists p, stack' = rcons p (Inverse o0)).
+    (exists pfx, stack = rcons pfx a) \/
+    (exists pfx, stack = rcons pfx a^-1) ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+      stack' = [::] \/
+      (exists pfx, stack' = rcons pfx a) \/
+      (exists pfx, stack' = rcons pfx a^-1).
 Proof.
-  move => state [[] [] [|[|//]] Hc|stack_head stack_tail letter]
-          state' stack' output /=.
-  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
-    case Hsp: (state == p)%B; case => _ <- _ _.
+  move => state stack letter;
+  apply Stallings_automaton_transition_invariant_ind =>
+    [//|state' _ _|//|//|//|state' _ _|//|//
+    |_ stack_head stack_tail
+    |_ stack_head stack_tail letter' _].
+  - by right; left; exists [::].
+  - by right; right; exists [::].
+  - case => [//|[|] [] [/= [] _ H|ph pt /= [] _ Ht]].
   -- by left.
-  -- by right; left; exists [::].
-  - case Hsp: (state == q.-1)%B; by case => _ <- _.
-  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
-    case Hsp: (state == p)%B; case => _ <- _ _.
+  -- by right; left; exists pt.
   -- by left.
-  -- by right; right; exists [::].
-  - case Hsp: (state == 0)%B; by case => _ <- _.
-  - case Hlh: (letter == invl stack_head)%B; case => _ <- _ [//|[] [s]].
-  (* TODO(reiniscirpons): Whats the most efficient way of doing these sorts
-     of highly symmetrical proofs more efficiently?*)
-  -- rewrite -(revK stack_tail);
-     case: (rev stack_tail) => [|stack_last stack_mid].
-  --- by left.
-  --- case: s => [|sh st].
-  ---- rewrite rev_cons; case => _ H;
-       by left.
-  ---- rewrite rev_cons rcons_cons; case => _ H;
-       by right; left; exists st.
-  -- rewrite -(revK stack_tail);
-     case: (rev stack_tail) => [|stack_last stack_mid].
-  --- by left.
-  --- case: s => [|sh st].
-  ---- rewrite rev_cons; case => _ H;
-       by left.
-  ---- rewrite rev_cons rcons_cons; case => _ H;
-       by right; right; exists st.
-  -- move => H.
-     by right; left; exists (letter :: s); rewrite H.
-  -- move => H.
-     by right; right; exists (letter :: s); rewrite H.
+  -- by right; right; exists pt.
+  - case => [//|[|] [] pfx Hpfx].
+  -- by right; left; exists (letter'::pfx); rewrite /= Hpfx.
+  -- by right; right; exists (letter'::pfx); rewrite /= Hpfx.
 Qed.
   
 
@@ -530,7 +540,7 @@ end.
 Fixpoint Stallings_automaton_mod
   (state: nat) (stack: F2) (word: F2): F2 :=
 match word with
-| nil => (power b state) @ (rev stack: F2)
+| nil => (power (`[b]_F2P) state) @ (rev stack)
 | c::w =>
   match (Stallings_automaton_transition state stack c) with
   | (state', stack', _) => Stallings_automaton_mod state' stack' w
@@ -542,18 +552,17 @@ Lemma Stallings_automaton_product:
     (state < q)%N ->
     (apbq_projection (Stallings_automaton_div state stack word)) @
     (Stallings_automaton_mod state stack word) ==
-    (power b state) @ (rev stack: F2) @ word.
+    (power (`[b]_F2P) state) @ (rev stack: F2) @ word.
 Proof.
   move => state stack word; 
   elim: word state stack => [/= |letter word IH] state stack Hq.
   - by rewrite /(\hat _) /extension /prod /= neutral_left neutral_right.
   - rewrite {3}cons_law !associativity [apbq_projection]lock /= -lock.
-    move H: (Stallings_automaton_transition _ _ _) => 
-      [[state' stack'] output].
-    rewrite (Stallings_automaton_transition_product H Hq)
-    morphism_preserve_law -associativity (IH state' stack');
-    last by apply (Stallings_automaton_transition_state_ltq H).
-    by rewrite !associativity.
+  move: (Stallings_automaton_transition_state_ltq state stack letter Hq).
+  move: (Stallings_automaton_transition_product state stack letter Hq).
+  move: (Stallings_automaton_transition state stack letter) =>
+        [[state' stack'] output] -> Hq'.
+  by rewrite morphism_preserve_law -associativity (IH _ _ Hq') !associativity.
 Qed.
 
 Lemma Stallings_automaton_mod_correct:
@@ -568,18 +577,39 @@ Qed.
 Lemma Stallings_automaton_mod_reduced:
   forall (state: nat) (stack: F2) (word: F2),
     stack = [::] \/
-    (exists p, stack = rcons p (Base o0)) \/
-    (exists p, stack = rcons p (Inverse o0)) ->
+    (exists p, stack = rcons p a) \/
+    (exists p, stack = rcons p a^-1) ->
     freely_reduced stack -> 
     freely_reduced (Stallings_automaton_mod state stack word).
 Proof.
   move => state stack word;
   elim: word stack state => [/=|letter word IH] stack state Hlast Hred.
-  - rewrite -cat_law; case: state => [/= | n].
-  -- by apply freely_reduced_rev.
-  -- rewrite powerS.
-(* TODO(reinisicirpons): Finish*)
-Admitted.
+  - rewrite -cat_law; case: state => [/= |];
+    first by apply freely_reduced_rev.
+    elim => [|n Hn].
+  -- case: Hlast => [-> /=|].
+  --- by apply freely_reduced_cons1.
+  --- case => x; case: x Hred => [] pfx -> Hred;
+      rewrite rev_rcons /= -cat1s;
+      have: ([::b] = rcons [::] b) => [//|->];
+      apply freely_reduced_cat => [//||].
+  ---- by apply freely_reduced_cons1.
+  ---- by rewrite -rev_rcons; apply freely_reduced_rev.
+  ---- by apply freely_reduced_cons1.
+  ---- by rewrite -rev_rcons; apply freely_reduced_rev.
+  -- rewrite !powerS -!cons_law !cat_cons.
+     apply freely_reduced_cons2 => [//|].
+     by rewrite -cat_cons cons_law -powerS.
+  - rewrite [freely_reduced]lock /= -lock.
+    move: (Stallings_automaton_transition_stack_last_a
+      state stack letter Hlast).
+    move: (Stallings_automaton_transition_stack_reduced
+      state stack letter Hred).
+    move: (Stallings_automaton_transition state stack letter) =>
+      [[state' stack'] _].
+    move => Hlast' Hred'.
+    by apply IH.
+Qed.
 
 
 

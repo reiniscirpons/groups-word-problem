@@ -309,7 +309,7 @@ Proof.
   (* TODO(reiniscirpons): Why does Rocq not figure this out by itself? *)
   - rewrite (bool_irrelevance Hc (ltn_ord 0)).
     case Hsp: (state == p)%B; case => <- <- <-;
-    rewrite /(\hat _) /extension /prod /= /nth_gen /= /rev /=.
+    rewrite /(\hat _) /extension /prod /nth_gen /rev /=.
   -- move/eqP: Hsp => ->; rewrite /a_encoding.
       (* TODO: by group *)
       by rewrite -!associativity !neutral_left !neutral_right
@@ -379,6 +379,56 @@ Proof.
   - case Hlh: (letter == invl stack_head)%B; case => _ <- _.
   -- by apply freely_reduced_behead.
   -- by move/eqP: Hlh; apply freely_reduced_cons2.
+Qed.
+
+Search last.
+
+Lemma Stallings_automaton_transition_stack_last_a:
+  forall state stack letter state' stack' output,
+    Stallings_automaton_transition state stack letter =
+    (state', stack', output) ->
+    stack = [::] \/
+    (exists p, stack = rcons p (Base o0)) \/
+    (exists p, stack = rcons p (Inverse o0)) ->
+    stack' = [::] \/
+    (exists p, stack' = rcons p (Base o0)) \/
+    (exists p, stack' = rcons p (Inverse o0)).
+Proof.
+  move => state [[] [] [|[|//]] Hc|stack_head stack_tail letter]
+          state' stack' output /=.
+  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
+    case Hsp: (state == p)%B; case => _ <- _ _.
+  -- by left.
+  -- by right; left; exists [::].
+  - case Hsp: (state == q.-1)%B; by case => _ <- _.
+  - rewrite (bool_irrelevance Hc (ltn_ord 0)).
+    case Hsp: (state == p)%B; case => _ <- _ _.
+  -- by left.
+  -- by right; right; exists [::].
+  - case Hsp: (state == 0)%B; by case => _ <- _.
+  - case Hlh: (letter == invl stack_head)%B; case => _ <- _ [//|[] [s]].
+  (* TODO(reiniscirpons): Whats the most efficient way of doing these sorts
+     of highly symmetrical proofs more efficiently?*)
+  -- rewrite -(revK stack_tail);
+     case: (rev stack_tail) => [|stack_last stack_mid].
+  --- by left.
+  --- case: s => [|sh st].
+  ---- rewrite rev_cons; case => _ H;
+       by left.
+  ---- rewrite rev_cons rcons_cons; case => _ H;
+       by right; left; exists st.
+  -- rewrite -(revK stack_tail);
+     case: (rev stack_tail) => [|stack_last stack_mid].
+  --- by left.
+  --- case: s => [|sh st].
+  ---- rewrite rev_cons; case => _ H;
+       by left.
+  ---- rewrite rev_cons rcons_cons; case => _ H;
+       by right; right; exists st.
+  -- move => H.
+     by right; left; exists (letter :: s); rewrite H.
+  -- move => H.
+     by right; right; exists (letter :: s); rewrite H.
 Qed.
   
 
@@ -516,10 +566,22 @@ Qed.
 
 
 Lemma Stallings_automaton_mod_reduced:
-  forall (state: nat) (word: F2),
-    freely_reduced (Stallings_automaton_mod state [::] word).
-  (* TODO(reiniscirpons): Do this *)
+  forall (state: nat) (stack: F2) (word: F2),
+    stack = [::] \/
+    (exists p, stack = rcons p (Base o0)) \/
+    (exists p, stack = rcons p (Inverse o0)) ->
+    freely_reduced stack -> 
+    freely_reduced (Stallings_automaton_mod state stack word).
+Proof.
+  move => state stack word;
+  elim: word stack state => [/=|letter word IH] stack state Hlast Hred.
+  - rewrite -cat_law; case: state => [/= | n].
+  -- by apply freely_reduced_rev.
+  -- rewrite powerS.
+(* TODO(reinisicirpons): Finish*)
 Admitted.
+
+
 
 Lemma Stallings_automaton_mod_unique:
   forall (x y: F2),

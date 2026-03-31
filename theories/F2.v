@@ -1,6 +1,7 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import eqtype seq fintype choice ssrnat all_algebra.
+From mathcomp Require Import ring lra zify.
 Require Import Setoid Morphisms.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
@@ -418,6 +419,35 @@ Proof.
   apply (H (c::p) s d); by rewrite He.
 Qed.
 
+Lemma freely_reduced_cat:
+  forall w1 c1 c2 w2,
+    c1 <> invl c2 ->
+    freely_reduced (rcons w1 c1) ->
+    freely_reduced (c2::w2) ->
+    freely_reduced ((rcons w1 c1) ++ (c2 :: w2)).
+Proof.
+  move => w1 c1 c2 w2 Hc Hw1 Hw2 p s d.
+  case Hp: (size p + 1 <= size w1)%N.
+  - move/(f_equal (take (size w1).+1)).
+    rewrite take_cat size_rcons ltnn subnn take0 cats0.
+    rewrite take_cat leq_gtF; last by move: Hp => /=; lia.
+    rewrite take_cat leq_gtF; last by move: Hp => /=; lia.
+    by apply Hw1.
+  - move/(f_equal (drop (size p))).
+    rewrite cat_rcons drop_cat leq_gtF; last by move: Hp => /=; lia.
+    rewrite drop_cat ltnn drop_cat subnn /=.
+    rewrite (drop_cat _ [::c1]) /=.
+    case Hpe: (eqn (size p) (size w1)).
+  -- move/eqP: Hpe => ->.
+     rewrite subnn /=; case => Hc1 Hc2 _.
+     by apply Hc; rewrite Hc1 Hc2.
+  -- rewrite leq_gtF; last by move: Hp Hpe => /=; lia.
+     move => H.
+     apply /(Hw2 (take (size p - size w1 - 1) (c2::w2)) s d).
+     by rewrite /= -H cat_take_drop.
+Qed.
+
+
 Lemma freely_reduced_correct:
   forall w, freely_reduced w <-> w = FreeGroup_norm w.
 Proof.
@@ -440,6 +470,20 @@ Proof.
   --- apply FreeGroup_norm_minimality => [//|].
       by rewrite Hps !cat_law cons_law invl_right neutral_left.
 Qed.
+
+Lemma freely_reduced_rev:
+  forall w, freely_reduced w -> freely_reduced (rev w).
+Proof.
+  move => w; rewrite !freely_reduced_correct => {1}->.
+  by rewrite FreeGroup_norm_rev.
+Qed.
+
+Lemma freely_reduced_power1: forall c n,
+  freely_reduced (power (`[c]_(FGP Sigma)) n).
+Proof.
+  by move => c n; rewrite freely_reduced_correct FreeGroup_norm_power1.
+Qed.
+
 End FreelyReduced.
 Arguments freely_reduced {_}.
 

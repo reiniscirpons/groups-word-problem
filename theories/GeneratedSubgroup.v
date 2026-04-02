@@ -19,7 +19,7 @@ Section GeneratedSubgroup.
 Variable G: group.
 Variable gens: seq G.
 
-(* TODO(reiniscirpons): Should I be using notations or local definitions?*)
+(*TODO(reiniscirpons): Should I be using notations or local definitions?*)
 Notation Sigma := (ordinal (length gens)).
 Local Definition nth_gen := fun (n: Sigma) => nth e gens n.
 
@@ -331,18 +331,6 @@ Proof.
   - by apply Hcons.
 Qed.
 
-Lemma Stallings_automaton_transition_state_ltq:
-  forall state stack letter,
-    (state < q)%N ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-      (state' < q)%N.
-Proof.
-  move => state stack letter.
-  apply Stallings_automaton_transition_invariant_ind => 
-    [//|//|||//|//|||//|//]; by lia.
-Qed.
-
 (* TODO(reiniscirpons): use the following for ternary casework on
    a pair of naturals:
     ltngtP: 3 case analysis*)
@@ -396,6 +384,18 @@ Proof.
     by rewrite neutral_left -!associativity. 
 Qed.
 
+Lemma Stallings_automaton_transition_state_ltq:
+  forall state stack letter,
+    (state < q)%N ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+      (state' < q)%N.
+Proof.
+  move => state stack letter.
+  apply Stallings_automaton_transition_invariant_ind => 
+    [//|//|||//|//|||//|//]; by lia.
+Qed.
+
 Lemma Stallings_automaton_transition_stack_reduced:
   forall state stack letter,
     freely_reduced stack ->
@@ -413,32 +413,103 @@ Proof.
   - apply freely_reduced_cons2.
 Qed.
 
+Definition Stallings_automaton_stack_last_a
+  (state: nat) (stack: F2) :=
+    (stack = [::] \/
+      ((state == p)%B = false /\
+      exists pfx,
+        stack = rcons pfx a \/
+        stack = rcons pfx a^-1)).
+
 Lemma Stallings_automaton_transition_stack_last_a:
   forall state stack letter,
-    stack = [::] \/
-    (exists pfx, stack = rcons pfx a) \/
-    (exists pfx, stack = rcons pfx a^-1) ->
+    Stallings_automaton_stack_last_a state stack ->
     let: (state', stack', output) :=
       Stallings_automaton_transition state stack letter in
-      stack' = [::] \/
-      (exists pfx, stack' = rcons pfx a) \/
-      (exists pfx, stack' = rcons pfx a^-1).
+        Stallings_automaton_stack_last_a state' stack'.
 Proof.
   move => state stack letter;
   apply Stallings_automaton_transition_invariant_ind =>
-    [//|state' _ _|//|//|//|state' _ _|//|//
-    |_ stack_head stack_tail
-    |_ stack_head stack_tail letter' _].
-  - by right; left; exists [::].
-  - by right; right; exists [::].
-  - case => [//|[|] [] [/= [] _ H|ph pt /= [] _ Ht]].
+    [//|state' H _|_|state' _ _|//|state' H _|_|state' _ _
+    |state' stack_head stack_tail|state' stack_head stack_tail letter' _].
+  - by right; split => [//|]; exists [::]; left.
+  - by left.
+  - by left.
+  - by right; split => [//|]; exists [::]; right.
+  - by left.
+  - by left.
+  - move => [//|] [] H [] [|pfxh pfxt] [|] [] _ ->.
   -- by left.
-  -- by right; left; exists pt.
   -- by left.
-  -- by right; right; exists pt.
-  - case => [//|[|] [] pfx Hpfx].
-  -- by right; left; exists (letter'::pfx); rewrite /= Hpfx.
-  -- by right; right; exists (letter'::pfx); rewrite /= Hpfx.
+  -- by right; split => [//|]; exists pfxt; left.
+  -- by right; split => [//|]; exists pfxt; right.
+  - move => [//| [] Hp [] pfx [] ->];
+    right; split => [//|]; exists (letter'::pfx).
+  -- by left.
+  -- by right.
+Qed.
+
+(* NOTE(reiniscirpons): The following characterizes all configurations
+   of stack and state that are reachable by repeatedly applying
+   the transition function to the initial configuration consisting
+   of state 0 and empty stack [::]. *)
+Definition Stallings_automaton_reachable_configuration
+  (state:nat) (stack: F2) :=
+    (state < q)%N /\ 
+    freely_reduced stack /\
+    Stallings_automaton_stack_last_a state stack.
+
+Lemma Stallings_automaton_transition_reachable_configuration:
+  forall state stack letter,
+    Stallings_automaton_reachable_configuration state stack ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+        Stallings_automaton_reachable_configuration state' stack'.
+Proof.
+  move => state stack letter [Hsq [Hred Hlast]].
+  move: (Stallings_automaton_transition_stack_last_a state stack letter Hlast).
+  move: (Stallings_automaton_transition_stack_reduced state stack letter Hred).
+  move: (Stallings_automaton_transition_state_ltq state stack letter Hsq).
+  by move: (Stallings_automaton_transition state stack letter) =>
+    [] [] state' letter' _.
+Qed.
+
+Lemma Stallings_automaton_transitionK:
+  forall state stack letter,
+    Stallings_automaton_reachable_configuration state stack ->
+    let: (state', stack', output) :=
+      Stallings_automaton_transition state stack letter in
+      let: (state'', stack'', output') :=
+        Stallings_automaton_transition state' stack' (invl letter) in
+          state = state'' /\ stack = stack'' /\ output = inv output'.
+Proof.
+  move => state stack letter;
+  apply Stallings_automaton_transition_invariant_ind =>
+  [_ /=|//|//|//|_ /=|//|_ /= |state' /=
+  |state' stack_head stack_tail /=
+  |state' stack_head stack_tail letter' _ _ /=].
+  (* TODO(reiniscirpons): Why did it not simplify automatically? *)
+  - by rewrite eq_refl.
+  - by rewrite eq_refl.
+  - by rewrite eq_refl.
+  - move => Hs0 [Hsq _]; have: (state'.-1 == q.-1)%B = false => [|->].
+  -- by move: Hs0 Hsq H0q Hpq; lia.
+  -- by move: Hs0 Hsq; case: state'.
+  - move => [_ [Hred [//|[] Hp [] pfx []]]];
+    case: stack_tail Hred => [_|stack_head' stack_tail Hred _ /=].
+  (* TODO(reiniscirpons): Is there a way to join up cases after a split?
+     Or do I need to change the definition of transition function? *)
+  -- case: pfx => [[] -> /= |pfxh [] //]; by rewrite Hp.
+  -- rewrite invlK; case: ifP => [/eqP H|//].
+     exfalso; rewrite /freely_reduced /not in Hred;
+     apply Hred with [::] stack_tail stack_head';
+     by rewrite -H.
+  -- case: pfx => [[] -> /= |pfxh [] //]; by rewrite Hp.
+  -- rewrite invlK; case: ifP => [/eqP H|//].
+     exfalso; rewrite /freely_reduced /not in Hred;
+     apply Hred with [::] stack_tail stack_head';
+     by rewrite -H.
+  -- by rewrite eq_refl.
 Qed.
   
 
@@ -573,42 +644,65 @@ Proof.
   by apply Stallings_automaton_product; exact H0q.
 Qed.
 
-
 Lemma Stallings_automaton_mod_reduced:
   forall (state: nat) (stack: F2) (word: F2),
-    stack = [::] \/
-    (exists p, stack = rcons p a) \/
-    (exists p, stack = rcons p a^-1) ->
-    freely_reduced stack -> 
+    Stallings_automaton_reachable_configuration state stack ->
     freely_reduced (Stallings_automaton_mod state stack word).
 Proof.
   move => state stack word;
-  elim: word stack state => [/=|letter word IH] stack state Hlast Hred.
-  - rewrite -cat_law; case: state => [/= |];
+  elim: word stack state => [/=|letter word IH] stack state.
+  - move => [_ [Hred Hlast]].
+    rewrite -cat_law; case: state Hlast => [_ /=|n];
     first by apply freely_reduced_rev.
-    elim => [|n Hn].
-  -- case: Hlast => [-> /=|].
-  --- by apply freely_reduced_cons1.
-  --- case => x; case: x Hred => [] pfx -> Hred;
-      rewrite rev_rcons /= -cat1s;
+  -- case => [->|[_ [pfx]]].
+  --- by rewrite cats0; apply freely_reduced_power1.
+  (* TODO: Is there any way to join up cases? *)
+  --- case => Hstack; elim: n => [|n IH].
+  ---- rewrite Hstack rev_rcons /= -cat1s.
       have: ([::b] = rcons [::] b) => [//|->];
       apply freely_reduced_cat => [//||].
-  ---- by apply freely_reduced_cons1.
-  ---- by rewrite -rev_rcons; apply freely_reduced_rev.
-  ---- by apply freely_reduced_cons1.
-  ---- by rewrite -rev_rcons; apply freely_reduced_rev.
+  ----- by apply freely_reduced_cons1.
+  ----- by rewrite -rev_rcons -Hstack; apply freely_reduced_rev.
+  --- rewrite !powerS -!cons_law !cat_cons.
+      by apply freely_reduced_cons2.
+  ---- rewrite Hstack rev_rcons /= -cat1s.
+      have: ([::b] = rcons [::] b) => [//|->];
+      apply freely_reduced_cat => [//||].
+  ----- by apply freely_reduced_cons1.
+  ----- by rewrite -rev_rcons -Hstack; apply freely_reduced_rev.
   -- rewrite !powerS -!cons_law !cat_cons.
-     apply freely_reduced_cons2 => [//|].
-     by rewrite -cat_cons cons_law -powerS.
+     by apply freely_reduced_cons2.
   - rewrite [freely_reduced]lock /= -lock.
-    move: (Stallings_automaton_transition_stack_last_a
-      state stack letter Hlast).
-    move: (Stallings_automaton_transition_stack_reduced
-      state stack letter Hred).
+    move/(Stallings_automaton_transition_reachable_configuration
+      _ _ letter).
     move: (Stallings_automaton_transition state stack letter) =>
       [[state' stack'] _].
-    move => Hlast' Hred'.
     by apply IH.
+Qed.
+
+Lemma Stallings_automaton_mod_reduction:
+  forall (state: nat) (stack: F2) (word: F2),
+    Stallings_automaton_reachable_configuration state stack ->
+    Stallings_automaton_mod state stack word =
+    Stallings_automaton_mod state stack (FreeGroup_norm word).
+Proof.
+  move => state stack word;
+  elim: word state stack => [//|letter word IH /=] state stack Hreach.
+  move: (Stallings_automaton_transition_reachable_configuration
+    _ _ letter Hreach).
+  case H: (Stallings_automaton_transition state stack letter) =>
+    [statestack output].
+  case: statestack H => [state' stack'] H.
+  move/IH => ->.
+  case: (FreeGroup_norm word) H => [/= -> //|letter' word'].
+  case: ifP => [/eqP -> /= H|Heq /= ->].
+  - move: (Stallings_automaton_transitionK
+      state stack (invl letter') Hreach).
+    rewrite H invlK.
+    by move: (Stallings_automaton_transition state' stack' letter') =>
+      [[state'' stack''] output'] [-> [-> _]].
+  - by move: (Stallings_automaton_transition state' stack' letter') =>
+      [[state'' stack''] output'].
 Qed.
 
 

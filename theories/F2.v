@@ -532,6 +532,23 @@ HB.instance Definition _ := isRelationPreservingMorphism.Build
   (extension_preserve_e _ _ FreeGroup_alphabet_extension)
   (extension_preserve_law _ _ FreeGroup_alphabet_extension).
 
+
+Lemma hat_nil:
+  FreeGroup_universal_extension [::] = e.
+Proof. by []. Qed.
+
+Lemma hat_cons1:
+  forall a,
+  FreeGroup_universal_extension [:: a] ==
+    match a with 
+    | Base a => f a
+    | Inverse a => inv (f a)
+    end.
+Proof.
+  case => a; rewrite /FreeGroup_universal_extension /extension /=;
+  by rewrite neutral_right.
+Qed.
+
 (* TODO(reiniscirpons): Is it possible to make Rocq treat sigma
   (FreeGroup_presentation Sigma) and InverseAlphabet Sigma as the same? *)
 (*Lemma FreeGroup_universal: forall {Sigma: finType} {G: group} (f: Sigma -> G),*)
@@ -547,5 +564,7 @@ HB.instance Definition _ := isRelationPreservingMorphism.Build
 (*Admitted.*)
 End FreeGroupUniversal.
 Arguments FreeGroup_universal_extension {_ _}.
+Arguments hat_nil {_ _}.
+Arguments hat_cons1 {_ _}.
 Notation "\hat f" := (FreeGroup_universal_extension f) (at level 5). 
 

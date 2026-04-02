@@ -459,6 +459,16 @@ Definition Stallings_automaton_reachable_configuration
     freely_reduced stack /\
     Stallings_automaton_stack_last_a state stack.
 
+Lemma Stallings_automaton_reachable_configuration0nil:
+  Stallings_automaton_reachable_configuration 0 [::].
+Proof.
+  split.
+  - by apply H0q.
+  split.
+  - by apply freely_reduced_nil.
+  - by left.
+Qed.
+
 Lemma Stallings_automaton_transition_reachable_configuration:
   forall state stack letter,
     Stallings_automaton_reachable_configuration state stack ->
@@ -705,7 +715,44 @@ Proof.
       [[state'' stack''] output'].
 Qed.
 
+Lemma Stallings_automaton_mod_proper:
+  forall (state: nat) (stack: F2) (word1 word2: F2),
+    Stallings_automaton_reachable_configuration state stack ->
+    word1 == word2 ->
+    Stallings_automaton_mod state stack word1 =
+    Stallings_automaton_mod state stack word2.
+Proof.
+  move => state stack word1 word2 Hreach /FreeGroup_dec_eqP /eqP.
+  rewrite Stallings_automaton_mod_reduction => [|//].
+  by rewrite (Stallings_automaton_mod_reduction _ _ word2) => [->|//].
+Qed.
 
+Lemma Stallings_automaton_mod_subgroup:
+  forall (x: F2) (h: H),
+  (* TODO(reiniscirpons): Why did we need to explicitly
+     specify F2 and H here? *)
+  Stallings_automaton_mod 0 [::] ((@subgroup_inj F2 H h) @ x) =
+  Stallings_automaton_mod 0 [::] x.
+Proof.
+  move => x [] /= y [w] /(congruent_right _ x) Hwy.
+  rewrite -(Stallings_automaton_mod_proper _ _ _ _ _ Hwy) => [|];
+  last by apply Stallings_automaton_reachable_configuration0nil.
+  move => {Hwy y}.
+  set f := \hat (nth_gen [:: a_encoding p; b_encoding q]).
+  elim: w => [//|h t IH].
+  rewrite cons_law.
+  move: (@morphism_preserve_law _ _ f (`[h]_F2P) t).
+  (* TODO(reiniscirpons): Figure out the issue with hat, this is
+     just too ridiculous. *)
+  (*case: h => h; case Hh: (h == 0)%B.*)
+  (*- move/eqP: Hh => ->.*)
+  (*  rewrite {2}/f. hat_cons1.*)
+  (**)
+  (*rewrite (Stallings_automaton_mod_proper _ _ _ _ _ H) => {H} [|];*)
+  (*last by apply Stallings_automaton_reachable_configuration0nil.*)
+  (*rewrite -cat_law -catA.*)
+  (*rewrite /f {2}/(\hat _) /extension /prod.*)
+Admitted.
 
 Lemma Stallings_automaton_mod_unique:
   forall (x y: F2),

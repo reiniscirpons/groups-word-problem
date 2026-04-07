@@ -299,6 +299,42 @@ have: (inv_word w) @ (`[invl a]_P @ `[a]_P) @ w == e; last by done.
 by rewrite invl_right neutral_right IH.
 Qed.
 
+(* TODO(reiniscirpons): In general many of the prior lemmas we have developed
+   in EquivalenceAlgebra, like power_inv hold not only with setoid equality
+   but with full = rocq equality for finitely presented groups.
+   This is because the specific choice of multiplication and inversion
+   we made. This causes some weird level switching however
+   (group -> underlying free monoid), and looks a bit ugly in the theory.
+   We should figure out how to fix, but maybe after the main essence of the
+   theory is there.
+*)
+Lemma inv_word_cons:
+  forall w a, inv_word (a::w) = (inv_word w) ++ [:: invl a].
+Proof.
+  by move => w a; rewrite /inv_word rev_cons map_rcons cats1.
+Qed.
+
+Lemma inv_word_rcons:
+  forall w a, inv_word (rcons w a) = invl a :: inv_word w.
+Proof.
+  by move => w a; rewrite /inv_word rev_rcons.
+Qed.
+
+Lemma inv_word_cat:
+  forall x y, inv_word (x ++ y) = inv_word y ++ inv_word x.
+Proof.
+  by move => x y; rewrite /inv_word !map_rev map_cat rev_cat.
+Qed.
+
+Lemma inv_word_involutive:
+  forall x, inv_word (inv_word x) = x.
+Proof.
+  move => x; rewrite /inv_word !map_rev revK -map_comp.
+  elim: x => [//|hx tx IH].
+  by rewrite /= IH invlK.
+Qed.
+
+
 HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
 
 End InvertiblePresentedGroup.

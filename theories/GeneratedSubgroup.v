@@ -21,7 +21,7 @@ Variable gens: seq G.
 
 (*TODO(reiniscirpons): Should I be using notations or local definitions?*)
 Notation Sigma := (ordinal (length gens)).
-Local Definition nth_gen := fun (n: Sigma) => nth e gens n.
+Local Definition nth_gen := fun (n: Sigma) => nth e gens (nat_of_ord n).
 
 Definition in_generated_subgroup (x: G): Prop :=
   exists (w: FreeGroup Sigma), \hat nth_gen w == x.
@@ -152,6 +152,18 @@ Notation H := (generatedSubgroup gens).
         specifying the group and subgroup? *)
 Definition apbq_projection: morphism IndexFG F2 := 
   (@subgroup_inj F2 H) \o (subgroup_projection gens).
+
+(* TODO(reiniscirpons): We need to probably get rid of prod or change
+   its definition to be recursive on the input list instead of 
+   having the iterated definition that is too hard to reason about
+   (when we eliminate it causes a lot of headache) *)
+Lemma apbq_projection_cons: forall h t,
+  apbq_projection (h::t) =
+    (match h with
+    | Base o => if (o == 0)%B then a_encoding p else b_encoding q
+    | Inverse o => inv (if (o == 0)%B then a_encoding p else b_encoding q)
+    end) ++ apbq_projection t.
+Proof. by move => [|] [] [|[|//]]. Qed.
 
 (* NOTE(reiniscirpons): Housekeeping lemmas:
 
@@ -820,18 +832,138 @@ Lemma Stallings_automaton_mod_unique:
   right_coset_eq H x y  ->
   Stallings_automaton_mod 0 [::] x =
   Stallings_automaton_mod 0 [::] y.
-  (* TODO(reiniscirpons): Do this, probably need to find correct
-   * generalization. *)
-Admitted.
+Proof.
+  move => x y /right_coset_eq' [] h /Stallings_automaton_mod_proper => <-;
+    last by apply Stallings_automaton_reachable_configuration0nil.
+  apply Stallings_automaton_mod_subgroup.
+Qed.
 
 Definition apbq_coset_rep (w: F2) :=
   Stallings_automaton_mod 0 [::] w.
-
 
 HB.instance Definition _ :=
   isRightCosetRep.Build _ _
     apbq_coset_rep
     Stallings_automaton_mod_correct
     Stallings_automaton_mod_unique.
+
+(*Lemma Stallings_automaton_div_subgroup:*)
+(*  forall (h: H),*)
+(*    apbq_projection (Stallings_automaton_div 0 [::] (@subgroup_inj F2 H h)) ==*)
+(*    @subgroup_inj F2 H h.*)
+(*Proof.*)
+(*  move => h.*)
+(*  move: (Stallings_automaton_product 0 [::] (@subgroup_inj F2 H h) H0q).*)
+(*  rewrite power0 !neutral_left => {2}<-.*)
+(*  move: (Stallings_automaton_mod_subgroup e h).*)
+(*  move: (neutral_right (@subgroup_inj F2 H h)) =>*)
+(*        /Stallings_automaton_mod_proper => ->;*)
+(*    last by apply Stallings_automaton_reachable_configuration0nil.*)
+(*  move => ->.*)
+(*  by rewrite /= power0 neutral_left neutral_right.*)
+(*Qed.*)
+
+Lemma Stallings_automaton_div_power_b:
+  forall state (n: nat) x,
+    (state + n < q)%N ->
+    Stallings_automaton_div state [::] ((power (`[b]_F2P) n) ++ x) ==
+    Stallings_automaton_div (state + n)%N [::] x.
+Proof.
+  move => state n x; elim: n state => [state _|n IH state Hsnq];
+    first by rewrite power0 /= addn0.
+  rewrite powerS -cat_law -catA /=.
+  case: ifP => [// Hsq|_];
+    first by exfalso; lia.
+  move: Hsnq.
+  have: (state + n.+1 = state.+1 +n)%N => [|->];
+    first by lia.
+  rewrite neutral_left;
+  by apply IH.
+Qed.
+
+Lemma F2_powerS':
+  forall (w: F2) (n: nat),
+    power w n.+1 = power w n @ w.
+Proof.
+  move => w; elim/nat_pairs_ind => [||n IH1 IH2].
+  - by rewrite power0 /power /= -!cat_law cat0s cats0.
+  - by rewrite /power /= -!cat_law !cats0.
+  - by rewrite powerS {1}IH2 [power w n.+2]powerS -!cat_law catA.
+Qed.
+
+
+Lemma Stallings_automaton_div_inv_power_b:
+  forall state n (x: F2),
+    (state < q)%N ->
+    (n <= state)%N ->
+    Stallings_automaton_div state [::] (inv (power (`[b]_F2P) n) ++ x) ==
+    Stallings_automaton_div (state-n)%N [::] x.
+Proof.
+  move => state n x; elim: n state => [|n IH state Hsq Hsn];
+    first by case.
+  rewrite F2_powerS' -rcons_law /inv /= inv_word_rcons cat_cons /=.
+  case: ifP => [|] Hs0;
+    first by exfalso; lia.
+  have: (state - n.+1 = state.-1 - n)%N => [|->];
+    first by lia.
+  by apply IH; lia.
+Qed.
+
+Lemma Stallings_automaton_div_subgroup:
+  forall (w: IndexFG),
+    Stallings_automaton_div 0 [::] (apbq_projection w) == w.
+Proof.
+  elim => [//|h t IH]; rewrite apbq_projection_cons.
+  case: h => o; case: ifP => [/eqP ->|].
+  - rewrite /a_encoding -!cat_law -!catA.
+    rewrite Stallings_automaton_div_power_b /=;
+      last by lia.
+    rewrite add0n.
+    case: ifP => [_|/eqP //].
+    rewrite Stallings_automaton_div_inv_power_b => [|//|//].
+    by rewrite subnn IH -cons_law.
+  - case: o => [] [//|[|//]] Hc _.
+    have: q = q.-1.+1 => [|->]; first by lia.
+    rewrite /b_encoding F2_powerS' -!cat_law -catA.
+    rewrite Stallings_automaton_div_power_b /=;
+      last by lia.
+    case: ifP => [_|]; last by lia.
+    rewrite IH.
+    (* TODO(reiniscirpons): I don't even want to talk about this ... :D *)
+    have: b = Base (Ordinal Hc) => [|<- //];
+    by apply /f_equal /eqP.
+  - rewrite /a_encoding -!cat_law -!catA /inv /=
+    !inv_word_cat inv_word_cons -!catA inv_word_involutive /=.
+    rewrite Stallings_automaton_div_power_b /=;
+      last by lia.
+    case: ifP => [_|]; last by lia.
+    rewrite Stallings_automaton_div_inv_power_b => [|//|//].
+    by rewrite subnn IH -cons_law.
+  - case: o => [] [//|[|//]] Hc _.
+    have: q = q.-1.+1 => [|->]; first by lia.
+    rewrite /b_encoding F2_powerS' -!cat_law /inv /= inv_word_cat /=.
+    rewrite Stallings_automaton_div_inv_power_b /= => [||//];
+      last by lia.
+    rewrite subnn IH.
+    (* TODO(reiniscirpons): I don't even want to talk about this ... :D *)
+    have: b^-1 = Inverse (Ordinal Hc) => [|<- //].
+    by apply /f_equal /eqP.
+Qed.
+
+Lemma subgroup_projection_inj:
+  forall (x y: IndexFG), 
+    subgroup_projection gens x == subgroup_projection gens y ->
+    x == y.
+Proof.
+  (*move => x y /(@morphism_preserve_equiv _ _ (@subgroup_inj F2 H)).*)
+  (*rewrite -[_ (_ x)]Stallings_automaton_div_subgroup*)
+  (*        -[_ (_ y)]Stallings_automaton_div_subgroup.*)
+Admitted.
+
+
+
+
+
+
 
 End NielsenSchreierStalling.

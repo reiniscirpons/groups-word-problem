@@ -38,12 +38,13 @@ End ProperMonoid.
 (* If `l = [a; b; c; ...; z]`, `prod l = a @ b @ ... @ z` *)
 Definition prod {M: monoid} (l: seq M) : M :=
   foldr (fun y acc => y @ acc) e l.
+Arguments prod {_} / !_.
 
 Lemma prod0 {M: monoid} : @prod M nil = e.
 Proof. done. Qed.
 
 Lemma prod1s {M: monoid} (a: M) (l: seq M) : prod (a :: l) == a @ prod l.
-Proof. by rewrite /prod. Qed.
+Proof. done. Qed.
 
 Lemma prod_cat {M: monoid} (l1 l2: seq M): prod (l1 ++ l2) == (prod l1) @ (prod l2).
 Proof.

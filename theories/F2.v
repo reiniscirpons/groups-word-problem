@@ -511,16 +511,15 @@ Qed.
 
 Definition FreeGroup_universal_extension: (FreeGroup Sigma) -> G :=
       extension FreeGroup_alphabet_extension.
+Arguments FreeGroup_universal_extension / !_.
 
 Lemma FreeGroup_alphabet_extension_preserve_relations:
   forall u v,
     (u, v) \in relations (FGP Sigma) ->
     FreeGroup_universal_extension u == FreeGroup_universal_extension v.
 Proof.
-  move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]];
-  rewrite/FreeGroup_universal_extension
-         /extension /FreeGroup_alphabet_extension /=
-         associativity neutral_right.
+  move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]] /=;
+  rewrite associativity neutral_right.
   - by rewrite inverse_left.
   - by rewrite inverse_right.
 Qed.
@@ -531,23 +530,6 @@ HB.instance Definition _ := isRelationPreservingMorphism.Build
   FreeGroup_alphabet_extension_preserve_relations
   (extension_preserve_e _ _ FreeGroup_alphabet_extension)
   (extension_preserve_law _ _ FreeGroup_alphabet_extension).
-
-
-Lemma hat_nil:
-  FreeGroup_universal_extension [::] = e.
-Proof. by []. Qed.
-
-Lemma hat_cons1:
-  forall a,
-  FreeGroup_universal_extension [:: a] ==
-    match a with 
-    | Base a => f a
-    | Inverse a => inv (f a)
-    end.
-Proof.
-  case => a; rewrite /FreeGroup_universal_extension /extension /=;
-  by rewrite neutral_right.
-Qed.
 
 (* TODO(reiniscirpons): Is it possible to make Rocq treat sigma
   (FreeGroup_presentation Sigma) and InverseAlphabet Sigma as the same? *)
@@ -563,8 +545,11 @@ Qed.
 (*Qed.*)
 (*Admitted.*)
 End FreeGroupUniversal.
-Arguments FreeGroup_universal_extension {_ _}.
-Arguments hat_nil {_ _}.
-Arguments hat_cons1 {_ _}.
+Arguments FreeGroup_alphabet_extension {_ _} / _ _.
+Arguments FreeGroup_universal_extension {_ _} _ / !_.
 Notation "\hat f" := (FreeGroup_universal_extension f) (at level 5). 
 
+Lemma hat_cons: forall (Sigma: finType) (G: group) (f: Sigma -> G)
+  (a: sigma (FGP Sigma)) w,
+  \hat f (a::w) = FreeGroup_alphabet_extension f a @ (\hat f w).
+Proof. done. Qed.

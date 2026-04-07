@@ -1,7 +1,7 @@
 From elpi.apps Require Import coercion.
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrint ssrnat.
-From mathcomp Require Import eqtype seq fintype all_algebra.
+From mathcomp Require Import eqtype seq fintype all_algebra div.
 From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
 Require Import Setoid Morphisms.
@@ -57,7 +57,7 @@ HB.instance Definition _ := isSubgroupCharacterizer.Build
 Lemma igs_gen (s: Sigma): in_generated_subgroup (nth_gen s).
 Proof.
   exists (`[Base s]_(FGP Sigma)).
-  by rewrite /(\hat _) /extension /prod /= neutral_right.
+  by rewrite /= neutral_right.
 Defined.
 
 Definition generatedSubgroup :=
@@ -113,8 +113,8 @@ End GeneratedSubgroup.
 Arguments generatedSubgroup {_}.
 Arguments in_generated_subgroup {_}.
 Arguments igs_gen {_}.
-Arguments subgroup_projection {_}.
-Arguments nth_gen {_}.
+Arguments subgroup_projection {_} _ / !_.
+Arguments nth_gen {_} _ / !_.
 
 
 (** In this section we develop the Nielsen-Schreier-Stalling
@@ -354,23 +354,20 @@ Proof.
   (* TODO: by group *)
   - by rewrite neutral_left neutral_right.
   - case: q => [//|m _ /=].
-  (* TODO(reiniscirpons): Add lemma for doing this expansion. *)
-    rewrite /(\hat _) /extension /prod /nth_gen /b_encoding /=.
   (* TODO: by group_powers *)
-    by rewrite !neutral_right powerS powerC'.
+    by rewrite /b_encoding !neutral_right powerS powerC'.
   (* TODO: by group_powers *)
   - by rewrite !neutral_right neutral_left powerS powerC'.
-  - rewrite /(\hat _) /extension /prod /nth_gen /=.
   (* TODO: by group *)
     by rewrite !inverse_law !inv_involutive -!associativity !neutral_left
               !neutral_right inverse_right neutral_right.
   (* TODO: by group *)
   - by rewrite neutral_left neutral_right.
   - case: q => [//|m _ /=].
-    rewrite /(\hat _) /extension /prod /nth_gen /b_encoding /=.
      (* TODO: by solve_group_powers *)
-     by rewrite power0 !neutral_right !neutral_left powerS -powerC'
-             inverse_law -associativity inverse_right neutral_right.
+     by rewrite /b_encoding power0 !neutral_right !neutral_left powerS
+                -powerC' inverse_law -associativity inverse_right
+                neutral_right.
   - case => [//|m _ _ /=].
      (* TODO: by solve_group_powers *)
     by rewrite neutral_left neutral_right powerS -powerC' -associativity
@@ -637,7 +634,7 @@ Lemma Stallings_automaton_product:
 Proof.
   move => state stack word; 
   elim: word state stack => [/= |letter word IH] state stack Hq.
-  - by rewrite /(\hat _) /extension /prod /= neutral_left neutral_right.
+  - by rewrite neutral_left neutral_right.
   - rewrite {3}cons_law !associativity [apbq_projection]lock /= -lock.
   move: (Stallings_automaton_transition_state_ltq state stack letter Hq).
   move: (Stallings_automaton_transition_product state stack letter Hq).
@@ -727,6 +724,47 @@ Proof.
   by rewrite (Stallings_automaton_mod_reduction _ _ word2) => [->|//].
 Qed.
 
+Lemma Stallings_automaton_mod_power_b:
+  forall state (n: nat) x,
+    (state < q)%N ->
+    Stallings_automaton_mod state [::] ((power (`[b]_F2P) n) ++ x) =
+    Stallings_automaton_mod ((state + n) %% q)%N [::] x.
+Proof.
+  move => state n x; elim: n state => [state /modn_small /=|n IH state HsnS].
+  - by rewrite addn0 => ->.
+  rewrite powerS -cons_law cat_cons /=.
+  case: ifP => [/eqP ->|Hsq].
+  - rewrite IH => [|]; last by exact H0q.
+    have: (q.-1 + n.+1 = q + n)%N => [|->]; first by lia.
+    by rewrite add0n modnDl.
+  - rewrite IH; last by lia.
+    by rewrite addSn addnS.
+Qed.
+
+Lemma Stallings_automaton_mod_inv_power_b:
+  forall state n (x: F2),
+    (state < q)%N ->
+    (n <= state)%N ->
+    Stallings_automaton_mod state [::] (inv (power (`[b]_F2P) n) ++ x) =
+    Stallings_automaton_mod (state-n)%N [::] x.
+Proof.
+  move => state n x; elim: n state => [|n IH state Hsq Hsn];
+    first by case.
+  move: (refl (inv (power (`[b]_F2P) n.+1))).
+  rewrite {2}powerS -powerC' (inverse_law _ (`[b]_F2P)).
+  (* TODO(reiniscirpons): Probably improve this. *)
+  rewrite {2}/inv /= /inv_word /= /invl /=.
+  move /(congruent_right _ x)
+       /(Stallings_automaton_mod_proper state [::]) => -> /=.
+  - move: Hsn; case: ifP => [/eqP -> //| Hs0 Hns].
+    have: (state - n.+1 = state.-1 - n)%N => [|->];
+    first by lia.
+    by apply IH; lia.
+  split => [//|]; split.
+  - by apply freely_reduced_nil.
+  - by left.
+Qed.
+
 Lemma Stallings_automaton_mod_subgroup:
   forall (x: F2) (h: H),
   (* TODO(reiniscirpons): Why did we need to explicitly
@@ -738,21 +776,44 @@ Proof.
   rewrite -(Stallings_automaton_mod_proper _ _ _ _ _ Hwy) => [|];
   last by apply Stallings_automaton_reachable_configuration0nil.
   move => {Hwy y}.
-  set f := \hat (nth_gen [:: a_encoding p; b_encoding q]).
-  elim: w => [//|h t IH].
-  rewrite cons_law.
-  move: (@morphism_preserve_law _ _ f (`[h]_F2P) t).
-  (* TODO(reiniscirpons): Figure out the issue with hat, this is
-     just too ridiculous. *)
-  (*case: h => h; case Hh: (h == 0)%B.*)
-  (*- move/eqP: Hh => ->.*)
-  (*  rewrite {2}/f. hat_cons1.*)
-  (**)
-  (*rewrite (Stallings_automaton_mod_proper _ _ _ _ _ H) => {H} [|];*)
-  (*last by apply Stallings_automaton_reachable_configuration0nil.*)
-  (*rewrite -cat_law -catA.*)
-  (*rewrite /f {2}/(\hat _) /extension /prod.*)
-Admitted.
+  elim: w => [//|hw tw IH].
+  rewrite hat_cons [a_encoding]lock [b_encoding]lock.
+  case: hw => [|] [] [|[|//]] /= _;
+  rewrite -cat_law -catA -{1}lock;
+  move: H0q => H0q.
+  - rewrite {1}/a_encoding -!cat_law -!catA -!lock
+    Stallings_automaton_mod_power_b /= => [|//].
+    rewrite modn_small add0n => [|//].
+    case: ifP => [_|/eqP //].
+    rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
+    rewrite subnn.
+    by apply IH.
+  - rewrite {1}/b_encoding Stallings_automaton_mod_power_b => [|//].
+    rewrite -!lock modnDr modn_small => [|//].
+    apply IH.
+  - move: (refl (inv (a_encoding p))).
+    rewrite {2}/a_encoding {2}inverse_law inv_involutive
+    (inverse_law _ (`[a]_F2P)) -!cat_law.
+    move /congruent_right /Stallings_automaton_mod_proper => ->;
+      last by apply Stallings_automaton_reachable_configuration0nil.
+    rewrite -!catA -!lock Stallings_automaton_mod_power_b /= => [|//].
+    rewrite modn_small add0n => [|//].
+    case: ifP => [_|/eqP //].
+    rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
+    rewrite subnn.
+    by apply IH.
+  - have: (q = q.-1.+1) => [|{1}->]; first by lia.
+    move: (refl (inv (b_encoding q.-1.+1))).
+    rewrite {2}/b_encoding powerS -powerC'
+            (inverse_law _ (`[b]_F2P)) -!cat_law /= /invl /=.
+    move /congruent_right /Stallings_automaton_mod_proper => ->;
+      last by apply Stallings_automaton_reachable_configuration0nil.
+    move => /=.
+    rewrite -!lock Stallings_automaton_mod_inv_power_b => [||//];
+      last by lia.
+    rewrite subnn.
+    by apply IH.
+Qed.
 
 Lemma Stallings_automaton_mod_unique:
   forall (x y: F2),

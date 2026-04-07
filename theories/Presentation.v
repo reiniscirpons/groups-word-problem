@@ -213,6 +213,12 @@ Variable f: sigma P -> M.
 
 Definition extension: presented P -> M :=
   fun l => prod (map f l).
+Arguments extension / !_.
+
+Lemma extension_cons:
+  forall (a: sigma P) (w: presented P),
+  extension (a::w) = (f a) @ (extension w).
+Proof. done. Qed.
 
 Lemma extension_universality:
   forall (varphi: morphism (presented P) M),
@@ -220,22 +226,17 @@ Lemma extension_universality:
     (forall w: presented P, 
       varphi w == extension w).
 Proof.
-  move => varphi Heq; rewrite /extension; elim => [|a w' IH] /=.
+  move => varphi Heq; elim => [|a w' IH].
   - exact morphism_preserve_e.
-  - have H: a :: w' = `[a]_P @ w' => [//|];
-    by rewrite H morphism_preserve_law IH Heq.
+  by rewrite {1}cons_law morphism_preserve_law extension_cons IH Heq.
 Qed.
 
 Lemma extension_preserve_e: extension e == e.
-Proof. by []. Qed.
+Proof. done. Qed.
 
 Lemma extension_preserve_1: forall (c: sigma P), extension (`[c]_P) == f c.
 Proof.
-  (* TODO(reiniscirpons): Why did I need to unfold prod here in order
-     for simplification to work correctly? Can we make it automatically
-     unfold and simplify? I can't imagine when we would want to do anything
-     else. *)
-  by move => c; rewrite /extension /prod /= neutral_right.
+  by move => c /=; rewrite neutral_right.
 Qed.
 
 Lemma extension_preserve_law: forall (x y: presented P),
@@ -254,7 +255,7 @@ HB.instance Definition _ :=
     extension_preserve_law.
 
 End ExtensionToMonoidMorphism.
-Arguments extension {_ _}.
+Arguments extension {_ _} _ / !_. 
 
 HB.mixin Record hasInvertibleLetters (P: presentation) := {
   invl : sigma P -> sigma P;

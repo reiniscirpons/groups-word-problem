@@ -724,6 +724,8 @@ Proof.
       [[state'' stack''] output'].
 Qed.
 
+(* TODO: how can I make Stallings_automaton_mod proper so that I can use setoid
+   tactics? Problem is that I have constraint on state and stack. *)
 Lemma Stallings_automaton_mod_proper:
   forall (state: nat) (stack: F2) (word1 word2: F2),
     Stallings_automaton_reachable_configuration state stack ->
@@ -881,6 +883,8 @@ Proof.
   by apply IH.
 Qed.
 
+(* TODO(reiniscirpons): Avoid having such lemmas or at least
+   make this more uniform. *)
 Lemma F2_powerS':
   forall (w: F2) (n: nat),
     power w n.+1 = power w n @ w.
@@ -890,7 +894,6 @@ Proof.
   - by rewrite /power /= -!cat_law !cats0.
   - by rewrite powerS {1}IH2 [power w n.+2]powerS -!cat_law catA.
 Qed.
-
 
 Lemma Stallings_automaton_div_inv_power_b:
   forall state n (x: F2),
@@ -908,6 +911,53 @@ Proof.
     first by lia.
   by apply IH; lia.
 Qed.
+
+Lemma Stallings_automaton_div_reduction:
+  forall (state: nat) (stack: F2) (word: F2),
+    Stallings_automaton_reachable_configuration state stack ->
+    Stallings_automaton_div state stack word ==
+    Stallings_automaton_div state stack (FreeGroup_norm word).
+Proof.
+  move => state stack word;
+  elim: word state stack => [//|letter word IH /=] state stack Hreach.
+  move: (Stallings_automaton_transition_reachable_configuration
+    _ _ letter Hreach).
+  case H: (Stallings_automaton_transition state stack letter) =>
+    [statestack output].
+  case: statestack H => [state' stack'] H.
+  move/IH => ->.
+  case: (FreeGroup_norm word) H => [/= -> //|letter' word'].
+  case: ifP => [/eqP -> /= H|Heq /= ->].
+  - move: (Stallings_automaton_transitionK
+      state stack (invl letter') Hreach).
+    rewrite H invlK.
+    move: (Stallings_automaton_transition state' stack' letter') =>
+      [[state'' stack''] output'] [-> [-> ->]].
+    by rewrite associativity inverse_right neutral_left.
+  - by move: (Stallings_automaton_transition state' stack' letter') =>
+      [[state'' stack''] output'].
+Qed.
+
+(* TODO(reiniscirpons): How can I make this proper so that I can use
+   setoid tactics? Problem is the state and stack constraint.*)
+Lemma Stallings_automaton_div_proper:
+  forall (state: nat) (stack: F2) (word1 word2: F2),
+    Stallings_automaton_reachable_configuration state stack ->
+    word1 == word2 ->
+    Stallings_automaton_div state stack word1 ==
+    Stallings_automaton_div state stack word2.
+Proof.
+  move => state stack word1 word2 Hreach /FreeGroup_dec_eqP /eqP.
+  rewrite Stallings_automaton_div_reduction => [|//].
+  by rewrite (Stallings_automaton_div_reduction _ _ word2) => [->|//].
+Qed.
+
+HB.instance Definition _ :=
+  isSetoidMorphism.Build _ _
+    (Stallings_automaton_div 0 [::])
+    (fun w1 w2 => 
+      Stallings_automaton_div_proper 0 [::] w1 w2
+      Stallings_automaton_reachable_configuration0nil).
 
 Lemma Stallings_automaton_div_subgroup:
   forall (w: IndexFG),
@@ -945,7 +995,7 @@ Proof.
     rewrite Stallings_automaton_div_inv_power_b /= => [||//];
       last by lia.
     rewrite subnn IH.
-    (* TODO(reiniscirpons): I don't even want to talk about this ... :D *)
+    (* TODO(reiniscirpons): Same as above. *)
     have: b^-1 = Inverse (Ordinal Hc) => [|<- //].
     by apply /f_equal /eqP.
 Qed.
@@ -955,15 +1005,49 @@ Lemma subgroup_projection_inj:
     subgroup_projection gens x == subgroup_projection gens y ->
     x == y.
 Proof.
-  (*move => x y /(@morphism_preserve_equiv _ _ (@subgroup_inj F2 H)).*)
-  (*rewrite -[_ (_ x)]Stallings_automaton_div_subgroup*)
-  (*        -[_ (_ y)]Stallings_automaton_div_subgroup.*)
+  move => x y /(@morphism_preserve_equiv _ _ (@subgroup_inj F2 H)).
+  rewrite -{2}[x]Stallings_automaton_div_subgroup
+          -{2}[y]Stallings_automaton_div_subgroup /=.
+  move/Stallings_automaton_div_proper => ->.
+  - by [].
+  - by exact: Stallings_automaton_reachable_configuration0nil.
+Qed.
+
+HB.instance Definition _ :=
+  isInjective.Build _ _
+    (subgroup_projection gens)
+    subgroup_projection_inj.
+
+Definition apbq_isomorphism: isomorphism F2 H := (subgroup_projection gens).
+
+Definition apbq_isomorphism_inv :=
+  ((Stallings_automaton_div 0 [::]) \o (@subgroup_inj F2 H)).
+
+HB.instance Definition _ :=
+  isBijectionLeftInverse.Build _ _
+    apbq_isomorphism
+    apbq_isomorphism_inv
+    morphism_preserve_equiv
+    Stallings_automaton_div_subgroup.
+
+Lemma apbq_isomorphism_inv_preserve_e: apbq_isomorphism_inv e == e.
+Proof. done. Qed.
+
+Lemma apbq_isomorphism_inv_preserve_law: forall x y,
+  apbq_isomorphism_inv (x @ y) ==
+  (apbq_isomorphism_inv x) @ (apbq_isomorphism_inv y).
+Proof.
+  move => x y.
+  (* TODO(reiniscirpons): use product lemma, then mod over subgroup cancels,
+     result follows. *)
 Admitted.
 
+HB.instance Definition _ :=
+  isMonoidMorphism.Build _ _
+    apbq_isomorphism_inv
+    apbq_isomorphism_inv_preserve_e
+    apbq_isomorphism_inv_preserve_law.
 
-
-
-
-
+Check apbq_isomorphism_inv: isomorphism H F2.
 
 End NielsenSchreierStalling.

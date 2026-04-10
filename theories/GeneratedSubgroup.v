@@ -1020,34 +1020,26 @@ HB.instance Definition _ :=
 
 Definition apbq_isomorphism: isomorphism F2 H := (subgroup_projection gens).
 
-Definition apbq_isomorphism_inv :=
+Definition apbq_isomorphism_inv' :=
   ((Stallings_automaton_div 0 [::]) \o (@subgroup_inj F2 H)).
+Arguments apbq_isomorphism_inv' / _.
 
 HB.instance Definition _ :=
-  isBijectionLeftInverse.Build _ _
+  isIsomorphismLeftInverse.Build _ _
     apbq_isomorphism
-    apbq_isomorphism_inv
+    apbq_isomorphism_inv'
     morphism_preserve_equiv
     Stallings_automaton_div_subgroup.
 
-Lemma apbq_isomorphism_inv_preserve_e: apbq_isomorphism_inv e == e.
-Proof. done. Qed.
-
-Lemma apbq_isomorphism_inv_preserve_law: forall x y,
-  apbq_isomorphism_inv (x @ y) ==
-  (apbq_isomorphism_inv x) @ (apbq_isomorphism_inv y).
-Proof.
-  move => x y.
-  (* TODO(reiniscirpons): use product lemma, then mod over subgroup cancels,
-     result follows. *)
-Admitted.
-
-HB.instance Definition _ :=
-  isMonoidMorphism.Build _ _
-    apbq_isomorphism_inv
-    apbq_isomorphism_inv_preserve_e
-    apbq_isomorphism_inv_preserve_law.
-
-Check apbq_isomorphism_inv: isomorphism H F2.
-
+(* TODO(reiniscirpons): Why do I need to do this weird dance? *)
+Definition apbq_isomorphism_inv: isomorphism H F2 := apbq_isomorphism_inv'.
 End NielsenSchreierStalling.
+
+(* NOTE(reiniscirpos): Finally done! *)
+Definition pqpq_isomorphism
+  (p1 q1: nat) (H1: (p1 < q1)%N)
+  (p2 q2: nat) (H2: (p2 < q2)%N):
+    isomorphism
+      (generatedSubgroup [:: a_encoding p1; b_encoding q1])
+      (generatedSubgroup [:: a_encoding p2; b_encoding q2])
+        := (apbq_isomorphism p2 q2 H2) \o (apbq_isomorphism_inv p1 q1 H1).

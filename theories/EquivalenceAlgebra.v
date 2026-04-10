@@ -107,94 +107,106 @@ HB.structure Definition Isomorphism (G H: monoid) :=
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-HB.factory Record isBijectionInverse (A B: equivType)
-  (f: bijectiveFunType A B) (g: B -> A) := {
+HB.factory Record isIsomorphismInverse (S T: monoid)
+  (f: isomorphism S T) (g: T -> S) := {
     morphism_preserve_equiv':
       forall x y, x == y -> g x == g y;
-    cancel_left: forall x, g (f x) == x;
-    cancel_right: forall x, f (g x) == x;
+    morphism_inverse_left: forall x, g (f x) == x;
+    morphism_inverse_right: forall x, f (g x) == x;
 }.
 
 HB.builders Context 
-  (A B: equivType) (f: bijectiveFunType A B) g of 
-    isBijectionInverse A B f g.
+  (S T: monoid) (f: isomorphism S T) g of 
+    isIsomorphismInverse S T f g.
 
   HB.instance Definition _ :=
     isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
 
-  Fact surjectivity_property': forall y, exists x, g x == y.
+  Fact g_surjectivity_property: forall y, exists x, g x == y.
   Proof.
-    move => y; exists (f y); by apply cancel_left.
+    move => y; exists (f y); by apply morphism_inverse_left.
   Qed.
 
   HB.instance Definition _ :=
-    isSurjective.Build _ _ g surjectivity_property'.
+    isSurjective.Build _ _ g g_surjectivity_property.
   
-  Fact injectivity_property': forall x y, g x == g y -> x == y.
+  Fact g_injectivity_property: forall x y, g x == g y -> x == y.
   Proof.
-    move => x y Hg; have Hf: f (g x) == f (g y).
+    move => x y Hg; have: f (g x) == f (g y).
     - by apply morphism_preserve_equiv.
-    by rewrite !cancel_right in Hf.
+    by rewrite !morphism_inverse_right.
   Qed.
 
   HB.instance Definition _ :=
-    isInjective.Build _ _ g injectivity_property'.
+    isInjective.Build _ _ g g_injectivity_property.
+
+  Fact g_preserve_e: g e == e.
+  Proof.
+    by rewrite -(morphism_inverse_left e) morphism_preserve_e.
+  Qed.
+
+  Fact g_preserve_law: forall x y, g (x @ y) == g x @ g y.
+  Proof.
+    move => x y.
+    move: (@surjectivity_property _ _ f x) => [x'] <-.
+    move: (@surjectivity_property _ _ f y) => [y'] <-.
+    by rewrite -morphism_preserve_law !morphism_inverse_left.
+  Qed.
+
+  HB.instance Definition _ :=
+    isMonoidMorphism.Build _ _ g g_preserve_e g_preserve_law.
 HB.end.
 
-HB.factory Record isBijectionLeftInverse (A B: equivType)
-  (f: bijectiveFunType A B) (g: B -> A) := {
+HB.factory Record isIsomorphismLeftInverse (S T: monoid)
+  (f: isomorphism S T) (g: T -> S) := {
     morphism_preserve_equiv':
       forall x y, x == y -> g x == g y;
-    cancel_left: forall x, g (f x) == x;
+    morphism_inverse_left: forall x, g (f x) == x;
 }.
 
 HB.builders Context 
-  (A B: equivType) (f: bijectiveFunType A B) g of 
-    isBijectionLeftInverse A B f g.
+  (S T: monoid) (f: isomorphism S T) g of 
+    isIsomorphismLeftInverse S T f g.
 
   HB.instance Definition _ :=
     isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
 
-  Fact cancel_right': forall y, f (g y) == y.
+  Fact morphism_inverse_right': forall y, f (g y) == y.
   Proof.
-    move => y; have H: exists x, f x == y.
-    - by apply surjectivity_property.
-    case: H => x <-; apply morphism_preserve_equiv.
-    by apply cancel_left.
+    move => y.
+    move: (@surjectivity_property _ _ f y) => [x] <-;
+    by apply /morphism_preserve_equiv /morphism_inverse_left.
   Qed.
   
   HB.instance Definition _ :=
-    isBijectionInverse.Build _ _ f g
+    isIsomorphismInverse.Build _ _ f g
       morphism_preserve_equiv'
-      cancel_left
-      cancel_right'.
+      morphism_inverse_left
+      morphism_inverse_right'.
 HB.end.
 
-HB.factory Record isBijectionRightInverse (A B: equivType)
-  (f: bijectiveFunType A B) (g: B -> A) := {
+HB.factory Record isIsomorphismRightInverse (S T: monoid)
+  (f: isomorphism S T) (g: T -> S) := {
     morphism_preserve_equiv':
       forall x y, x == y -> g x == g y;
-    cancel_right: forall x, f (g x) == x;
+    morphism_inverse_right: forall x, f (g x) == x;
 }.
 
 HB.builders Context 
-  (A B: equivType) (f: bijectiveFunType A B) g of 
-    isBijectionRightInverse A B f g.
+  (S T: monoid) (f: isomorphism S T) g of 
+    isIsomorphismRightInverse S T f g.
 
-  HB.instance Definition _ :=
-    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
-
-  Fact cancel_left': forall x, g (f x) == x.
+  Fact morphism_inverse_left': forall x, g (f x) == x.
   Proof.
     move => x; apply (@injectivity_property _ _ f).
-    by apply cancel_right.
+    by apply morphism_inverse_right.
   Qed.
   
   HB.instance Definition _ :=
-    isBijectionInverse.Build _ _ f g
+    isIsomorphismInverse.Build _ _ f g
       morphism_preserve_equiv'
-      cancel_left'
-      cancel_right.
+      morphism_inverse_left'
+      morphism_inverse_right.
 HB.end.
 
 (** Composition of morphisms *)
@@ -214,8 +226,55 @@ Lemma comp_preserve_law: forall x y,
   (g \o f) (x @ y) == ((g \o f) x) @ ((g \o f) y).
 Proof. move => x y; by rewrite /comp !morphism_preserve_law. Qed.
 
-HB.instance Definition _ := isMonoidMorphism.Build S U (g \o f) comp_preserve_e comp_preserve_law.
+HB.instance Definition _ :=
+  isMonoidMorphism.Build S U (g \o f) comp_preserve_e comp_preserve_law.
 End MorphismComposition.
+
+Section InjectionComposition.
+Variables A B C: equivType.
+Variable f: injectiveFunType A B.
+Variable g: injectiveFunType B C.
+
+Lemma comp_preserve_injectivity_property: forall x y,
+  (g \o f) x == (g \o f) y -> x == y.
+Proof.
+  move => x y; rewrite /comp;
+  by move/injectivity_property/injectivity_property.
+Qed.
+HB.instance Definition _ :=
+  isInjective.Build A C (g \o f) comp_preserve_injectivity_property.
+End InjectionComposition.
+
+Section SurjectionComposition.
+Variables A B C: equivType.
+Variable f: surjectiveFunType A B.
+Variable g: surjectiveFunType B C.
+
+
+Lemma comp_preserve_surjectivity_property: forall y,
+  exists x, (g \o f) x == y.
+Proof.
+  move => y.
+  move: (@surjectivity_property _ _ g y) => [z] Hz.
+  move: (@surjectivity_property _ _ f z) => [x] Hx.
+  by exists x; rewrite /= Hx Hz.
+Qed.
+HB.instance Definition _ :=
+  isSurjective.Build A C (g \o f) comp_preserve_surjectivity_property.
+End SurjectionComposition.
+
+Section IsomorphismComposition.
+Variables S T U: monoid.
+Variable f: isomorphism S T.
+Variable g: isomorphism T U.
+
+(* TODO(reiniscirpons): Without this line isomorphism composition
+  is not an isomorphism. Why? *)
+HB.instance Definition _ :=
+  isSetoidMorphism.Build S U
+  (g \o f) morphism_preserve_equiv.
+End IsomorphismComposition.
+
 
 (** Theory of groups *)
 

@@ -20,7 +20,7 @@ Variable G: group.
 Variable gens: seq G.
 
 (*TODO(reiniscirpons): Should I be using notations or local definitions?*)
-Notation Sigma := (ordinal (length gens)).
+Notation Sigma := (ordinal (size gens)).
 Local Definition nth_gen := fun (n: Sigma) => nth e gens (nat_of_ord n).
 
 Definition in_generated_subgroup (x: G): Prop :=
@@ -116,6 +116,38 @@ Arguments igs_gen {_}.
 Arguments subgroup_projection {_} _ / !_.
 Arguments nth_gen {_} _ / !_.
 
+Section GeneratedSubgroupIsomorphisms.
+
+Variable G: group.
+Variable gens: seq G.
+
+Search map.
+
+Lemma in_generated_subgroup_inv: forall x,
+  in_generated_subgroup gens x ->
+  in_generated_subgroup [seq inv g | g <- gens] x.
+Proof.
+  move => x [w Hw].
+  pose z := inv w.
+  rewrite /= in z.
+  move: (size_map inv gens) => E.
+  (*rewrite -E in z |- *.*)
+  (*exists z.*)
+  (*move: (size_map inv gens) => <-.*)
+  (*Search (size (map _ _)).*)
+(*Qed.*)
+Admitted.
+
+Definition generatedSubgroup_inv: 
+  generatedSubgroup gens ->
+  generatedSubgroup [seq inv g | g <- gens].
+Proof.
+  move => [] x /in_generated_subgroup_inv H.
+  by exists x.
+Defined.
+
+End GeneratedSubgroupIsomorphisms.
+
 
 (** In this section we develop the Nielsen-Schreier-Stalling
     theory of subgroups of the free group, as it applies
@@ -142,7 +174,7 @@ Variable p q: nat.
 Notation gens := [:: a_encoding p; b_encoding q].
 (* TODO: Why is Gamma not equal to Sigma? Shouldn't they be because
          length gens computationally reduces to 2? *)
-Notation Gamma := (ordinal (length gens)).
+Notation Gamma := (ordinal (size gens)).
 Notation IndexFG := (FreeGroup Gamma).
 Notation H := (generatedSubgroup gens).
 
@@ -165,23 +197,6 @@ Lemma apbq_projection_cons: forall h t,
     end) ++ apbq_projection t.
 Proof. by move => [|] [] [|[|//]]. Qed.
 
-(* NOTE(reiniscirpons): Housekeeping lemmas:
-
-   <a_p, b^q> \isomorphic <a_p, b^{-q}> (they both equal to <a_p, b^q, b^-q>)
-   <a_p, b^q> \isomorphic <a_-p, b^{-q}> (fix a and map b to b^{-1})
-   => every <a_p, b^q> is isomorphic to some <a_p', b^q'> with 0 <= p, q.
-   Furthermore, if p, q: nat and q != 0, then
-   <a_p, b^q> \isomorphic <a_(modulo p q), b^q>
-   (these subgroups are in fact equal since we get a_(p+kq) by
-    conjugating by b^q)
-
-   So, if q != 0 (which it has to be as otherwise we get a rank 1 subgroup,
-   which is bad), then we can additionally assume that p < q.
-
-   TODO(reiniscirpons): Implement these reductions
-   TODO(reiniscirpons): Add a lemma to show that if we can mutually derive
-       generating sets, then subgroups are isomorphic.
-*)
 Variable Hpq: (p < q)%N.
 
 (* TODO(reiniscirpons): Is Local Lemma the correct thing here? *)
@@ -535,80 +550,11 @@ Qed.
 (* TODO(reiniscirpons): Would be nice if there was some "monoid" or
     "group" tactic that essentially does all the busywork in the above
     proof and allows us to do rewrites modulo associativity. *)
-(* NOTE(reiniscirpons): Like here all we are doing is just
-    some busywork with multiplication and powers. I think
-    this is some kind of algebraic structure, maybe a module,
-    where we could just decide equality by jiggling things around.
-    I guess I should implement it ... *)
-(* NOTE(reiniscirpons):
-    group axioms -> dealt with by using free group normal forms, i.e.
-
-    1. Use `rewrite !inverse_law` to move all inversions as low down
-      in the term tree as possible, now all inverses should be at the
-      bottom.
-    2. Use `rewrite !inv_involutive` to remove repeated inversions.
-    3. Use `rewrite !associativity` to linearize multiplication term
-    4. Use `rewrite !neutral_left !neutral_right`
-      to remove all identity elements (this is enough because we have a
-      linear multiplication term of the form
-        (..((x_0 * x_1) * x_2 ...) * x_n),
-      if x_0 is not the identity, then there we cannot use neutral_left
-      ever. So, the initial !neutral_left will cancel the longest 
-      prefix of x_0 ... x_n that are all identities. Afterwards,
-      we only need to use neutral_right as discussed.
-    5. Set the innermost multiplication pair as the "active pair"
-    6. Check if active multiplication pair cancels:
-    6.1. if theactive pair is (x * inv(y)) or (inv(x) * y) and
-        x and y are convertible terms (or whatever the proper terminology
-        is, basically we want to treat each term as a generator of a
-        free group, where the underlying equality is on terms),
-        then replace the term by e
-        (using either inverse_left or inverse_right) and then
-        remove it using either neutral_left or neutral right.
-        If we used neutral_right, then the new innermost term
-        becomes active. If we used neutral left, then we need to
-        use associativity to take the right element of the left subtree
-        and move it up to be in a new active pair with the
-        right element of the current node. The second situation
-        situation is shown graphically below:
-                /
-               /|       /       /
-              / n      /|      /|
-             /|       / n     / |
-            / |   -> /|   -> / /|
-           / /|     T r     T r n 
-          /|a b
-         T r
-        Here (T r) is an already processed subtree whose right leaf is r,
-        then a and b are elements of the
-        active pair that cancel, leaving a neutral on the right, and n in the
-        right sibling of the parent of the active pair. using a single call to
-        associativity, we make r, n the new active pair.
-    6.2. Otherwise, no cancellation happened, in this case we take the
-        left term of multiplication and set it aside using two
-        associativity calls:
-                /        /        /
-               /|       /|       /|
-              / n      / n      / |
-             /|       /|       / /|
-            / |   -> / b  ->  /|b n
-           / /|     /|       T a
-          T a b    T a
-        here T is anready processed subtree, (a b) is the active pair
-        and n is the right sibling of the parent of the active pair.
-        The two calls to associativity make (b n) the new active pair
-    7. If we got to the top of the tree, then the term is reduced with
-      respect to the group axioms, i.e. no usage of the associativity,
-      identity and inversion rewrites will yield a distinct term (up to
-      associativity). Otherwise, got to 6.
-*)
-(* NOTE(reiniscirpons): exponential axioms:
-    x^a * x^b = x^(a+b) -> should be fine
-    (x*y)^a -> this is where we run into trouble...
-    TODO(reiniscirpons): look up if the algebra of the free group with
-    exponentiation has a normal form algorithm.
+(* NOTE(reiniscirpons): To handle group with exponents, check out
+   https://www.jstor.org/stable/1993539?seq=1
 *)
 
+(* NOTE: Stallings foldings. *)
 (* NOTE(reiniscirpons):
    The output of Stallings_automaton_div is a word in the index free group,
    which, when mapped by apbq_projection, gives the largest, in the sense that
@@ -849,22 +795,6 @@ HB.instance Definition _ :=
     Stallings_automaton_mod_correct
     Stallings_automaton_mod_unique.
 
-(*Lemma Stallings_automaton_div_subgroup:*)
-(*  forall (h: H),*)
-(*    apbq_projection (Stallings_automaton_div 0 [::] (@subgroup_inj F2 H h)) ==*)
-(*    @subgroup_inj F2 H h.*)
-(*Proof.*)
-(*  move => h.*)
-(*  move: (Stallings_automaton_product 0 [::] (@subgroup_inj F2 H h) H0q).*)
-(*  rewrite power0 !neutral_left => {2}<-.*)
-(*  move: (Stallings_automaton_mod_subgroup e h).*)
-(*  move: (neutral_right (@subgroup_inj F2 H h)) =>*)
-(*        /Stallings_automaton_mod_proper => ->;*)
-(*    last by apply Stallings_automaton_reachable_configuration0nil.*)
-(*  move => ->.*)
-(*  by rewrite /= power0 neutral_left neutral_right.*)
-(*Qed.*)
-
 Lemma Stallings_automaton_div_power_b:
   forall state (n: nat) x,
     (state + n < q)%N ->
@@ -875,7 +805,7 @@ Proof.
     first by rewrite power0 /= addn0.
   rewrite powerS -cat_law -catA /=.
   case: ifP => [// Hsq|_];
-    first by exfalso; lia.
+    first by lia.
   move: Hsnq.
   have: (state + n.+1 = state.+1 +n)%N => [|->];
     first by lia.
@@ -906,7 +836,7 @@ Proof.
     first by case.
   rewrite F2_powerS' -rcons_law /inv /= inv_word_rcons cat_cons /=.
   case: ifP => [|] Hs0;
-    first by exfalso; lia.
+    first by lia.
   have: (state - n.+1 = state.-1 - n)%N => [|->];
     first by lia.
   by apply IH; lia.
@@ -940,6 +870,16 @@ Qed.
 
 (* TODO(reiniscirpons): How can I make this proper so that I can use
    setoid tactics? Problem is the state and stack constraint.*)
+(* NOTE(reiniscirpons): *)
+(* Unclear implementation choice, look at docs for Proper. *)
+(* Generalized rewriting. Essentially the same thing. *)
+(* Automate synthesis of relatedness proofs. 
+   Generalized rewriting generalizes to non-symmetric
+   relations. *)
+(* <-> : setoid relation of Prop.
+   -> : Not symmetric. However if A -> B then get
+   some properties e.g. (A -> B) -> (A /\ C -> B /\ C).
+*)
 Lemma Stallings_automaton_div_proper:
   forall (state: nat) (stack: F2) (word1 word2: F2),
     Stallings_automaton_reachable_configuration state stack ->
@@ -1035,7 +975,25 @@ HB.instance Definition _ :=
 Definition apbq_isomorphism_inv: isomorphism H F2 := apbq_isomorphism_inv'.
 End NielsenSchreierStalling.
 
-(* NOTE(reiniscirpos): Finally done! *)
+(* NOTE(reiniscirpons): Housekeeping lemmas:
+
+   <a_p, b^q> \isomorphic <a_p, b^{-q}> (they both equal to <a_p, b^q, b^-q>)
+   <a_p, b^q> \isomorphic <a_-p, b^{-q}> (fix a and map b to b^{-1})
+   => every <a_p, b^q> is isomorphic to some <a_p', b^q'> with 0 <= p, q.
+   Furthermore, if p, q: nat and q != 0, then
+   <a_p, b^q> \isomorphic <a_(modulo p q), b^q>
+   (these subgroups are in fact equal since we get a_(p+kq) by
+    conjugating by b^q)
+
+   So, if q != 0 (which it has to be as otherwise we get a rank 1 subgroup,
+   which is bad), then we can additionally assume that p < q.
+
+   TODO(reiniscirpons): Implement these reductions
+   TODO(reiniscirpons): Add a lemma to show that if we can mutually derive
+       generating sets, then subgroups are isomorphic.
+*)
+
+(* NOTE(reiniscirpos): Finally done! (almost!) *)
 Definition pqpq_isomorphism
   (p1 q1: nat) (H1: (p1 < q1)%N)
   (p2 q2: nat) (H2: (p2 < q2)%N):

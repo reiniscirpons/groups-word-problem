@@ -54,6 +54,17 @@ Section ProperMorphism.
 Variable S T: equivType.
 Variable f: setoidMorphism S T.
 
+(* NOTE(reiniscirpons): *)
+(* Ad-hoc polymorphism resolution *)
+(* 
+   (C t1), search C in known instances of Proper
+   not found, then tactic tries to decompose into
+   succession of proper Terms. Composition might
+   require other relations.
+   C1, C2 should be known as proper constants, if
+   not more decomposition. If no solution found then
+   error. Otherwise compose proofs.
+*)
 Global Instance : Proper (eq ==> eq) f.
 Proof. exact: morphism_preserve_equiv. Qed.
 End ProperMorphism.

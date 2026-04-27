@@ -118,34 +118,320 @@ Arguments nth_gen {_} _ / !_.
 Section GeneratedSubgroupIsomorphisms.
 
 Variable G: group.
-Variable gens: seq G.
 
-Search map.
+(* If two sets of generators are entrywise equivalent, then
+  there is an isomorphism. *)
+Section GeneratedSubgroupEquivMorphism.
+  Variable gens: seq G.
+  Variable gens': seq G.
+  Variable Hsize: size gens = size gens'.
+  Variable Hequiv: forall n, nth e gens n == nth e gens' n.
 
-Lemma in_generated_subgroup_inv: forall x,
-  in_generated_subgroup gens x ->
-  in_generated_subgroup [seq inv g | g <- gens] x.
+  Lemma in_generated_subgroup_equiv_morphism: forall x,
+    in_generated_subgroup gens x ->
+    in_generated_subgroup gens' x.
+  Proof.
+    move => x [w].
+    elim: w x => [x /= H|wh wt IH x].
+    - by exists e.
+    - rewrite hat_cons; case: wh => wh /=.
+    -- move/(congruent_left (inv (nth_gen gens wh))).
+      rewrite associativity inverse_right neutral_left.
+      move/IH => [w Hw]; exists ((`[Base (cast_ord Hsize wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= -Hequiv.
+      by rewrite associativity inverse_left neutral_left.
+    -- move/(congruent_left (nth_gen gens wh)).
+      rewrite associativity inverse_left neutral_left.
+      move/IH => [w Hw]; exists ((`[Inverse (cast_ord Hsize wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= -Hequiv.
+      by rewrite associativity inverse_right neutral_left.
+  Qed.
+
+  Definition generatedSubgroup_equiv_morphism: 
+    generatedSubgroup gens ->
+    generatedSubgroup gens'.
+  Proof.
+    move => [] x /in_generated_subgroup_equiv_morphism H.
+    by exists x.
+  Defined.
+
+  Lemma generatedSubgroup_equiv_morphism_equiv: forall x y,
+    x == y -> generatedSubgroup_equiv_morphism x == generatedSubgroup_equiv_morphism y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isSetoidMorphism.Build _ _
+    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_equiv.
+
+  Lemma generatedSubgroup_equiv_morphism_e: generatedSubgroup_equiv_morphism e == e.
+  Proof.
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  Lemma generatedSubgroup_equiv_morphism_law: forall x y,
+    generatedSubgroup_equiv_morphism (x @ y) ==
+    generatedSubgroup_equiv_morphism x @ generatedSubgroup_equiv_morphism y.
+  Proof.
+    move => [x Hx] [y Hy].
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  HB.instance Definition _ := isMonoidMorphism.Build _ _
+    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_e
+    generatedSubgroup_equiv_morphism_law.
+
+  Lemma generatedSubgroup_equiv_morphism_injective: forall x y,
+    generatedSubgroup_equiv_morphism x == generatedSubgroup_equiv_morphism y -> x == y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isInjective.Build _ _
+    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_injective.
+End GeneratedSubgroupEquivMorphism.
+
+Lemma generatedSubgroup_equiv_morphism_surjective (gens gens': seq G) Hsize Hequiv:
+  forall y, exists x,
+    generatedSubgroup_equiv_morphism gens gens' Hsize Hequiv x == y.
 Proof.
-  move => x [w Hw].
-  pose z := inv w.
-  rewrite /= in z.
-  move: (size_map inv gens) => E.
-  (*rewrite -E in z |- *.*)
-  (*exists z.*)
-  (*move: (size_map inv gens) => <-.*)
-  (*Search (size (map _ _)).*)
-(*Qed.*)
-Admitted.
+  move => y;
+  have: (size gens' = size gens) => [//|Hsize'];
+  have: (forall n, nth e gens' n == nth e gens n) => [|Hequiv'];
+    first by move => n; apply symm.
+  exists (generatedSubgroup_equiv_morphism gens' gens Hsize' Hequiv' y).
+  by rewrite /(_ == _) /= /subgroupby_eq /=.
+Qed.
+HB.instance Definition _ (gens gens': seq G) Hsize Hequiv := isSurjective.Build _ _
+  (generatedSubgroup_equiv_morphism gens gens' Hsize Hequiv)
+  (generatedSubgroup_equiv_morphism_surjective gens gens' Hsize Hequiv).
 
-Definition generatedSubgroup_inv: 
-  generatedSubgroup gens ->
-  generatedSubgroup [seq inv g | g <- gens].
+(* The map x |-> inv x is an isomorphism *)
+Section GeneratedSubgroupInvMorphism.
+  Variable gens: seq G.
+  Let inv_gens := [seq inv g | g <- gens].
+
+  Lemma in_generated_subgroup_inv_morphism: forall x,
+    in_generated_subgroup gens x ->
+    in_generated_subgroup inv_gens x.
+  Proof.
+    move/esym: (size_map inv gens) => E.
+    move => x [w].
+    elim: w x => [x /= H|wh wt IH x].
+    - by exists e.
+    - rewrite hat_cons; case: wh => wh /=.
+    -- move/(congruent_left (inv (nth_gen gens wh))).
+      rewrite associativity inverse_right neutral_left.
+      move/IH => [w Hw]; exists ((`[Inverse (cast_ord E wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= (nth_map e) => [|//].
+      by rewrite inv_involutive associativity inverse_left neutral_left.
+    -- move/(congruent_left (nth_gen gens wh)).
+      rewrite associativity inverse_left neutral_left.
+      move/IH => [w Hw]; exists ((`[Base (cast_ord E wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= (nth_map e) => [|//].
+      by rewrite associativity inverse_right neutral_left.
+  Qed.
+
+  Definition generatedSubgroup_inv_morphism: 
+    generatedSubgroup gens ->
+    generatedSubgroup inv_gens.
+  Proof.
+    move => [] x /in_generated_subgroup_inv_morphism H.
+    by exists x.
+  Defined.
+
+  Lemma generatedSubgroup_inv_morphism_equiv: forall x y,
+    x == y -> generatedSubgroup_inv_morphism x == generatedSubgroup_inv_morphism y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isSetoidMorphism.Build _ _
+    generatedSubgroup_inv_morphism generatedSubgroup_inv_morphism_equiv.
+
+  Lemma generatedSubgroup_inv_morphism_e: generatedSubgroup_inv_morphism e == e.
+  Proof.
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  Lemma generatedSubgroup_inv_morphism_law: forall x y,
+    generatedSubgroup_inv_morphism (x @ y) ==
+    generatedSubgroup_inv_morphism x @ generatedSubgroup_inv_morphism y.
+  Proof.
+    move => [x Hx] [y Hy].
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  HB.instance Definition _ := isMonoidMorphism.Build _ _
+    generatedSubgroup_inv_morphism generatedSubgroup_inv_morphism_e
+    generatedSubgroup_inv_morphism_law.
+
+  Lemma generatedSubgroup_inv_morphism_injective: forall x y,
+    generatedSubgroup_inv_morphism x == generatedSubgroup_inv_morphism y -> x == y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isInjective.Build _ _
+    generatedSubgroup_inv_morphism generatedSubgroup_inv_morphism_injective.
+End GeneratedSubgroupInvMorphism.
+
+Lemma generatedSubgroup_inv_morphism_surjective (gens: seq G):
+  forall y, exists x, generatedSubgroup_inv_morphism gens x == y.
 Proof.
-  move => [] x /in_generated_subgroup_inv H.
-  by exists x.
-Defined.
+  move => y.
+  set gens_inv_inv := map inv (map inv gens).
+  have: size gens_inv_inv = size gens => [|Hsize];
+    first by rewrite /gens_inv_inv !size_map.
+  have: (forall n, nth e gens_inv_inv n == nth e gens n) => [n|Hequiv].
+  - rewrite /gens_inv_inv; case H: (n < size gens)%N.
+  -- rewrite !(nth_map e) => [|//|].
+  --- by rewrite inv_involutive.
+  --- by rewrite size_map.
+  -- rewrite !nth_default => [//||]; apply/negPn; rewrite -ltnNge.
+  --- by rewrite H.
+  --- by rewrite Hsize H.
+  exists (generatedSubgroup_equiv_morphism gens_inv_inv gens Hsize Hequiv
+      (generatedSubgroup_inv_morphism [seq inv g | g <- gens] y)).
+  by rewrite /(_ == _) /= /subgroupby_eq /=.
+Qed.
 
+HB.instance Definition _ gens := isSurjective.Build _ _
+  (generatedSubgroup_inv_morphism gens)
+  (generatedSubgroup_inv_morphism_surjective gens).
+
+(* Adding a generator induces an isomorphism. *)
+Section GeneratedSubgroupRconsMorphism.
+  Variable gens: seq G.
+  Variable g: G.
+  Variable Hg: in_generated_subgroup gens g.
+  Let rcons_gens := rcons gens g.
+
+  Lemma in_generated_subgroup_rcons_morphism: forall x,
+    in_generated_subgroup gens x ->
+    in_generated_subgroup rcons_gens x.
+  Proof.
+    have: (size gens <= size rcons_gens)%N = true => [|E];
+      first by rewrite size_rcons leqnSn.
+    move => x [w].
+    elim: w x => [x /= H|wh wt IH x].
+    - by exists e.
+    - rewrite hat_cons; case: wh => wh /=.
+    -- move/(congruent_left (inv (nth_gen gens wh))).
+      rewrite associativity inverse_right neutral_left.
+      move/IH => [w Hw]; exists ((`[Base (widen_ord E wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= nth_rcons.
+      case: wh Hw => m H Hw /=; rewrite H.
+      by rewrite associativity inverse_left neutral_left.
+    -- move/(congruent_left (nth_gen gens wh)).
+      rewrite associativity inverse_left neutral_left.
+      move/IH => [w Hw]; exists ((`[Inverse (widen_ord E wh)]_(FGP _)) @ w).
+      rewrite hat_cons Hw /= nth_rcons.
+      case: wh Hw => m H Hw /=; rewrite H.
+      by rewrite associativity inverse_right neutral_left.
+  Qed.
+
+  Definition generatedSubgroup_rcons_morphism: 
+    generatedSubgroup gens ->
+    generatedSubgroup rcons_gens.
+  Proof.
+    move => [] x /in_generated_subgroup_rcons_morphism H.
+    by exists x.
+  Defined.
+
+  Lemma generatedSubgroup_rcons_morphism_equiv: forall x y,
+    x == y -> generatedSubgroup_rcons_morphism x == generatedSubgroup_rcons_morphism y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isSetoidMorphism.Build _ _
+    generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism_equiv.
+
+  Lemma generatedSubgroup_rcons_morphism_e: generatedSubgroup_rcons_morphism e == e.
+  Proof.
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  Lemma generatedSubgroup_rcons_morphism_law: forall x y,
+    generatedSubgroup_rcons_morphism (x @ y) ==
+    generatedSubgroup_rcons_morphism x @ generatedSubgroup_rcons_morphism y.
+  Proof.
+    move => [x Hx] [y Hy].
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  HB.instance Definition _ := isMonoidMorphism.Build _ _
+    generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism_e
+    generatedSubgroup_rcons_morphism_law.
+
+  Lemma generatedSubgroup_rcons_morphism_injective: forall x y,
+    generatedSubgroup_rcons_morphism x == generatedSubgroup_rcons_morphism y -> x == y.
+  Proof. done. Qed.
+
+  HB.instance Definition _ := isInjective.Build _ _
+    generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism_injective.
+
+  Lemma in_generated_subgroup_rcons_morphism': forall x,
+    in_generated_subgroup rcons_gens x ->
+    in_generated_subgroup gens x.
+  Proof.
+    have: (size gens <= size rcons_gens)%N = true => [|E];
+      first by rewrite size_rcons leqnSn.
+    move => x [w].
+    elim: w x => [x /= H|wh wt IH x].
+    - by exists e.
+    - rewrite hat_cons; case: wh => wh /=.
+    -- move/(congruent_left (inv (nth_gen rcons_gens wh))).
+       rewrite associativity inverse_right neutral_left.
+       move/IH => [w Hw]; case H: (wh < size gens)%N.
+    --- exists ((`[Base (Ordinal H)]_(FGP _)) @ w).
+        rewrite hat_cons Hw /= /nth_gen nth_rcons H.
+        by rewrite associativity inverse_left neutral_left.
+    --- move: Hg => [wg Hwg]; exists (wg @ w).
+        rewrite morphism_preserve_law /= Hw Hwg /nth_gen nth_rcons H.
+        case: wh {Hw} H => /= n; rewrite size_rcons => Hn Hn'.
+        have: (n == size gens)%B => [|->]; first by lia.
+        by rewrite associativity inverse_left neutral_left.
+    -- move/(congruent_left (nth_gen rcons_gens wh)).
+       rewrite associativity inverse_left neutral_left.
+       move/IH => [w Hw]; case H: (wh < size gens)%N.
+    --- exists ((`[Inverse (Ordinal H)]_(FGP _)) @ w).
+        rewrite hat_cons Hw /= /nth_gen nth_rcons H.
+        by rewrite associativity inverse_right neutral_left.
+    --- move: Hg => [wg Hwg]; exists ((inv wg) @ w).
+        rewrite morphism_preserve_law -morphism_preserve_inv /= Hw Hwg /nth_gen nth_rcons H.
+        case: wh {Hw} H => /= n; rewrite size_rcons => Hn Hn'.
+        have: (n == size gens)%B => [|->]; first by lia.
+        by rewrite associativity inverse_right neutral_left.
+  Qed.
+
+  Definition generatedSubgroup_rcons_morphism': 
+    generatedSubgroup rcons_gens ->
+    generatedSubgroup gens.
+  Proof.
+    move => [] x /in_generated_subgroup_rcons_morphism' H.
+    by exists x.
+  Defined.
+
+  Lemma generatedSubgroup_rcons_morphism_equiv': forall x y,
+    x == y -> generatedSubgroup_rcons_morphism' x == generatedSubgroup_rcons_morphism' y.
+  Proof. done. Qed.
+
+  Lemma generatedSubgroup_rcons_morphism_right_inverse: forall x,
+    generatedSubgroup_rcons_morphism (generatedSubgroup_rcons_morphism' x) == x.
+  Proof.
+    move => [x Hx].
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
+  Qed.
+
+  Lemma generatedSubgroup_rcons_morphism_surjective: forall y, exists x,
+    generatedSubgroup_rcons_morphism x == y.
+  Proof.
+    move => y; exists (generatedSubgroup_rcons_morphism' y).
+    by apply generatedSubgroup_rcons_morphism_right_inverse.
+  Qed.
+
+  HB.instance Definition _ := isSurjective.Build _ _
+    generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism_surjective.
+
+  HB.instance Definition _ := isIsomorphismRightInverse.Build _ _
+    generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism'
+    generatedSubgroup_rcons_morphism_equiv'
+    generatedSubgroup_rcons_morphism_right_inverse.
+End GeneratedSubgroupRconsMorphism.
 End GeneratedSubgroupIsomorphisms.
+
 
 
 (** In this section we develop the Nielsen-Schreier-Stalling
@@ -713,7 +999,7 @@ Proof.
   rewrite {2}powerS -powerC' (inverse_law _ (`[b]_F2P)).
   (* TODO(reiniscirpons): Probably improve this. *)
   rewrite {2}/inv /= /inv_word /= /invl /=.
-  move /(congruent_right _ x)
+  move /(congruent_right x)
        /(Stallings_automaton_mod_proper state [::]) => -> /=.
   - move: Hsn; case: ifP => [/eqP -> //| Hs0 Hns].
     have: (state - n.+1 = state.-1 - n)%N => [|->];
@@ -731,7 +1017,7 @@ Lemma Stallings_automaton_mod_subgroup:
   Stallings_automaton_mod 0 [::] ((@subgroup_inj F2 K h) @ x) =
   Stallings_automaton_mod 0 [::] x.
 Proof.
-  move => x [] /= y [w] /(congruent_right _ x) Hwy.
+  move => x [] /= y [w] /(congruent_right x) Hwy.
   rewrite -(Stallings_automaton_mod_proper _ _ _ _ _ Hwy) => [|];
   last by apply Stallings_automaton_reachable_configuration0nil.
   move => {Hwy y}.
@@ -755,7 +1041,7 @@ Proof.
     (inverse_law _ (`[a]_F2P)) -!cat_law.
     move /congruent_right /Stallings_automaton_mod_proper => ->;
       last by apply Stallings_automaton_reachable_configuration0nil.
-    rewrite -!catA Stallings_automaton_mod_power_b /= => [|//].
+    rewrite -cat_law -!catA Stallings_automaton_mod_power_b /= => [|//].
     rewrite modn_small add0n => [|//].
     case: ifP => [_|/eqP //].
     rewrite Stallings_automaton_mod_inv_power_b => [|//|//].

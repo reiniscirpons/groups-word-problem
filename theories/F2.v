@@ -10,18 +10,25 @@ Import PresentationNotations.
 
 Inductive InverseAlphabet (Sigma: eqType) :=
 | Base: Sigma -> InverseAlphabet Sigma
-  | Inverse: Sigma -> InverseAlphabet Sigma.
+| Inverse: Sigma -> InverseAlphabet Sigma.
 Arguments Base {_}.
 Arguments Inverse {_}.
+
+Definition inverse_alphabet_map {Sigma Gamma: eqType} (f: Sigma -> Gamma):
+  InverseAlphabet Sigma -> InverseAlphabet Gamma :=
+    fun a =>
+      match a with
+      | Base a' => Base (f a')
+      | Inverse a' => Inverse (f a')
+      end.
 
 Section InverseAlphabetEqType.
 Variable (Sigma: eqType).
 
 Definition InverseAlphabet_eq (u v: InverseAlphabet Sigma) :=
   match (u, v) with
-  (* TODO(reiniscirpons): how do I use the usual == notation here? *)
-  | (Base a, Base b) => (eq_op a b)
-  | (Inverse a, Inverse b) => (eq_op a b)
+  | (Base a, Base b) => (a == b)%B
+  | (Inverse a, Inverse b) => (a == b)%B
   | _ => false
   end.
 

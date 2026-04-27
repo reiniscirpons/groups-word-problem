@@ -99,7 +99,7 @@ Proof. by move=> x; rewrite /concat /=. Qed.
 Let neutral_right : forall (x: M), x .@ epsilon == x.
 Proof. by move=> x; rewrite /concat cats0. Qed.
 
-Lemma congruent_left: forall (a u v: M),
+Let congruent_left: forall (a u v: M),
   u == v -> a .@ u == a .@ v.
 Proof.
 move=> a u v; elim => [|//||].
@@ -111,7 +111,7 @@ move=> a u v; elim => [|//||].
 - by move=> ? v'; transitivity (a .@ v').
 Qed.
 
-Lemma congruent_right: forall (b u v: M),
+Let congruent_right: forall (b u v: M),
   u == v -> u .@ b == v .@ b.
 Proof.
 move=> b u v; elim => [|//||].

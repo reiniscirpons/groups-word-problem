@@ -23,6 +23,7 @@ HB.mixin Record isMonoid M of hasEq M := {
 #[short(type="monoid")]
 HB.structure Definition Monoid := { G of isMonoid G & hasEq G }.
 Infix "@" := law (at level 50).
+Notation "x @ y :> T" := (law (x: T) (y: T)) (at level 50).
 
 Section ProperMonoid.
 HB.declare Context G of hasEq G & isMonoid G.

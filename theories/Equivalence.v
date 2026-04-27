@@ -1,7 +1,7 @@
 From HB Require Import structures.
 Require Import ssreflect ssrfun RelationClasses Setoid Morphisms.
 
-(* TODO(reiniscirpons): How does this differ from eqType? *)
+(* TODO(reiniscirpons): Change notation, maybe \approx ?*)
 
 (* Types with an equality, noted `==`.
    

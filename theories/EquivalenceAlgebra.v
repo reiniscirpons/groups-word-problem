@@ -555,6 +555,11 @@ by rewrite !power_inv power_proper_pos.
 Qed.
 Arguments power_proper {_ _ _}.
 
+Global Instance: forall G, Proper (eq ==> Logic.eq ==> eq) (@power G).
+Proof.
+  by move => G x y Hxy h k ->; apply power_proper.
+Qed.
+
 Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
   f (power x k) == power (f x) k.
 Proof.

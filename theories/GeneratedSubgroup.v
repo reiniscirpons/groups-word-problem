@@ -119,15 +119,15 @@ Section GeneratedSubgroupIsomorphisms.
 
 Variable G: group.
 
-(* If two sets of generators are entrywise equivalent, then
+(* If two sets of generators are permutations of each other, then
   there is an isomorphism. *)
-Section GeneratedSubgroupEquivMorphism.
+Section GeneratedSubgroupPermMorphism.
   Variable gens: seq G.
   Variable gens': seq G.
-  Variable Hsize: size gens = size gens'.
-  Variable Hequiv: forall n, nth e gens n == nth e gens' n.
+  Variable perm: ordinal (size gens) -> ordinal (size gens').
+  Hypothesis Hequiv: forall n, nth_gen gens n == nth_gen gens' (perm n).
 
-  Lemma in_generated_subgroup_equiv_morphism: forall x,
+  Lemma in_generated_subgroup_perm_morphism (Hperm: bijective perm): forall x,
     in_generated_subgroup gens x ->
     in_generated_subgroup gens' x.
   Proof.
@@ -137,70 +137,81 @@ Section GeneratedSubgroupEquivMorphism.
     - rewrite hat_cons; case: wh => wh /=.
     -- move/(congruent_left (inv (nth_gen gens wh))).
       rewrite associativity inverse_right neutral_left.
-      move/IH => [w Hw]; exists ((`[Base (cast_ord Hsize wh)]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists ((`[Base (perm wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= -Hequiv.
       by rewrite associativity inverse_left neutral_left.
     -- move/(congruent_left (nth_gen gens wh)).
       rewrite associativity inverse_left neutral_left.
-      move/IH => [w Hw]; exists ((`[Inverse (cast_ord Hsize wh)]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists ((`[Inverse (perm wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= -Hequiv.
       by rewrite associativity inverse_right neutral_left.
   Qed.
 
-  Definition generatedSubgroup_equiv_morphism: 
+  Hypothesis Hperm: bijective perm.
+
+  Definition generatedSubgroup_perm_morphism: 
     generatedSubgroup gens ->
     generatedSubgroup gens'.
   Proof.
-    move => [] x /in_generated_subgroup_equiv_morphism H.
+    move => [] x /(in_generated_subgroup_perm_morphism Hperm) H.
     by exists x.
   Defined.
 
-  Lemma generatedSubgroup_equiv_morphism_equiv: forall x y,
-    x == y -> generatedSubgroup_equiv_morphism x == generatedSubgroup_equiv_morphism y.
+  Lemma generatedSubgroup_perm_morphism_equiv: forall x y,
+    x == y -> generatedSubgroup_perm_morphism x == generatedSubgroup_perm_morphism y.
   Proof. done. Qed.
 
   HB.instance Definition _ := isSetoidMorphism.Build _ _
-    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_equiv.
+    generatedSubgroup_perm_morphism generatedSubgroup_perm_morphism_equiv.
 
-  Lemma generatedSubgroup_equiv_morphism_e: generatedSubgroup_equiv_morphism e == e.
+  Lemma generatedSubgroup_perm_morphism_e: generatedSubgroup_perm_morphism e == e.
   Proof.
     by rewrite /(_ == _) /= /subgroupby_eq /=.
   Qed.
 
-  Lemma generatedSubgroup_equiv_morphism_law: forall x y,
-    generatedSubgroup_equiv_morphism (x @ y) ==
-    generatedSubgroup_equiv_morphism x @ generatedSubgroup_equiv_morphism y.
+  Lemma generatedSubgroup_perm_morphism_law: forall x y,
+    generatedSubgroup_perm_morphism (x @ y) ==
+    generatedSubgroup_perm_morphism x @ generatedSubgroup_perm_morphism y.
   Proof.
     move => [x Hx] [y Hy].
     by rewrite /(_ == _) /= /subgroupby_eq /=.
   Qed.
 
   HB.instance Definition _ := isMonoidMorphism.Build _ _
-    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_e
-    generatedSubgroup_equiv_morphism_law.
+    generatedSubgroup_perm_morphism generatedSubgroup_perm_morphism_e
+    generatedSubgroup_perm_morphism_law.
 
-  Lemma generatedSubgroup_equiv_morphism_injective: forall x y,
-    generatedSubgroup_equiv_morphism x == generatedSubgroup_equiv_morphism y -> x == y.
+  Lemma generatedSubgroup_perm_morphism_injective: forall x y,
+    generatedSubgroup_perm_morphism x == generatedSubgroup_perm_morphism y -> x == y.
   Proof. done. Qed.
 
   HB.instance Definition _ := isInjective.Build _ _
-    generatedSubgroup_equiv_morphism generatedSubgroup_equiv_morphism_injective.
-End GeneratedSubgroupEquivMorphism.
+    generatedSubgroup_perm_morphism generatedSubgroup_perm_morphism_injective.
+End GeneratedSubgroupPermMorphism.
 
-Lemma generatedSubgroup_equiv_morphism_surjective (gens gens': seq G) Hsize Hequiv:
-  forall y, exists x,
-    generatedSubgroup_equiv_morphism gens gens' Hsize Hequiv x == y.
+Lemma generatedSubgroup_perm_morphism_surjective (gens gens': seq G)
+  perm Hequiv Hperm:
+    forall y, exists x,
+      generatedSubgroup_perm_morphism gens gens' perm Hequiv Hperm x == y.
 Proof.
+  move/esym: (bij_eq_card Hperm); rewrite !card_ord => E.
+  move: (inj_comp (bij_inj Hperm) (@cast_ord_inj _ _ E)) => Hperm_inv.
+  set perm_inv := ((cast_ord E) \o (invF Hperm_inv)).
   move => y;
-  have: (size gens' = size gens) => [//|Hsize'];
-  have: (forall n, nth e gens' n == nth e gens n) => [|Hequiv'];
-    first by move => n; apply symm.
-  exists (generatedSubgroup_equiv_morphism gens' gens Hsize' Hequiv' y).
-  by rewrite /(_ == _) /= /subgroupby_eq /=.
+  have: (forall n, nth_gen gens' n == nth_gen gens (perm_inv n)) => [|Hequiv'];
+    first by move => n; rewrite /perm_inv /= -{1}(f_invF Hperm_inv n) /= -Hequiv.
+  have: bijective perm_inv => [|Hperm'].
+  - apply inj_card_bij.
+  -- apply inj_comp.
+  --- by apply cast_ord_inj.
+  --- by apply (can_inj (f_invF Hperm_inv)).
+  -- by rewrite E leqnn.
+  - exists (generatedSubgroup_perm_morphism gens' gens perm_inv Hequiv' Hperm' y).
+    by rewrite /(_ == _) /= /subgroupby_eq /=.
 Qed.
-HB.instance Definition _ (gens gens': seq G) Hsize Hequiv := isSurjective.Build _ _
-  (generatedSubgroup_equiv_morphism gens gens' Hsize Hequiv)
-  (generatedSubgroup_equiv_morphism_surjective gens gens' Hsize Hequiv).
+HB.instance Definition _ (gens gens': seq G) perm Hequiv Hperm := isSurjective.Build _ _
+  (generatedSubgroup_perm_morphism gens gens' perm Hequiv Hperm)
+  (generatedSubgroup_perm_morphism_surjective gens gens' perm Hequiv Hperm).
 
 (* The map x |-> inv x is an isomorphism *)
 Section GeneratedSubgroupInvMorphism.
@@ -275,15 +286,16 @@ Proof.
   set gens_inv_inv := map inv (map inv gens).
   have: size gens_inv_inv = size gens => [|Hsize];
     first by rewrite /gens_inv_inv !size_map.
-  have: (forall n, nth e gens_inv_inv n == nth e gens n) => [n|Hequiv].
-  - rewrite /gens_inv_inv; case H: (n < size gens)%N.
-  -- rewrite !(nth_map e) => [|//|].
-  --- by rewrite inv_involutive.
-  --- by rewrite size_map.
-  -- rewrite !nth_default => [//||]; apply/negPn; rewrite -ltnNge.
-  --- by rewrite H.
-  --- by rewrite Hsize H.
-  exists (generatedSubgroup_equiv_morphism gens_inv_inv gens Hsize Hequiv
+  have: (forall n, nth_gen gens_inv_inv n == nth_gen gens (cast_ord Hsize n)) => [n|Hequiv].
+  - rewrite /gens_inv_inv; rewrite /nth_gen !(nth_map e) => [|//|].
+  -- by rewrite inv_involutive.
+  -- by rewrite -Hsize.
+  -- by rewrite (size_map inv gens) -Hsize.
+  have: (bijective (cast_ord Hsize)) => [|Hperm].
+  - apply inj_card_bij.
+  -- by apply cast_ord_inj.
+  -- by rewrite Hsize leqnn.
+  - exists (generatedSubgroup_perm_morphism gens_inv_inv gens (cast_ord Hsize) Hequiv Hperm
       (generatedSubgroup_inv_morphism [seq inv g | g <- gens] y)).
   by rewrite /(_ == _) /= /subgroupby_eq /=.
 Qed.
@@ -296,10 +308,9 @@ HB.instance Definition _ gens := isSurjective.Build _ _
 Section GeneratedSubgroupRconsMorphism.
   Variable gens: seq G.
   Variable g: G.
-  Variable Hg: in_generated_subgroup gens g.
   Let rcons_gens := rcons gens g.
 
-  Lemma in_generated_subgroup_rcons_morphism: forall x,
+  Lemma in_generated_subgroup_rcons_morphism (Hg: in_generated_subgroup gens g): forall x,
     in_generated_subgroup gens x ->
     in_generated_subgroup rcons_gens x.
   Proof.
@@ -323,11 +334,13 @@ Section GeneratedSubgroupRconsMorphism.
       by rewrite associativity inverse_right neutral_left.
   Qed.
 
+  Hypothesis Hg: in_generated_subgroup gens g.
+
   Definition generatedSubgroup_rcons_morphism: 
     generatedSubgroup gens ->
     generatedSubgroup rcons_gens.
   Proof.
-    move => [] x /in_generated_subgroup_rcons_morphism H.
+    move => [] x /(in_generated_subgroup_rcons_morphism Hg) H.
     by exists x.
   Defined.
 
@@ -361,6 +374,7 @@ Section GeneratedSubgroupRconsMorphism.
 
   HB.instance Definition _ := isInjective.Build _ _
     generatedSubgroup_rcons_morphism generatedSubgroup_rcons_morphism_injective.
+
 
   Lemma in_generated_subgroup_rcons_morphism': forall x,
     in_generated_subgroup rcons_gens x ->
@@ -431,6 +445,10 @@ Section GeneratedSubgroupRconsMorphism.
     generatedSubgroup_rcons_morphism_right_inverse.
 End GeneratedSubgroupRconsMorphism.
 End GeneratedSubgroupIsomorphisms.
+Arguments generatedSubgroup_perm_morphism {_}.
+Arguments generatedSubgroup_inv_morphism {_}.
+Arguments generatedSubgroup_rcons_morphism {_}.
+Arguments generatedSubgroup_rcons_morphism' {_}.
 
 
 
@@ -1278,11 +1296,201 @@ End NielsenSchreierStalling.
        generating sets, then subgroups are isomorphic.
 *)
 
-(* NOTE(reiniscirpos): Finally done! (almost!) *)
+Section apbqIsomorphismHousekeeping.
+
+Variable p q: int.
+Let gens := [:: a_encoding p; b_encoding q].
+Variable Hq: (q != 0)%Z.
+
+Definition pq_isomorphism_inv:
+  isomorphism
+    (generatedSubgroup gens)
+    (generatedSubgroup [:: a_encoding p; b_encoding (-q)]).
+Proof.
+  set gens_inv := map inv gens.
+  move: (generatedSubgroup_inv_morphism gens:
+    isomorphism (generatedSubgroup gens) (generatedSubgroup gens_inv)) => f1.
+  set gens_rcons := rcons gens_inv (a_encoding p).
+  have: in_generated_subgroup gens_inv (a_encoding p) => [|H];
+    first by exists [:: Inverse 0] => /=; rewrite inv_involutive neutral_right.
+  move: (generatedSubgroup_rcons_morphism gens_inv (a_encoding p) H:
+    isomorphism (generatedSubgroup gens_inv) (generatedSubgroup gens_rcons)) => f2.
+  set gens' := [:: a_encoding p; b_encoding (-q)].
+  set gens_rcons' := rcons gens' (inv (a_encoding p)).
+  set perm :(ordinal (size gens_rcons)) -> (ordinal (size gens_rcons')) :=
+    fun x =>
+      match x with
+      | @Ordinal _ 0 _ => 2
+      | @Ordinal _ 1 _ => 1
+      | @Ordinal _ 2 _ => 0
+      | _ => x
+      end.
+  have: injective perm => [|Hperm_inj];
+    first by move => [] [|[|[|//]]] Hx [] [|[|[|//]]] Hy /= /eqP // _;
+    rewrite (bool_irrelevance Hx Hy).
+  have: bijective perm => [|Hperm];
+    first by apply inj_card_bij => [//|] /=; apply leqnn.
+  have: forall n, nth_gen gens_rcons n == nth_gen gens_rcons' (perm n) => [|Hequiv];
+    first by move => [] [//|[|[//|//]]] /= _; rewrite -power_inv.
+  move: (generatedSubgroup_perm_morphism gens_rcons gens_rcons' perm Hequiv Hperm:
+    isomorphism (generatedSubgroup gens_rcons) (generatedSubgroup gens_rcons')) => f3.
+  have: in_generated_subgroup gens' (inv (a_encoding p)) => [|H'];
+    first by exists [:: Inverse 0] => /=; rewrite neutral_right.
+  move: (generatedSubgroup_rcons_morphism' gens' (inv (a_encoding p)) H':
+    isomorphism (generatedSubgroup gens_rcons') (generatedSubgroup gens')) => f4.
+  by exact: (f4 \o f3 \o f2 \o f1).
+Defined.
+
+Definition pq_isomorphism_mod:
+  isomorphism
+    (generatedSubgroup gens)
+    (generatedSubgroup [:: a_encoding (p %% q)%Z; b_encoding q]).
+Proof.
+  set gens' := [:: a_encoding (p %% q)%Z; b_encoding q].
+  set gens_rcons := rcons gens (a_encoding (p %% q)%Z).
+  have: in_generated_subgroup gens (a_encoding (p %% q)%Z) => [|H].
+  - exists ((power (`[Base 1]_(FGP _)) (- (p %/ q)%Z)) @ [:: Base 0] @
+           (power (`[Base 1]_(FGP _)) (p %/ q)%Z)).
+    rewrite !morphism_preserve_law !morphism_preserve_power /=
+            !neutral_right /b_encoding -!power_mul /a_encoding
+            !associativity -power_add -!associativity
+            -!power_inv -power_add.
+    have: (q * - (p %/ q)%Z + p = p %%q)%Z => [|->]; first by lia.
+    by have: (-p + q * (p %/ q)%Z = - (p %%q)%Z)%Z => [|->]; first by lia.
+  - move: (generatedSubgroup_rcons_morphism gens (a_encoding (p %% q)%Z) H:
+      isomorphism (generatedSubgroup gens) (generatedSubgroup gens_rcons)) => f1.
+    set gens_rcons' := rcons gens' (a_encoding p).
+    set perm :(ordinal (size gens_rcons)) -> (ordinal (size gens_rcons')) :=
+      fun x =>
+        match x with
+        | @Ordinal _ 0 _ => 2
+        | @Ordinal _ 1 _ => 1
+        | @Ordinal _ 2 _ => 0
+        | _ => x
+        end.
+    have: injective perm => [|Hperm_inj];
+      first by move => [] [|[|[|//]]] Hx [] [|[|[|//]]] Hy /= /eqP // _;
+      rewrite (bool_irrelevance Hx Hy).
+    have: bijective perm => [|Hperm];
+      first by apply inj_card_bij => [//|] /=; apply leqnn.
+    have: forall n, nth_gen gens_rcons n == nth_gen gens_rcons' (perm n) => [|Hequiv];
+      first by move => [] [//|[|[//|//]]] /= _.
+    move: (generatedSubgroup_perm_morphism gens_rcons gens_rcons' perm Hequiv Hperm:
+      isomorphism (generatedSubgroup gens_rcons) (generatedSubgroup gens_rcons')) => f2.
+    have: in_generated_subgroup gens' (a_encoding p) => [|H'].
+  -- exists ((power (`[Base 1]_(FGP _)) (p %/ q)%Z) @ [:: Base 0] @
+        (power (`[Base 1]_(FGP _)) (- (p %/ q)%Z))).
+     rewrite !morphism_preserve_law !morphism_preserve_power /=
+              !neutral_right /b_encoding -!power_mul /a_encoding
+              !associativity -power_add -!associativity
+              -!power_inv -power_add.
+     have: (q * (p %/ q)%Z + (p%%q)%Z = p)%Z => [|->]; first by lia.
+     by have: (- (p %% q)%Z + q * - (p %/ q)%Z = - p)%Z => [|->]; first by lia.
+  -- move: (generatedSubgroup_rcons_morphism' gens' (a_encoding p) H':
+       isomorphism (generatedSubgroup gens_rcons') (generatedSubgroup gens')) => f3.
+     by exact: (f3 \o f2 \o f1).
+Defined.
+
+Definition pq_isomorphism_mod':
+  isomorphism
+    (generatedSubgroup [:: a_encoding (p %% q)%Z; b_encoding q])
+    (generatedSubgroup gens).
+Proof.
+  set gens' := [:: a_encoding (p %% q)%Z; b_encoding q].
+  set gens_rcons' := rcons gens' (a_encoding p).
+  have: in_generated_subgroup gens' (a_encoding p) => [|H'].
+  - exists ((power (`[Base 1]_(FGP _)) (p %/ q)%Z) @ [:: Base 0] @
+        (power (`[Base 1]_(FGP _)) (- (p %/ q)%Z))).
+     rewrite !morphism_preserve_law !morphism_preserve_power /=
+              !neutral_right /b_encoding -!power_mul /a_encoding
+              !associativity -power_add -!associativity
+              -!power_inv -power_add.
+     have: (q * (p %/ q)%Z + (p%%q)%Z = p)%Z => [|->]; first by lia.
+     by have: (- (p %% q)%Z + q * - (p %/ q)%Z = - p)%Z => [|->]; first by lia.
+  - move: (generatedSubgroup_rcons_morphism gens' (a_encoding p) H':
+       isomorphism (generatedSubgroup gens') (generatedSubgroup gens_rcons')) => f1.
+    set gens_rcons := rcons gens (a_encoding (p %% q)%Z).
+
+    set perm :(ordinal (size gens_rcons')) -> (ordinal (size gens_rcons)) :=
+      fun x =>
+        match x with
+        | @Ordinal _ 0 _ => 2
+        | @Ordinal _ 1 _ => 1
+        | @Ordinal _ 2 _ => 0
+        | _ => x
+        end.
+    have: injective perm => [|Hperm_inj];
+      first by move => [] [|[|[|//]]] Hx [] [|[|[|//]]] Hy /= /eqP // _;
+      rewrite (bool_irrelevance Hx Hy).
+    have: bijective perm => [|Hperm];
+      first by apply inj_card_bij => [//|] /=; apply leqnn.
+    have: forall n, nth_gen gens_rcons' n == nth_gen gens_rcons (perm n) => [|Hequiv];
+      first by move => [] [//|[|[//|//]]] /= _.
+    move: (generatedSubgroup_perm_morphism gens_rcons' gens_rcons perm Hequiv Hperm:
+      isomorphism (generatedSubgroup gens_rcons') (generatedSubgroup gens_rcons)) => f2.
+
+    have: in_generated_subgroup gens (a_encoding (p %% q)%Z) => [|H].
+  -- exists ((power (`[Base 1]_(FGP _)) (- (p %/ q)%Z)) @ [:: Base 0] @
+           (power (`[Base 1]_(FGP _)) (p %/ q)%Z)).
+     rewrite !morphism_preserve_law !morphism_preserve_power /=
+             !neutral_right /b_encoding -!power_mul /a_encoding
+             !associativity -power_add -!associativity
+             -!power_inv -power_add.
+     have: (q * - (p %/ q)%Z + p = p %%q)%Z => [|->]; first by lia.
+     by have: (-p + q * (p %/ q)%Z = - (p %%q)%Z)%Z => [|->]; first by lia.
+  -- move: (generatedSubgroup_rcons_morphism' gens (a_encoding (p %% q)%Z) H:
+       isomorphism (generatedSubgroup gens_rcons) (generatedSubgroup gens)) => f3.
+     by exact: (f3 \o f2 \o f1).
+Defined.
+
+End apbqIsomorphismHousekeeping.
+
+Definition pq_isomorphism_nat (p q: int) (H: (q != 0)%Z):
+  isomorphism
+    (generatedSubgroup [:: a_encoding p; b_encoding q])
+    (generatedSubgroup [:: a_encoding `|(p %% q)%Z|%N; b_encoding `|q|%N]).
+Proof.
+  move: (pq_isomorphism_mod p q H).
+  have: ((p %% q)%Z = `|(p%% q)%Z|%N) => [|-> f1]; first by lia.
+  case Hq0: (q >= 0)%Z.
+  - have: (q = `|q|%N) => [|<-]; first by lia.
+    by exact: f1.
+  - move: (pq_isomorphism_inv (`|(p%%q)%Z|%N) q).
+    have: ((-q)%Z = `|q|%N) => [|-> f2]; first by lia.
+    by exact: (f2 \o f1).
+Qed.
+
+Definition pq_isomorphism_nat' (p q: int) (H: (q != 0)%Z):
+  isomorphism
+    (generatedSubgroup [:: a_encoding `|(p %% q)%Z|%N; b_encoding `|q|%N])
+    (generatedSubgroup [:: a_encoding p; b_encoding q]).
+Proof.
+  move: (pq_isomorphism_mod' p q H).
+  have: ((p %% q)%Z = `|(p%% q)%Z|%N) => [|-> f2]; first by lia.
+  case Hq0: (q >= 0)%Z.
+  - have: (q = `|q|%N) => [|<-]; first by lia.
+    by exact: f2.
+  - move: (pq_isomorphism_inv (`|(p %% q)%Z|%N) (-q)%Z).
+    have: (- (-q)%Z = q) => [|->]; first by lia.
+    have: ((-q)%Z = `|q|%N) => [|-> f1]; first by lia.
+    by exact: (f2 \o f1).
+Qed.
+
+
+(* NOTE(reiniscirpos): Finally done!*)
 Definition pqpq_isomorphism
-  (p1 q1: nat) (H1: (p1 < q1)%N)
-  (p2 q2: nat) (H2: (p2 < q2)%N):
+  (p1 q1: int) (H1: (q1 != 0)%Z)
+  (p2 q2: int) (H2: (q2 != 0)%Z):
     isomorphism
       (generatedSubgroup [:: a_encoding p1; b_encoding q1])
-      (generatedSubgroup [:: a_encoding p2; b_encoding q2])
-        := (apbq_isomorphism p2 q2 H2) \o (apbq_isomorphism_inv p1 q1 H1).
+      (generatedSubgroup [:: a_encoding p2; b_encoding q2]).
+Proof.
+  move: (pq_isomorphism_nat p1 q1 H1) => f1.
+  have: (`|(p1 %% q1)%Z|%N < `|q1|%N)%N => [|H1']; first by lia.
+  move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1') => f2.
+  have: (`|(p2 %% q2)%Z|%N < `|q2|%N)%N => [|H2']; first by lia.
+  move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2') => f3.
+  move: (pq_isomorphism_nat' p2 q2 H2) => f4.
+  exact: (f4 \o f3 \o f2 \o f1).
+Defined.
+

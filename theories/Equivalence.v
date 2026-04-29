@@ -51,7 +51,7 @@ HB.mixin Record isSetoidMorphism (S T: equivType) (f: S -> T) := {
 HB.structure Definition SetoidMorphism (G H: equivType) := { f of isSetoidMorphism G H f }.
 
 Section ProperMorphism.
-Variable S T: equivType.
+Context {S T: equivType}.
 Variable f: setoidMorphism S T.
 
 (* NOTE(reiniscirpons): *)
@@ -71,7 +71,7 @@ End ProperMorphism.
 
 Section SetoidMorphismComp.
 
-Variables (A B C: equivType).
+Context {A B C: equivType}.
 Variable (f: setoidMorphism A B).
 Variable (g: setoidMorphism B C).
 
@@ -84,4 +84,3 @@ Qed.
 
 HB.instance Definition _ := isSetoidMorphism.Build A C (g \o f) comp_preserve_equiv.
 End SetoidMorphismComp.
-Arguments comp_preserve_equiv {_ _ _}.

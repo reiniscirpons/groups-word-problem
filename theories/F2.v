@@ -23,7 +23,7 @@ Definition inverse_alphabet_map {Sigma Gamma: eqType} (f: Sigma -> Gamma):
       end.
 
 Section InverseAlphabetEqType.
-Variable (Sigma: eqType).
+Context {Sigma: eqType}.
 
 Definition InverseAlphabet_eq (u v: InverseAlphabet Sigma) :=
   match (u, v) with
@@ -46,7 +46,7 @@ HB.instance Definition _ := hasDecEq.Build (InverseAlphabet Sigma) InverseAlphab
 End InverseAlphabetEqType.
 
 Section InverseAlphabetCountType.
-Variable (Sigma: countType).
+Context {Sigma: countType}.
 
 Definition InverseAlphabet_pickle (x: InverseAlphabet Sigma) :=
   match x with
@@ -79,7 +79,7 @@ HB.instance Definition _ := isCountable.Build
 End InverseAlphabetCountType.
 
 Section InverseAlphabetFinType.
-Variable (Sigma: finType).
+Context {Sigma: finType}.
 
 Definition InverseAlphabet_enum:
   seq (InverseAlphabet Sigma) :=
@@ -400,7 +400,7 @@ Arguments FreeGroup_norm {_}.
 
 Section FreelyReduced.
 
-Variable Sigma: finType.
+Variable (Sigma: finType).
 
 Definition freely_reduced (w: FreeGroup Sigma): Prop :=
   forall p s c, w <> p ++ [:: invl c; c] ++ s.
@@ -496,8 +496,7 @@ Arguments freely_reduced {_}.
 
 Section FreeGroupUniversal.
 
-Variable (Sigma: finType).
-Variable (G: group).
+Context {Sigma: finType} {G: group}.
 Variable (f: Sigma -> G).
 
 Definition FreeGroup_alphabet_extension:

@@ -215,7 +215,7 @@ HB.end.
    has already been done. *)
 Section MorphismComposition.
 
-Variables S T U: monoid.
+Context {S T U: monoid}.
 Variable f: morphism S T.
 Variable g: morphism T U.
 
@@ -231,7 +231,7 @@ HB.instance Definition _ :=
 End MorphismComposition.
 
 Section InjectionComposition.
-Variables A B C: equivType.
+Context {A B C: equivType}.
 Variable f: injectiveFunType A B.
 Variable g: injectiveFunType B C.
 
@@ -246,7 +246,7 @@ HB.instance Definition _ :=
 End InjectionComposition.
 
 Section SurjectionComposition.
-Variables A B C: equivType.
+Context {A B C: equivType}.
 Variable f: surjectiveFunType A B.
 Variable g: surjectiveFunType B C.
 
@@ -264,7 +264,7 @@ HB.instance Definition _ :=
 End SurjectionComposition.
 
 Section IsomorphismComposition.
-Variables S T U: monoid.
+Context {S T U: monoid}.
 Variable f: isomorphism S T.
 Variable g: isomorphism T U.
 
@@ -671,7 +671,7 @@ Coercion morphism_to_local_morphism {G} {H1 H2: subgroup G}: morphism H1 H2 -> l
 
 Section RightCoset.
 
-Variable G: group.
+Context {G: group}.
 Variable H: subgroup G.
 
 Definition right_coset_eq (x y: G): Prop := in_subgroup H (x @ inv y).
@@ -743,7 +743,7 @@ HB.mixin Record isSubgroupCharacterizer (G: group) (P: G -> Type) := {
 HB.structure Definition SubgroupCharacterizer (G: group) := { P of isSubgroupCharacterizer G P }.
 
 Section SubgroupByCharacterization.
-Variable G: group.
+Context {G: group}.
 Variable P: subgroup_characterizer G.
 
 #[projections(primitive)]
@@ -890,7 +890,7 @@ End SingletonSubgroup.
 (* TODO(reiniscirpons): Do we need this? *)
 (* Intersection of subgroups *)
 Section SubgroupIntersection.
-Variable G: group.
+Context {G: group}.
 Variable (H1 H2: subgroup G).
 
 Record is_in_intersection (x: G) : Prop := {

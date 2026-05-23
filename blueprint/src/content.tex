@@ -1216,7 +1216,7 @@ We require the rather technical \cref{lem:HNN_constructive_technical_rws_lemma},
 to manipulate certain rewriting sequences in $G\ast_\varphi$.
 
 \begin{lemma}\label{lem:HNN_constructive_technical_rws_lemma}
-  \uses{def:presentation,def:elementary_sequence}
+  \uses{def:presentation,def:elementary_sequence,def:HNN_extension}
   Let $R^{\prime\prime} = {(R\cup R_{\FG(\Sigma)}\cup R_\varphi \cup R_{\varphi^{-1}})}^\dagger
   \cup \{(tt^{-1}, \varepsilon), (t^{-1}t,\varepsilon)\}$.
   Let $p, s \in {(\Sigma\cup \Sigma^{-1}\cup \{t, t^{-1}\})}^\ast$ and
@@ -1353,7 +1353,7 @@ introduction of a subword $tt^{-1}$ or $t^{-1}t$ in a rewriting sequence that yi
 \end{proof}
 
 \begin{lemma}\label{lem:HNN_commutator_sequence_characterization}
-  \uses{def:elementary_sequence}
+  \uses{def:elementary_sequence,def:HNN_extension}
   Let $S$ be a rewriting sequence with
   $\source(S) = w_n t^{\varepsilon_n} \cdots t^{\varepsilon_1} w_0$,
   $\target(S) = w_m^\prime t^{\varepsilon^\prime_m} \cdots t^{\varepsilon^\prime_1} w^\prime_0$

@@ -25,7 +25,7 @@ jobs:
       homepage: "home_page"
       rocq_version: "9.1"
       opam_file: "groups-word-problem.opam"
-      custom_doc_command: "make coqdoc"
+      custom_doc_command: "make html"
     steps:
       - uses: actions/checkout@v4
         with:

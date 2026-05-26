@@ -1,0 +1,32 @@
+opam-version: "2.0"
+maintainer: "reinis.cirpons@inria.fr"
+version: "dev"
+
+homepage: "https://github.com/lweqx/groups-word-problem"
+dev-repo: "git+https://github.com/lweqx/groups-word-problem.git"
+bug-reports: "https://github.com/lweqx/groups-word-problem/issues"
+
+synopsis: "An formalization of the Boone-Novikov theorem of undecidability of the word problem for groups"
+description: """This project provides a formalization of the Boone-Novikov
+theorem for the undecidability of the word problem for finitely presented
+groups"""
+
+build: [make "-j%{jobs}%"]
+install: [make "install"]
+depends: [
+  "rocq-core" {= "9.1.0"}
+  "rocq-stdlib" {= "9.1.0"}
+  "rocq-mathcomp-boot" {= "2.5.0"}
+  "coq-library-undecidability" {= "dev"}
+]
+
+pin-depends: [
+  # TODO: replace this with stable deps once new releases are made
+  ["coq-library-undecidability.dev" "git+https://github.com/reiniscirpons/coq-library-undecidability.git#rocq-9.1"]
+]
+
+authors: [
+  "Lucie Lahaye"
+  "Assia Mahboubi"
+  "Reinis Cirpons"
+]

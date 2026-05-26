@@ -1,2 +1,11 @@
 -R theories GWP
-theories/
+
+theories/AffineMachines.v
+theories/Equivalence.v
+theories/EquivalenceAlgebra.v
+theories/F2.v
+theories/GeneratedSubgroup.v
+theories/LM2.v
+theories/Presentation.v
+theories/ReductionUtils.v
+theories/Utils.v

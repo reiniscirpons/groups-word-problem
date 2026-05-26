@@ -15,7 +15,7 @@ build: [make "-j%{jobs}%"]
 install: [make "install"]
 depends: [
   "rocq-core" {>= "9.1.0"}
-  "rocq-stdlib" {>= "9.1.0"}
+  "rocq-stdlib" {>= "9.0.0"}
   "rocq-mathcomp-boot" {= "2.5.0"}
   "rocq-mathcomp-algebra" {= "2.5.0"}
   "rocq-mathcomp-zify" {= "dev"}
@@ -25,7 +25,7 @@ depends: [
 
 pin-depends: [
   # TODO: replace this with stable deps once new releases are made
-  ["coq-library-undecidability.dev" "git+https://github.com/reiniscirpons/coq-library-undecidability.git#rocq-9.1"]
+  ["coq-library-undecidability.dev" "git+https://github.com/uds-psl/coq-library-undecidability.git#rocq-9.0"]
   ["rocq-mathcomp-zify.dev" "git+https://github.com/reiniscirpons/mczify#rocq-9.1"]
   ["coq-mathcomp-algebra-tactics.dev" "git+https://github.com/reiniscirpons/algebra-tactics#rocq-9.1"]
 ]

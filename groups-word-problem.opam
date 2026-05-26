@@ -14,8 +14,8 @@ groups"""
 build: [make "-j%{jobs}%"]
 install: [make "install"]
 depends: [
-  "rocq-core" {= "9.1.0"}
-  "rocq-stdlib" {= "9.1.0"}
+  "rocq-core" {>= "9.1.0"}
+  "rocq-stdlib" {>= "9.1.0"}
   "rocq-mathcomp-boot" {= "2.5.0"}
   "rocq-mathcomp-algebra" {= "2.5.0"}
   "rocq-mathcomp-zify" {= "dev"}

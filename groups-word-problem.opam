@@ -26,7 +26,7 @@ depends: [
 pin-depends: [
   # TODO: replace this with stable deps once new releases are made
   ["coq-library-undecidability.dev" "git+https://github.com/uds-psl/coq-library-undecidability.git#rocq-9.0"]
-  ["rocq-mathcomp-zify.dev" "git+https://github.com/reiniscirpons/mczify#rocq-9.1"]
+  ["rocq-mathcomp-zify.dev" "git+https://github.com/math-comp/mczify#master"]
   ["coq-mathcomp-algebra-tactics.dev" "git+https://github.com/reiniscirpons/algebra-tactics#rocq-9.1"]
 ]
 

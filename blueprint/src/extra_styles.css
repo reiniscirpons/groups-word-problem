@@ -23,3 +23,10 @@ div.corollary_thmcontent {
 div.proof_content {
 	border-left: .08rem solid grey;
 }
+
+span.mbox {
+	display: block;
+	padding: 0.5rem;
+	margin: 0.2rem 0;
+	border: solid 2px;
+}

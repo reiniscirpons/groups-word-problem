@@ -856,42 +856,383 @@ To prove it in full generality, one usually assumes the axiom of choice, and the
 known to imply some weaker forms of choice. Nevertheless, if we restrict our attention to
 \emph{finitely generated} subgroups, then we obtain a constructive algorithm for finding the
 basis for the subgroup, akin to Gaussian elimination in linear algebra. This is sometimes called
-Nielsen's method.~\cite{Lyndon2001aa}
+Nielsen's method~\cite{Lyndon2001aa}. Many other proofs of this result are known, in particular
+there is a topological proof due to Stallings~\cite{Stallings1983aa}. In~\cite{Kapovich2002aa},
+Stallings proof is turned more effective and automata-theoretic, associating to each subgroup
+of the free group a certain automaton, dubbed the Stallings automaton.
 
-We will not prove this result in this section, rather we will apply some ideas from the proof of
-Nielsens method from~\cite[Section 1.2]{Lyndon2001aa}
-to concrete subgroups of the free group that appear our chosen proof of
-the Boone-Novikov theorem.
+We will not prove the Nielsen-Schreier theorem in full generality in this section.
+Rather we will apply some ideas from the theory of Stallings automata~\cite{Kapovich2002aa} to concrete subgroups of the
+free group that appear our chosen proof of the Boone-Novikov theorem.
+
+We say that a group $G$ is \emph{free} if it is isomorphic to some free group, $G\cong \FG(\Gamma)$ for some
+set $\Gamma$. If $G$ is isomorhpic to $\FG(\Gamma)$ via the isomorphism $\psi: \FG(\Gamma) \rightarrow G$, then
+we call the set $(\Gamma)\psi = \set{(a)\psi}{a \in \Gamma}$ a \emph{basis} for $G$. Note that $G$ may admit multiple
+possible bases, but it can be shown that all bases of $G$ have the same size. If $G$ is free, then the \emph{rank}
+of $G$ is the size of any basis for $G$. It is not hard to see that every pair of free groups with the same rank are
+isomorphic.
 
 For the remainder of this section we will work with a fixed binary alphabet
 $\Sigma = \{a, b\}$. For each $p \in \mathbb{Z}$ let $a_p = b^p a b^{-p} \in \FG(\Sigma)$. Our
-goal is to prove \cref{thm:subgroup_ap_bq_is_free}.
+goal is to prove that the subgroup $\Gp\genset{a_p, b^q}_{\FG(\Sigma)}$ is free,
+which we record as \cref{thm:subgroup_ap_bq_is_free}. Since we will only consider subgroups of $\FG(\Sigma)$ in this
+section, we will simply write the subgroup as $\Gp\genset{a_p b^q}$ for the remainder of this section.
+
+\section{Automata}
+
+To prove \cref{thm:subgroup_ap_bq_is_free}, we will employ a certain kind of automaton, called the
+\emph{Stallings automaton}. Roughly speaking, such an automaton can be associated to every subgroup of the free group,
+and a basis for the subgroup can be found from this automaton by considering its spanning tree.
+We give a formal definition of the Stallings automaton associated to the subgroup $\Gp\genset{a_p b^q}$ in
+\cref{def:Stallings_automaton}. But first we briefly sketch out the general construction.
+
+We begin with some definitions.
+A \emph{finite state automaton} $\mathcal{A}$ is a tuple $\mathcal{A} = (\Sigma, S, \delta, s_0, F)$, where
+\begin{itemize}
+  \item $\Sigma$ is a finite set, the \emph{alphabet} of $\mathcal{A}$,
+  \item $S$ is a finite set, the \emph{state set} of $\mathcal{A}$,
+  \item $\delta \subseteq S \times \Sigma \times S$ is a set, the \emph{transition relation} of $\mathcal{A}$,
+  \item $s_0 \in S$ is a state, the \emph{initial state} of $\mathcal{A}$,
+  \item $F\subseteq S$ is a set of statem, the \emph{final states} of $\mathcal{A}$.
+\end{itemize}
+We interpret $\mathcal{A}$ as a graph with vertices $S$ and edges labelled by $\Sigma$, with distinguished vertices
+$s_0$ and $F$. The \emph{language} accepted by $\mathcal{A}$, written $L(\mathcal{A})$, is the set of all words that
+label a path from $s_0$ to any state in $F$.
+We say that an automaton is an \emph{inverse automaton}, if its alphabet is of the form $\Sigma \cup \Sigma^{-1}$
+and, for every transition $(s, a, t) \in \delta$, the inverse transition $(t, a^{-1}, s)$ is also in $\delta$.
+
+Given a set of words $w_1, \ldots, w_n \in \FG(\Sigma)$, the Stallings automaton associated to $\{w_1, \ldots, w_n\}$
+is an inverse automaton with alphabet $\Sigma \cup \Sigma^{-1}$ obtained by repeatedly folding the
+bouquet constructed from $w_1, \ldots, w_n$. We explain each term in turn with the concrete set of words $bab^{-1}$ and
+$b^2$.
+
+A \emph{bouquet} automaton associated to the words $w_1, \ldots, w_n$ is the automaton obtained by repeatedly adding
+each word $w_i$ as a cycle from the initial state labelled by its letters, with inverse transitions added.
+So for example, to construct the bouquet automaton of $bab^{-1}$ and $b^2$, we would start with an automaton with a
+single state $0$, then we would add $bab^{-1}$ by creating transitions $(0, b, 1)$, $(1, a, 2)$ and $(2, b^{-1}, 0)$
+creating a cycle labelled by $bab^{-1}$, and then add the inverse transitions $(1, b^{-1}, 0)$, $(2, a^{-1}, 1)$ and
+$(0, b, 2)$. To add $b^2$ we would add the transitions $(0, b, 3)$ and $(3, b, 0)$ with the inverses $(3, b^{-1}, 0)$
+and $(0, b^{-1}, 3)$. The initial state is $0$ and it is also the only final state.
+We illustrate the bouquet automaton obtained associated to $bab^{-1}$ and $b^2$ in \cref{fig:bouquet}.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=50\pcttextwidth]{images/bouquet.png}
+  \end{center}
+  \caption{A bouquet automaton constructed from the words $bab^{-1}$ and $b^2$.
+    Edges labelled by $a$ are drawn in dashed red, edges labelled by $b$ are drawn in solid blue.
+    We omit edges labelled by $a^{-1}$ and $b^{-1}$, since these are always the reverse edges of ones labelled by
+    $a$ and $b$ respectively. In particular, instead of an edge labelled by $b^{-1}$ for the word $bab^{-1}$, we
+    just use an edge labelled by $b$ drawn backwards.}%
+  \label{fig:bouquet}
+\end{figure}
+
+Note that every word in the language of the bouquet automaton of $w_1, \ldots, w_n$ is an element of
+$\Gp\genset{w_1,\ldots, w_n}$, since every path from the initial state to the final state is equal up to free
+cancellation to one of the words $w_i$ or its inverse, and every word in the language can necessarily be decomposed as
+a collection of words labelling such paths. The converse is not true, however, for example the word $bab =
+(bab^{-1})(b^2)$ is an element of $\Gp\genset{bab^{-1}, b^2}$, but it is easy to check that the automaton in
+\cref{fig:bouquet} does not accept it.
+
+We say that an automaton is \emph{deterministic} if for every pair of transitions
+$(s_1, a_1, t_1), (s_2, a_2, t_2)\in \delta$, if $s_1 = s_2$ and $a_1 = a_2$, then $t_1 = t_2$ also.
+In other words, an automaton is deterministic if its transition relation $\delta$ is a partial function
+$\delta: S\times \Sigma \rightarrow S$. The \emph{quotient} of an automaton $\mathcal{A}$ by an equivalence relation
+$\rho \subseteq S \times S$ on its states is the automaton
+$\mathcal{A}/\rho = (\Sigma, S/\rho, \delta^\prime, {[s_0]}_\rho, F/\rho)$, where
+$\Sigma/\rho$ is the set of equivalence classes of states in $S$, the new set of transitions is given by
+\[\delta^\prime = \set{({[s]}_\rho, a, {[t]}_\rho)}{(s, a, t)\in \delta}, \]
+where ${[s]}_\rho$ is the equivalence class of $s$ in $\rho$, ${[s_0]}_\rho$ is the equivalence class of the initial
+state and $F/\rho$ is the set of equivalnce classes of the final states.
+
+The \emph{folding} of an automaton $\mathcal{A}$ is the quotient of $\mathcal{A}$ by the least congruence containing a
+pair of distinct vertices $t_1 \neq t_2\in S$ for which there exist $s\in S$ and $a\in A$ such that
+$(s, a, t_1), (s, b, t_2)\in \delta$, i.e.\ a pair of vertices that make $\mathcal{A}$ non-deterministic.
+It can be shown that the procedure of repeatedly folding a finite state automaton always terminates, and furthermore
+the final automaton is deterministic and independent of the order of foldings.
+
+We illustrate the folding of the bouquet automaton of $bab^{-1}$ and $b^2$ in \cref{fig:folding}.
+Note that the final automaton is deterministic even with respect to the inverse edges not shown.
+This automaton, is the Stallings automaton associated to the subgroup generated by $bab^{-1}$ and $b^2$.
+It is possible to show that the language accepted by the Stallings automaton contains the set of reduced words
+in $\Gp\genset{bab^{-1}, b^2}$.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=90\pcttextwidth]{images/folding.png}
+  \end{center}
+  \caption{An illustration of the folding process as applied to the bouquet automaton constructed from
+  the words $bab^{-1}$ and $b^2$. We outline the non-determinsitic edge pair being folded in green.}%
+  \label{fig:folding}
+\end{figure}
+
+The same procedure for constructing the Stallings automaton, applied to the words $a_p$ and $b^q$ when $0\leq p < q$
+similarly yields a loop consisting of $q$ transitions labelled by $b$ and a loop transition labelled by $a$
+a distance of $p$ from the initial and final state. We give a schematic representation of this in
+\cref{fig:automaton_pq}.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=50\pcttextwidth]{images/automaton_pq.png}
+  \end{center}
+  \caption{An illustration of the Stallings automaton obtained when folding the words $a_p$ and $b^q$,
+  where $0 \leq p < q$.}%
+  \label{fig:automaton_pq}
+\end{figure}
+
+\section{Transducers}
+
+It is possible to increase the expresivenes of Stallings automaton by equipping it with a stack and adding output.
+This is precisely what we do in \cref{def:Stallings_automaton}. This addition allows us to give a function for
+factorizing elements of the subgroup into the generators, as well as a coset representative function. More on this
+later.
+
+A \emph{pushdown transducer} is a $7$-tuple $\mathcal{A} = (\Sigma, \Gamma, \Theta, S, \delta, s_0, F)$ consisting
+of
+\begin{itemize}
+  \item a finite set $\Sigma$, the \emph{input alphabet} of $\mathcal{A}$,
+  \item a finite set $\Gamma$, the \emph{stack alphabet} of $\mathcal{A}$,
+  \item a finite set $\Theta$, the \emph{output alphabet} of $\mathcal{A}$,
+  \item a finite set $S$, the \emph{state set} of $\mathcal{A}$,
+  \item a set $\delta \subseteq S \times \Sigma \times \Gamma \times S \times \Gamma^\ast \times \Theta^\ast$,
+        the \emph{transition relation} of $\mathcal{A}$,
+  \item a state $s_0 \in S$, the \emph{initial state} of $\mathcal{A}$,
+  \item a set of states $F\subseteq S$, the \emph{final states} of $\mathcal{A}$.
+\end{itemize}
+For our purposes the transition relation $\delta$ will always be a partial function
+$\delta: S\times \Sigma \times \Gamma \rightarrow S\times \Gamma^\ast \times \Theta^\ast$,
+and the set $\Gamma$ will always contain a distinguished symbol $\bot\in \Gamma$ called the \emph{bottom symbol}.
+
+A \emph{configuration} of $\mathcal{A}$ is a triple
+$(s, \gamma, \theta) \subseteq S\times \bot\Gamma^\ast \times \Theta^\ast$.
+We call the $s$ component of a configuration the \emph{current state}, the $\gamma$ component the \emph{stack}
+and the $\theta$ component the \emph{output}. The \emph{initial configuration} is the configuration
+$(s_0, \bot, \varepsilon)$. A configuration $(s, \gamma, \theta)$ is \emph{final} if $s\in F$.
+The \emph{configuration automaton} is an infinite state automaton with alphabet $\Sigma$,
+whose states are the configurations of
+$\mathcal{A}$, where
+there is a transition with source $(s, \gamma \cdot y, \theta)$, label $x$ and target
+$(t, \gamma \cdot \gamma^\prime, \theta\cdot \theta^\prime)$ for every
+$s, t\in S, x\in \Sigma, y\in \Gamma, \gamma, \gamma^\prime \in \Gamma^\ast$ and $\theta, \theta^\prime \in \Theta^\ast$
+such that $(s, a, b)\delta = (t, \gamma^\prime, \theta^\prime)$.
+The initial state is the initial configuration and the final states are the final configurations.
+We say that a given configuration is \emph{reachable} if there is any path in the configuration automaton starting at
+the initial configuration and ending with the given configuration.
+We additionally require that every reachable configuration is of the form $(s, \bot \gamma, \theta)$, i.e.
+we are not allowed to remove or change the bottom of the stack.
+
+The \emph{language} of $\mathcal{A}$, written $L(\mathcal{A})$, is the set of all words labelling a path from the
+initial configuration to the final configuration in the automaton graph.
+Let $w\in L(\mathcal{A})$. Since $\delta$ is a function, there exists a unique final configuration
+$(s, \bot\gamma, \theta)$ that is reachable from the initial configuration by a path labelled
+by $w$. With $w, s, \gamma$ and $\theta$ as above, we define the
+\begin{itemize}
+  \item \emph{transduced function} of $\mathcal{A}$ to be the function
+    $f_{\mathcal{A}}: L(\mathcal{A}) \rightarrow \Theta^\ast$ given by $(w)f_{\mathcal{A}} = \theta$.,
+  \item \emph{final stack function} of $\mathcal{A}$ to be the function
+    $g_{\mathcal{A}}: L(\mathcal{A}) \rightarrow \Gamma^\ast$ given by $(w)g_{\mathcal{A}} = \gamma$,
+  \item \emph{final state function} of $\mathcal{A}$ to be the function
+    $h_{\mathcal{A}}: L(\mathcal{A}) \rightarrow S$ given by $(w)h_{\mathcal{A}} = s$.
+\end{itemize}
+
+We exemplify the utility of the stack of a pushdown transducer by showing how it can be used to freely reduce words
+in $\FG(\Sigma)$, in some sense. Let $\mathcal{A}_{\FG(A)}$ be the pushdown transducer with
+alphabet $\Sigma \cup \Sigma^{-1}$, stack alphabet $\bot \cup \Sigma \cup \Sigma^{-1}$,
+empty output alphabet, a single state $\{0\}$ which is both the initial and terminal state and a transition function
+$\delta$ given by
+\[
+  (0, x, y)\delta = \begin{cases}
+    (0, yx, \varepsilon) & \textrm{if }y\neq x^{-1}\\
+    (0, \varepsilon, \varepsilon) & \textrm{otherwise}\\
+  \end{cases}
+\]
+for all $x\in \Sigma \cup \Sigma^{-1}$ and $y\in \{\bot\} \cup \Sigma \cup \Sigma^{-1}$.
+Note that $L(\mathcal{A}_{\FG(\Sigma)}) = {\left(\Sigma \cup \Sigma^{-1}\right)}^\ast$.
+Despite this, for every word $w\in {\left(\Sigma \cup \Sigma^{-1}\right)}^\ast$,
+the value of $(w)g_{\mathcal{A}}$ is the unique reduced word such that
+$(w)g_{\mathcal{A}} =_{\FG(\Sigma)} w$.
+
+\section{The Nielsen-Schreier theorem for $\Gp\genset{a_p, b^q}$}
+
+We are now ready to define the Stallings automaton associated to the generating set $\{a_p, b^q\}$ where
+$0 \leq p < q$. By minor abuse of language, we will define it as a pushdown transducer, but still refer to it
+as an automaton.
+
+\begin{definition}%
+  \label{def:Stallings_automaton}
+  \rocq{GWP.GeneratedSubgroup.Stallings_automaton}
+  \rocqok{}
+  Let $0 \leq p < q$. Then the Stalling automaton associated to the words $a_p$ and $b^q$ is the pushdown transducer
+  $\mathcal{A}_{p, q}$ with input alphabet $\{a, b, a^{-1}, b^{-1}\}$, stack alphabet
+  $\Gamma = \{\bot, a, b, a^{-1}, b^{-1}\}$,
+  output alphabet $\Theta = \{c, d, c^{-1}, d^{-1}\}$, state set $S = \{0, \ldots, q-1\}$, initial state $s_0 = 0$,
+  final states $F = Q$ and transition function $\delta$ given by
+  \begin{align*}
+    (s, a, \bot)\delta &= \begin{cases}
+      (s, \bot, c) & \textrm{if }s=p\\
+      (s, \bot a, \varepsilon) & \textrm{otherwise}
+    \end{cases} \\
+    (s, a^{-1}, \bot)\delta &= \begin{cases}
+      (s, \bot, c^{-1}) & \textrm{if }s=p\\
+      (s, \bot a^{-1}, \varepsilon) & \textrm{otherwise}
+    \end{cases} \\
+    (s, b, \bot)\delta &= \begin{cases}
+      (0, \bot, d) & \textrm{if }s = q - 1\\
+      (s+1, \bot, \varepsilon) & \textrm{otherwise}
+    \end{cases} \\
+    (s, b^{-1}, \bot)\delta &= \begin{cases}
+      (q-1, \bot, d^{-1}) & \textrm{if }s = 0\\
+      (s-1, \bot, \varepsilon) & \textrm{otherwise}
+    \end{cases} \\
+    (s, x, y)\delta &= \begin{cases}
+      (s, yx, \varepsilon) & \textrm{if }y\neq x^{-1}\\
+      (s, \varepsilon, \varepsilon) & \textrm{otherwise}\\
+    \end{cases}
+  \end{align*}
+  for all $s \in Q$ and $x, y \in \Sigma \cup \Sigma^{-1}$.
+\end{definition}
+
+The interpretation of the automaton in question is as follows:
+\reinis{Write up the interpretation of the automaton. Essentially it boils down to two things:
+the states correspond to left cosets of $\Gp\genset{a_p, b^q}$ in $\FG(\Sigma)$, the stack is used to freely
+reduced the input word, and finally the output is used to track which of the generators $a_p$ or $b^q$ was
+used to construct the input word so far.}
+It is not hard to see that $L(\mathcal{A}_{p, q}) = {\left(\Sigma \cup \Sigma^{-1}\right)}^\ast$.
+
+\begin{definition}%
+  \label{def:Stallings_automaton_reachable_configuration}
+  \uses{def:Stallings_automaton}
+  \rocq{GWP.GeneratedSubgroup.Stallings_automaton_reachable_configuration}
+  \rocqok{}
+  There exists a $\theta$ such that the configuration $(q, \bot\gamma, \theta)$ of $\mathcal{A}$ is reachable
+  precisely when $\gamma\in {\{a, b, a^{-1}, b^{-1}\}}^\ast$ is freely reduced and $\gamma$ starts with an
+  $a$ or $a^{-1}$.
+\end{definition}
+
+Let $\psi: \FG(\Theta) \rightarrow \FG(\Sigma)$ be the unique homomorphism such that $(c)\psi = bab^{-1}$ and
+$(d)\psi = b^2$. We illustrate the utility of Stallings automaton in \cref{lem:Stallings_automaton_product}.
+
+\begin{lemma}%
+  \label{lem:Stallings_automaton_product}
+  \uses{def:Stallings_automaton}
+  \rocq{GWP.GeneratedSubgroup.Stallings_automaton_product}
+  \rocqok{}
+  Let $w\in {\left(\Sigma \cup \Sigma^{-1}\right)}^\ast$.
+  Then 
+  \[ ((w)f_{\mathcal{A_{p, q}}})\psi \cdot b^{(w)h_{\mathcal{A}_{p, q}}} \cdot (w)g_{\mathcal{A}_{p, q}} =_{\FG(\Sigma)} w. \]
+\end{lemma}
+\begin{proof}
+  \uses{def:Stallings_automaton_reachable_configuration}
+  \rocqok{}
+  It is easiest to prove a generalization of this statement over all reachable states. Namely, if
+  $(s, \bot \gamma, \theta)$ is a reachable state, and we transition to the state
+  $(t, \bot \gamma^\prime, \theta\theta^\prime)$ when reading $w$ from $(s, \bot \gamma, \theta)$, then
+  \[
+    (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime =_{\FG(\Sigma)} b^s \cdot \gamma \cdot w.
+  \]
+  The proof proceeds by induction on $w$.
+  Clearly, if $w = \varepsilon$, then $\theta^\prime = \varepsilon$, $s = t$ and $\gamma = \gamma^\prime$, so
+  the statement holds immediately.
+  Now assume that $w = w^\prime x$ and that
+  \[
+    (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime =_{\FG(\Sigma)} b^s \cdot \gamma \cdot w^\prime.
+  \]
+  holds, where $(s, \bot \gamma, \theta)$ is the starting reachable state, and we transition to the state
+  $(t, \bot \gamma^\prime, \theta\theta^\prime)$ when reading $w^\prime$ from $(s, \bot \gamma, \theta)$.
+
+  Let $(t^\prime, \bot \gamma^{\prime\prime}, \theta\theta^\prime\theta^{\prime\prime})$ be the configuration reached
+  when transitioning from $(t, \gamma^\prime, \theta\theta^\prime)$ via $x$.
+  We proceed by casework on $x$, $t$ and $\gamma^\prime$:
+  \begin{enumerate}[1)]
+    \item If $x = a$, $t = p$ and $\gamma^\prime = \varepsilon$, then, by definition of $\delta$,
+      $t^\prime = t$, $\gamma^{\prime\prime} = \gamma^\prime$ and $\theta^{\prime\prime} = c$. Then
+    \begin{align*}
+      b^s \cdot \gamma \cdot w &=_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime \cdot a =\\
+      &=
+      (\theta^{\prime})\psi \cdot b^{p} \cdot a =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot (c^{-1})\psi \cdot b^{p} \cdot a  =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^p a^{-1} b^{-p} \cdot b^{p} \cdot a  =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^p a^{-1} a  =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^p  =\\
+      &=
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^{t^\prime} \cdot \gamma^{\prime\prime}
+    \end{align*}
+    as required.
+  \item If $x = a$, $t = p$ and $\gamma^\prime = \gamma_1^\prime a^{-1}$, then, by definition of $\delta$,
+    $t^\prime = t$, $\gamma^{\prime\prime} = \gamma_1^\prime$ and $\theta^{\prime\prime} = \varepsilon$. Then
+    \begin{align*}
+      b^s \cdot \gamma \cdot w &=_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime \cdot a =\\
+      &=
+      (\theta^{\prime}\theta^{\prime\prime})\psi \cdot b^{t^\prime} \cdot \gamma^{\prime\prime} a^{-1} \cdot a
+      =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^{t^\prime} \cdot \gamma^{\prime\prime}
+    \end{align*}
+    as required.
+  \item If $x = a$, $t = p$, $\gamma^\prime \neq \varepsilon$ and
+    $\gamma^\prime \neq \gamma_1^{\prime} a^{-1}$, then, by definition of $\delta$,
+    $t^\prime = t$, $\gamma^{\prime\prime} = \gamma^\prime a$ and $\theta^{\prime\prime} = \varepsilon$. Then
+    \begin{align*}
+      b^s \cdot \gamma \cdot w &=_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime \cdot a =\\
+      &=
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^{t^\prime} \cdot \gamma^{\prime\prime}
+    \end{align*}
+    as required.
+  \item If $x = b$, $t = q-1$ and $\gamma^\prime = \varepsilon$, then, by definition of $\delta$,
+    $t^\prime = 0$, $\gamma^{\prime\prime} = \varepsilon$ and $\theta^{\prime\prime} = d$. Then
+    \begin{align*}
+      b^s \cdot \gamma \cdot w &=_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime)\psi \cdot b^{t} \cdot \gamma^\prime \cdot b =\\
+      &=
+      (\theta^{\prime})\psi \cdot b^{q-1} \cdot b =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot (d^{-1})\psi \cdot b^{q-1} \cdot b  =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^{-q} \cdot b^{q} =_{\FG(\Sigma)}\\
+      &=_{\FG(\Sigma)}
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^0  =\\
+      &=
+      (\theta^\prime\theta^{\prime\prime})\psi \cdot b^{t^\prime} \cdot \gamma^{\prime\prime}
+    \end{align*}
+    as required.
+  \item The remaining cases follow in a similar manner by straightforward calculation.
+  \end{enumerate}
+  This completes the induction.
+
+  The original statement follows by taking $s = s_0 = 0$, $\gamma = \varepsilon$ and $\theta = \varepsilon$.
+\end{proof}
+
+\reinis{Still need to add: proof that $w\mapsto b^{(w)h_{\mathcal{A}}} \cdot (w)g_{\mathcal{A}}$ is a coset rep
+function, proof that $f_{\mathcal{A}}$ is a factorization function for $\Gp\genset{a_p, b^q}$.}
 
 \begin{theorem}\label{thm:subgroup_ap_bq_is_free}
   \uses{def:generated_subgroup}
   \rocq{GWP.GeneratedSubgroup.pqpq_isomorphism}
   \rocqok{}
   For all $p, q\in \mathbb{Z}$, if $q\neq 0$ then the subgroup
-  $\Gp\genset{a_p, b^q}_{\FG(\Sigma)}$ is free of rank $2$.
+  $\Gp\genset{a_p, b^q}$ is free of rank $2$.
   In particular,
   \[
-    \Gp\genset{a_{p_1}, b^{q_1}}_{\FG(\Sigma)} \cong
-    \Gp\genset{a_{p_2}, b^{q_2}}_{\FG(\Sigma)}
+    \Gp\genset{a_{p_1}, b^{q_1}} \cong
+    \Gp\genset{a_{p_2}, b^{q_2}}
   \]
   for all $p_1, q_1, p_2, q_2\in \mathbb{Z}$ such that $q_1, q_2\neq 0$.
 \end{theorem}
 \begin{proof}
+  \uses{lem:Stallings_automaton_product}
   \rocqok{}
 \end{proof}
-
-In order to prove this, we will essentially redevelop a small fragment of Nielsen's argument
-here, specialized to $\Gp\genset{a_p, b^q}_{\FG(\Sigma)}$.
-
-\reinis{TODO:\\
-  1. Small cancellation theory for $a_p, b^q$ \\
-  2. Small cancellation product length lemma \\
-  3. Coset representative algorithm
-}
 
 \chapter{HNN extensions}
 

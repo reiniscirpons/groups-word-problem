@@ -23,3 +23,4 @@ blueprint/**/*.out
 blueprint/**/*.pdf
 blueprint/**/*.synctex.gz
 html/
+.DS_Store

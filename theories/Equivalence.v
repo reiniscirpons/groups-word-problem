@@ -1,57 +1,63 @@
 From HB Require Import structures.
 Require Import ssreflect ssrfun RelationClasses Setoid Morphisms.
 
-(* TODO(reiniscirpons): How does this differ from eqType? *)
-
-(* Types with an equality, noted `==`.
+(* Types with an equality, noted `\approx`.
    
    All types have an equality in Rocq: `eq`.
    However this equality type is essentially definitional equality,
-   while our `==` can be any equivalence relation. This is useful to
-   represent quotiented types. *)
-HB.mixin Record hasEq T := {
-  eq : T -> T -> Prop;
+   while our `\approx` can be any equivalence relation.
+   This is useful to represent quotiented types. *)
 
-  refl : forall x, eq x x;
-  symm : forall x y, eq x y -> eq y x;
-  trans : forall x y z, eq x y -> eq y z -> eq x z;
+HB.mixin Record isSetoid T := {
+  approx : T -> T -> Prop;
+
+  approx_refl : forall x, approx x x;
+  approx_sym : forall x y, approx x y -> approx y x;
+  approx_trans : forall x y z,
+    approx x y -> approx y z -> approx x z;
 }.
-#[short(type = "equivType")]
-HB.structure Definition EqProp := { T of hasEq T }.
+#[short(type = "setoid")]
+HB.structure Definition _ := { T of isSetoid T }.
 
-Hint Resolve refl : core.
+Hint Resolve approx_refl : core.
 
-Infix "==" := eq (at level 70, no associativity).
-Notation "x == y :> T" := ((x: T) == (y: T)) (at level 70, no associativity).
+Infix "\approx" := approx (at level 70, no associativity).
+Infix "≈" := approx (at level 70, no associativity).
+Notation "x \approx y :> T" :=
+  ((x: T) \approx (y: T)) (at level 70, no associativity).
+Notation "x ≈ y :> T" := (x \approx y :> T).
 
 (* Defining Rocq relation classes.
    This enables the `reflexivity`/`symmetry`/`transitivity` tactics to work with `eqType`s. *)
-Section EqEquivalence.
-Variable T: equivType.
-Let eq := @eq T.
+Section ApproxEquivalence.
+Variable T: setoid.
+Let approx := @approx T.
 
-Instance EqReflexivity : Reflexive eq.
-Proof. exact: hasEq.refl. Qed.
-Instance EqSymmetry : Symmetric eq.
-Proof. exact: hasEq.symm. Qed.
-Instance EqTransitivity : Transitive eq.
-Proof. exact: hasEq.trans. Qed.
-Instance EqEquivalence : Equivalence eq := {}.
-End EqEquivalence.
-Existing Instance EqReflexivity.
-Existing Instance EqSymmetry.
-Existing Instance EqTransitivity.
-Existing Instance EqEquivalence.
+Instance ApproxReflexivity : Reflexive approx.
+Proof. exact: isSetoid.approx_refl. Qed.
+Instance ApproxSymmetry : Symmetric approx.
+Proof. exact: isSetoid.approx_sym. Qed.
+Instance ApproxTransitivity : Transitive approx.
+Proof. exact: isSetoid.approx_trans. Qed.
+Instance ApproxEquivalence : Equivalence approx := {}.
+End ApproxEquivalence.
+Existing Instance ApproxReflexivity.
+Existing Instance ApproxSymmetry.
+Existing Instance ApproxTransitivity.
+Existing Instance ApproxEquivalence.
 
 (* TODO(reiniscirpons): Is this already part of the library? *)
-HB.mixin Record isSetoidMorphism (S T: equivType) (f: S -> T) := {
-  morphism_preserve_equiv: forall x y, x == y -> f x == f y;
+HB.mixin Record isSetoidMorphism
+    (S T: setoid) (f: S -> T) := {
+  morphism_preserve_approx: forall x y,
+    x \approx y -> f x \approx f y;
 }.
 #[short(type="setoidMorphism")]
-HB.structure Definition SetoidMorphism (G H: equivType) := { f of isSetoidMorphism G H f }.
+HB.structure Definition SetoidMorphism (G H: setoid) :=
+  { f of isSetoidMorphism G H f }.
 
 Section ProperMorphism.
-Context {S T: equivType}.
+Context {S T: setoid}.
 Variable f: setoidMorphism S T.
 
 (* NOTE(reiniscirpons): *)
@@ -65,22 +71,21 @@ Variable f: setoidMorphism S T.
    not more decomposition. If no solution found then
    error. Otherwise compose proofs.
 *)
-Global Instance : Proper (eq ==> eq) f.
-Proof. exact: morphism_preserve_equiv. Qed.
+Global Instance : Proper (approx ==> approx) f.
+Proof. exact: morphism_preserve_approx. Qed.
 End ProperMorphism.
 
 Section SetoidMorphismComp.
-
-Context {A B C: equivType}.
+Context {A B C: setoid}.
 Variable (f: setoidMorphism A B).
 Variable (g: setoidMorphism B C).
 
 Lemma comp_preserve_equiv :
-  forall x y, x == y -> (g \o f) x == (g \o f) y.
+  forall x y, x \approx y -> (g \o f) x \approx (g \o f) y.
 Proof.
-  move => x y H;
-  by apply /morphism_preserve_equiv /morphism_preserve_equiv.
+  move => x y H; by repeat apply /morphism_preserve_approx.
 Qed.
 
-HB.instance Definition _ := isSetoidMorphism.Build A C (g \o f) comp_preserve_equiv.
+HB.instance Definition _ :=
+  isSetoidMorphism.Build A C (g \o f) comp_preserve_equiv.
 End SetoidMorphismComp.

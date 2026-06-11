@@ -11,13 +11,16 @@ Require Import ssreflect ssrfun RelationClasses Setoid Morphisms.
 HB.mixin Record isSetoid T := {
   approx : T -> T -> Prop;
 
-  approx_refl : forall x, approx x x;
-  approx_sym : forall x y, approx x y -> approx y x;
+  approx_refl : forall x,
+   approx x x;
+  approx_sym : forall x y,
+   approx x y -> approx y x;
   approx_trans : forall x y z,
     approx x y -> approx y z -> approx x z;
 }.
 #[short(type = "setoid")]
 HB.structure Definition _ := { T of isSetoid T }.
+
 
 Hint Resolve approx_refl : core.
 

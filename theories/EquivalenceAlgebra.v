@@ -1,62 +1,79 @@
 From elpi.apps Require Import coercion.
 From HB Require Import structures.
+Require Import Setoid Morphisms.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrint ssrnat.
 From mathcomp Require Import eqtype seq fintype all_algebra.
 From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
-Require Import Setoid Morphisms.
 
 From GWP Require Import Utils Equivalence.
 
 Open Scope int_scope.
 Open Scope ring_scope.
 
-HB.mixin Record isMonoid M of hasEq M := {
-  law : M -> M -> M;
-  e : M;
-  associativity : forall x y z, law x (law y z) == law (law x y) z;
-  neutral_left : forall x, law e x == x;
-  neutral_right : forall x, law x e == x;
-  congruent_left : forall x y z, y == z -> law x y == law x z;
-  congruent_right : forall x y z, y == z -> law y x == law z x;
+Set Implicit Arguments.
+
+Reserved Notation "*%sg" (at level 0).
+
+Declare Scope setoid_group_scope.
+Delimit Scope setoid_group_scope with sg.
+Local Open Scope setoid_group_scope.
+
+HB.mixin Record isMonoid M of isSetoid M := {
+  mul: M -> M -> M;
+  one: M;
+  mulgA: forall x y z,
+    mul x (mul y z) \approx mul (mul x y) z;
+  mul1g: forall x,
+    mul one x \approx x;
+  mulg1: forall x,
+    mul x one \approx x;
+  mul_ext: Proper (approx ==> approx ==> approx) mul;
 }.
 #[short(type="monoid")]
-HB.structure Definition Monoid := { G of isMonoid G & hasEq G }.
-Infix "@" := law (at level 50).
+HB.structure Definition Monoid := { G of isMonoid G & isSetoid G }.
+
+Bind Scope setoid_group_scope with Monoid.sort.
+
+Local Notation "*%sg" := (@mul _) : function_scope.
+Local Notation "x * y" := (mul x y) : setoid_group_scope.
+Local Notation "1" := (@one _) : setoid_group_scope.
 
 Section ProperMonoid.
-HB.declare Context G of hasEq G & isMonoid G.
+HB.declare Context G of isSetoid G & isMonoid G.
 
-Global Instance : Proper (eq ==> eq ==> eq) (law : G -> G -> G).
-Proof.
-move=> a b eq_ab u v eq_uv.
-transitivity (a @ v); do [exact: congruent_left|exact: congruent_right].
-Qed.
+Global Instance :
+  Proper (approx ==> approx ==> approx) (mul : G -> G -> G).
+Proof. exact: mul_ext. Qed.
 
 End ProperMonoid.
 
 (* If `l = [a; b; c; ...; z]`, `prod l = a @ b @ ... @ z` *)
 Definition prod {M: monoid} (l: seq M) : M :=
-  foldr (fun y acc => y @ acc) e l.
+  foldr (fun y acc => y * acc) 1 l.
 Arguments prod {_} / !_.
 
-Lemma prod0 {M: monoid} : @prod M nil = e.
+Lemma prod0 {M: monoid} : @prod M nil = 1.
 Proof. done. Qed.
 
-Lemma prod1s {M: monoid} (a: M) (l: seq M) : prod (a :: l) == a @ prod l.
+Lemma prod1s {M: monoid} (a: M) (l: seq M) :
+  prod (a :: l) \approx a * prod l.
 Proof. done. Qed.
 
-Lemma prod_cat {M: monoid} (l1 l2: seq M): prod (l1 ++ l2) == (prod l1) @ (prod l2).
+Lemma prod_cat {M: monoid} (l1 l2: seq M):
+  prod (l1 ++ l2) \approx (prod l1) * (prod l2).
 Proof.
-elim: l1 => [|a l1 /= ->]; first by rewrite /= neutral_left.
-by rewrite associativity.
+  elim: l1 => [|a l1 /= ->]; first by rewrite /= mul1g.
+  by rewrite mulgA.
 Qed.
 
 (** Some theory about morphisms *)
 
 HB.mixin Record isMonoidMorphism (G H: monoid) (f: G -> H) := {
-  morphism_preserve_e: f e == e;
-  morphism_preserve_law: forall x y, f (x @ y) == (f x) @ (f y);
+  morphism_preserve_one:
+    f 1 \approx 1;
+  morphism_preserve_mul: forall x y,
+    f (x * y) \approx (f x) * (f y);
 }.
 #[short(type="morphism")]
 HB.structure Definition Morphism (G H: monoid) :=
@@ -64,12 +81,13 @@ HB.structure Definition Morphism (G H: monoid) :=
        & isMonoidMorphism G H f}.
 
 
-HB.mixin Record isInjective (A B: equivType) (f: A -> B) := {
-  injectivity_property: forall x y, f x == f y -> x == y;
+HB.mixin Record isInjective (A B: setoid) (f: A -> B) := {
+  injectivity_property:
+    forall x y, f x \approx f y -> x \approx y;
 }.
 
 #[short(type="injectiveFunType")]
-HB.structure Definition Injective (A B: equivType) :=
+HB.structure Definition Injective (A B: setoid) :=
   { f of isInjective A B f
        & isSetoidMorphism A B f}.
 
@@ -79,12 +97,13 @@ HB.structure Definition InjectiveMorphism (G H: monoid) :=
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-HB.mixin Record isSurjective (A B: equivType) (f: A -> B) := {
-  surjectivity_property: forall y, exists x, f x == y;
+HB.mixin Record isSurjective (A B: setoid) (f: A -> B) := {
+  surjectivity_property: forall y, exists x,
+    f x \approx y;
 }.
 
 #[short(type="surjectiveFunType")]
-HB.structure Definition Surjective (A B: equivType) :=
+HB.structure Definition Surjective (A B: setoid) :=
   { f of isSurjective A B f
        & isSetoidMorphism A B f}.
 
@@ -95,7 +114,7 @@ HB.structure Definition SurjectiveMorphism (G H: monoid) :=
        & isMonoidMorphism G H f }.
 
 #[short(type="bijectiveFunType")]
-HB.structure Definition Bijective (A B: equivType) :=
+HB.structure Definition Bijective (A B: setoid) :=
   { f of isInjective A B f
        & isSurjective A B f
        & isSetoidMorphism A B f}.
@@ -107,12 +126,14 @@ HB.structure Definition Isomorphism (G H: monoid) :=
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-HB.factory Record isIsomorphismInverse (S T: monoid)
-  (f: isomorphism S T) (g: T -> S) := {
-    morphism_preserve_equiv':
-      forall x y, x == y -> g x == g y;
-    morphism_inverse_left: forall x, g (f x) == x;
-    morphism_inverse_right: forall x, f (g x) == x;
+HB.factory Record isIsomorphismInverse
+  (S T: monoid) (f: isomorphism S T) (g: T -> S) := {
+    morphism_preserve_approx': forall x y,
+      x \approx y -> g x \approx g y;
+    morphism_inverse_left: forall x,
+      g (f x) \approx x;
+    morphism_inverse_right: forall x,
+      f (g x) \approx x;
 }.
 
 HB.builders Context 
@@ -120,9 +141,10 @@ HB.builders Context
     isIsomorphismInverse S T f g.
 
   HB.instance Definition _ :=
-    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+    isSetoidMorphism.Build _ _ g morphism_preserve_approx'.
 
-  Fact g_surjectivity_property: forall y, exists x, g x == y.
+  Fact g_surjectivity_property: forall y, exists x,
+    g x \approx y.
   Proof.
     move => y; exists (f y); by apply morphism_inverse_left.
   Qed.
@@ -130,38 +152,41 @@ HB.builders Context
   HB.instance Definition _ :=
     isSurjective.Build _ _ g g_surjectivity_property.
   
-  Fact g_injectivity_property: forall x y, g x == g y -> x == y.
+  Fact g_injectivity_property: forall x y,
+    g x \approx g y -> x \approx y.
   Proof.
-    move => x y Hg; have: f (g x) == f (g y).
-    - by apply morphism_preserve_equiv.
+    move => x y Hg; have: f (g x) \approx f (g y).
+    - by apply morphism_preserve_approx.
     by rewrite !morphism_inverse_right.
   Qed.
 
   HB.instance Definition _ :=
     isInjective.Build _ _ g g_injectivity_property.
 
-  Fact g_preserve_e: g e == e.
+  Fact g_preserve_e: g 1 \approx 1.
   Proof.
-    by rewrite -(morphism_inverse_left e) morphism_preserve_e.
+    by rewrite -(morphism_inverse_left 1) morphism_preserve_one.
   Qed.
 
-  Fact g_preserve_law: forall x y, g (x @ y) == g x @ g y.
+  Fact g_preserve_law: forall x y,
+    g (x * y) \approx g x * g y.
   Proof.
     move => x y.
     move: (@surjectivity_property _ _ f x) => [x'] <-.
     move: (@surjectivity_property _ _ f y) => [y'] <-.
-    by rewrite -morphism_preserve_law !morphism_inverse_left.
+    by rewrite -morphism_preserve_mul !morphism_inverse_left.
   Qed.
 
   HB.instance Definition _ :=
     isMonoidMorphism.Build _ _ g g_preserve_e g_preserve_law.
 HB.end.
 
-HB.factory Record isIsomorphismLeftInverse (S T: monoid)
-  (f: isomorphism S T) (g: T -> S) := {
-    morphism_preserve_equiv':
-      forall x y, x == y -> g x == g y;
-    morphism_inverse_left: forall x, g (f x) == x;
+HB.factory Record isIsomorphismLeftInverse
+  (S T: monoid) (f: isomorphism S T) (g: T -> S) := {
+    morphism_preserve_approx': forall x y,
+      x \approx y -> g x \approx g y;
+    morphism_inverse_left: forall x,
+      g (f x) \approx x;
 }.
 
 HB.builders Context 
@@ -169,34 +194,37 @@ HB.builders Context
     isIsomorphismLeftInverse S T f g.
 
   HB.instance Definition _ :=
-    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+    isSetoidMorphism.Build _ _ g morphism_preserve_approx'.
 
-  Fact morphism_inverse_right': forall y, f (g y) == y.
+  Fact morphism_inverse_right': forall y,
+    f (g y) \approx y.
   Proof.
     move => y.
     move: (@surjectivity_property _ _ f y) => [x] <-;
-    by apply /morphism_preserve_equiv /morphism_inverse_left.
+    by apply /morphism_preserve_approx /morphism_inverse_left.
   Qed.
   
   HB.instance Definition _ :=
     isIsomorphismInverse.Build _ _ f g
-      morphism_preserve_equiv'
+      morphism_preserve_approx'
       morphism_inverse_left
       morphism_inverse_right'.
 HB.end.
 
-HB.factory Record isIsomorphismRightInverse (S T: monoid)
-  (f: isomorphism S T) (g: T -> S) := {
-    morphism_preserve_equiv':
-      forall x y, x == y -> g x == g y;
-    morphism_inverse_right: forall x, f (g x) == x;
+HB.factory Record isIsomorphismRightInverse
+  (S T: monoid) (f: isomorphism S T) (g: T -> S) := {
+    morphism_preserve_approx': forall x y,
+      x \approx y -> g x \approx g y;
+    morphism_inverse_right: forall x,
+      f (g x) \approx x;
 }.
 
 HB.builders Context 
   (S T: monoid) (f: isomorphism S T) g of 
     isIsomorphismRightInverse S T f g.
 
-  Fact morphism_inverse_left': forall x, g (f x) == x.
+  Fact morphism_inverse_left': forall x,
+    g (f x) \approx x.
   Proof.
     move => x; apply (@injectivity_property _ _ f).
     by apply morphism_inverse_right.
@@ -204,7 +232,7 @@ HB.builders Context
   
   HB.instance Definition _ :=
     isIsomorphismInverse.Build _ _ f g
-      morphism_preserve_equiv'
+      morphism_preserve_approx'
       morphism_inverse_left'
       morphism_inverse_right.
 HB.end.
@@ -219,24 +247,24 @@ Context {S T U: monoid}.
 Variable f: morphism S T.
 Variable g: morphism T U.
 
-Lemma comp_preserve_e: (g \o f) e == e.
-Proof. by rewrite /comp !morphism_preserve_e. Qed.
+Lemma comp_preserve_e: (g \o f) 1 \approx 1.
+Proof. by rewrite /comp !morphism_preserve_one. Qed.
 
 Lemma comp_preserve_law: forall x y,
-  (g \o f) (x @ y) == ((g \o f) x) @ ((g \o f) y).
-Proof. move => x y; by rewrite /comp !morphism_preserve_law. Qed.
+  (g \o f) (x * y) \approx ((g \o f) x) * ((g \o f) y).
+Proof. move => x y; by rewrite /comp !morphism_preserve_mul. Qed.
 
 HB.instance Definition _ :=
   isMonoidMorphism.Build S U (g \o f) comp_preserve_e comp_preserve_law.
 End MorphismComposition.
 
 Section InjectionComposition.
-Context {A B C: equivType}.
+Context {A B C: setoid}.
 Variable f: injectiveFunType A B.
 Variable g: injectiveFunType B C.
 
 Lemma comp_preserve_injectivity_property: forall x y,
-  (g \o f) x == (g \o f) y -> x == y.
+  (g \o f) x \approx (g \o f) y -> x \approx y.
 Proof.
   move => x y; rewrite /comp;
   by move/injectivity_property/injectivity_property.
@@ -246,13 +274,13 @@ HB.instance Definition _ :=
 End InjectionComposition.
 
 Section SurjectionComposition.
-Context {A B C: equivType}.
+Context {A B C: setoid}.
 Variable f: surjectiveFunType A B.
 Variable g: surjectiveFunType B C.
 
 
-Lemma comp_preserve_surjectivity_property: forall y,
-  exists x, (g \o f) x == y.
+Lemma comp_preserve_surjectivity_property: forall y, exists x,
+  (g \o f) x \approx y.
 Proof.
   move => y.
   move: (@surjectivity_property _ _ g y) => [z] Hz.
@@ -272,98 +300,108 @@ Variable g: isomorphism T U.
   is not an isomorphism. Why? *)
 HB.instance Definition _ :=
   isSetoidMorphism.Build S U
-  (g \o f) morphism_preserve_equiv.
+  (g \o f) morphism_preserve_approx.
 End IsomorphismComposition.
 
 
 (** Theory of groups *)
 
-HB.mixin Record isGroup G of hasEq G & isMonoid G := {
+HB.mixin Record isGroup G of isSetoid G & isMonoid G := {
   inv : G -> G;
-  inverse_law : forall x y, inv (x @ y) == (inv y) @ (inv x);
-  inverse_left : forall x, x @ (inv x) == e;
-  inverse_right : forall x, (inv x) @ x == e;
+  invgM : forall x y,
+    inv (x * y) \approx (inv y) * (inv x);
+  invgV : forall x,
+    x * (inv x) \approx 1;
+  invVg : forall x,
+    (inv x) * x \approx 1;
 }.
 #[short(type="group")]
-HB.structure Definition Group := { G of isGroup G & hasEq G & isMonoid G }.
+HB.structure Definition Group :=
+  { G of isGroup G & isSetoid G & isMonoid G }.
 
-Lemma inv_involutive {G: group}: forall (g: G), inv (inv g) == g.
+Bind Scope setoid_group_scope with Group.sort.
+
+Local Notation "x ^-1" := (inv x) : setoid_group_scope.
+Local Notation "x ^- n" := ((x ^+ n)^-1) : setoid_group_scope.
+
+Lemma invgK {G: group}: forall (g: G),
+  g^-1^-1 \approx g.
 Proof.
 move=> g.
-have: (inv g) @ (inv (inv g)) == (inv g) @ g.
-  by rewrite inverse_left inverse_right.
-move=> /(congruent_left g).
-by rewrite !associativity inverse_left !neutral_left.
+have: g * (g^-1 * g^-1^-1) \approx g * (g^-1 * g).
+  by rewrite invgV invVg.
+by rewrite !mulgA invgV !mul1g.
 Qed.
 
-Lemma inverse_e: forall G: group, (@inv G e) == e.
+Lemma invg1 {G: group}: 1^-1 \approx 1 :> G.
 Proof.
-  move => G.
-  have: (@inv G e) @ e == e => [|{2}<-]; first by rewrite inverse_right.
-  by rewrite neutral_right.
+  have: 1^-1 * 1 \approx 1 :> G => [|{2}<-];
+    first by rewrite invVg.
+  by rewrite mulg1.
 Qed.
 
 
 Section ProperGroup.
-HB.declare Context G of hasEq G & isMonoid G & isGroup G.
+HB.declare Context G of isSetoid G & isMonoid G & isGroup G.
 
-Global Instance : Proper (eq ==> eq) (inv : G -> G).
+Global Instance : Proper (approx ==> approx) (@inv G).
 Proof.
 move=> a b eq_ab.
-have H: (inv a) @ b == e; first by rewrite -eq_ab inverse_right.
-have: (inv a) @ b @ (inv b) == (inv b); first by rewrite H neutral_left.
-by rewrite -associativity inverse_left neutral_right.
+have H: a^-1 * b \approx 1;
+  first by rewrite -eq_ab invVg.
+have: a^-1 * b * b^-1 \approx b^-1;
+  first by rewrite H mul1g.
+by rewrite -mulgA invgV mulg1.
 Qed.
 
 End ProperGroup.
 
-Lemma inv_e {G: group}: inv (s:=G) e == e.
-Proof. by rewrite -{1}[inv e]neutral_right inverse_right. Qed.
-
 Lemma prod_inv {G: group} (l: seq G):
-  inv (prod l) == prod (map inv (rev l)).
+  (prod l)^-1 \approx prod (map inv (rev l)).
 Proof.
 elim: l => [/=|c l].
-  by rewrite inv_e.
-rewrite -cat1s rev_cat map_cat !prod_cat inverse_law => ->.
-by rewrite /= !neutral_right.
+  by rewrite invg1.
+rewrite -cat1s rev_cat map_cat !prod_cat invgM => ->.
+by rewrite /= !mulg1.
 Qed.
 
 Lemma prod_rcons {G: group} (l: seq G) (c: G):
-  prod (rcons l c) == (prod l) @ c.
+  prod (rcons l c) \approx (prod l) * c.
 Proof.
 elim: l => /= [|a l ->].
-  by rewrite neutral_left neutral_right.
-by rewrite associativity.
+  by rewrite mul1g mulg1.
+by rewrite mulgA.
 Qed.
 
 Lemma morphism_preserve_inv:
   forall (G H: group) (f: morphism G H) x,
-    inv (f x) == f (inv x).
+  (f x)^-1 \approx f (x^-1).
 Proof.
   move => G H f x.
-  have H1: (f x) @ (f (inv x)) == e.
-  - rewrite -morphism_preserve_law -morphism_preserve_e;
-    apply morphism_preserve_equiv; by rewrite inverse_left.
-  - by rewrite -(neutral_left (f (inv x))) -(inverse_right (f x))
-            -associativity H1 neutral_right.
+  have H1: (f x) * (f (x^-1)) \approx 1.
+  - rewrite -morphism_preserve_mul -morphism_preserve_one;
+    apply morphism_preserve_approx; by rewrite invgV.
+  - by rewrite -(mul1g (f (inv x))) -(invVg (f x))
+            -mulgA H1 mulg1.
 Qed.
 
 Definition power {G: group} (w: G) (k: int) : G :=
   match k with
-  | Posz k => iter k (fun acc => w @ acc) e
-  | Negz k => iter k.+1 (fun acc => (inv w) @ acc) e (* Negx 0 is -1 *)
+  | Posz k => iter k (fun acc => w * acc) 1
+  | Negz k => iter k.+1 (fun acc => w^-1 * acc) 1 (* Negx 0 is -1 *)
   end.
 
-Lemma power0 {G: group} (w: G): power w 0 = e.
+Notation "x ^ n" := (power x n) : setoid_group_scope.
+
+Lemma power0 {G: group} (w: G): w ^ 0 = 1.
 Proof. done. Qed.
 
 Lemma powerS {G: group} (w: G) (x: nat):
-  power w x.+1 = w @ (power w x).
+  w ^ x.+1 = w * w ^ x.
 Proof. done. Qed.
 
 Lemma powerP {G: group} (w: G) (x: nat):
-  power w (- (x.+1: int)) = (inv w) @ (power w (- (x:int))).
+  w ^ (- (x.+1%:Z)) = w^-1 * w ^(- x%:Z).
 Proof. by case: x. Qed.
 
 (* TODO(reiniscirpons): I locked power here to avoid it being simplified
@@ -373,16 +411,17 @@ Proof. by case: x. Qed.
    work? *)
 Arguments power {_} _ _: simpl never.
 
-Lemma power_e {G: group} (k: int) : power (e (s:=G)) k == (e (s:=G)).
+Lemma power_e {G: group} (k: int) :
+  1 ^ k \approx 1 :> G.
 Proof.
   elim: k => [//||] k.
-  - by rewrite powerS => ->; rewrite neutral_left.
-  - by rewrite powerP => ->; rewrite neutral_right inv_e.
+  - by rewrite powerS => ->; rewrite mul1g.
+  - by rewrite powerP => ->; rewrite mulg1 invg1.
 Qed.
 
 (* TODO(reiniscirpons): Should I be defining my own induction principles?*)
 Definition nat_pairs_ind: forall (P: nat -> Prop),
-  P 0 -> P 1 -> (forall n, P n -> P n.+1 -> P n.+2) ->
+  P 0 -> P (1: nat) -> (forall n, P n -> P n.+1 -> P n.+2) ->
   forall n, P n.
 Proof.
   move => P H0 H1 HnSn n; enough (H: P n /\ P n.+1).
@@ -392,88 +431,88 @@ Proof.
 Qed.
 
 Lemma power_inv {G: group} (w: G) (x:int):
-  power w (- x) == inv (power w x).
+  w ^ (- x) \approx (w ^ x)^-1.
 Proof.
 case: x; elim/nat_pairs_ind => [||k].
-- by rewrite /power /= inv_e.
-- by rewrite /power /= inverse_law neutral_right inv_e neutral_left.
-- rewrite !powerS !powerP !inverse_law => <- H.
-  by rewrite H -{2}H associativity.
-- by rewrite /power /= !neutral_right inv_involutive.
-- by rewrite /power /= !neutral_right inverse_law inv_involutive.
-- rewrite !powerS !powerP !inverse_law !inv_involutive => <- H.
-  by rewrite H -{2}H !associativity.
+- by rewrite /power /= invg1.
+- by rewrite /power /= invgM mulg1 invg1 mul1g.
+- rewrite !powerS !powerP !invgM => <- H.
+  by rewrite H -{2}H mulgA.
+- by rewrite /power /= !mulg1 invgK.
+- by rewrite /power /= !mulg1 invgM invgK.
+- rewrite !powerS !powerP !invgM !invgK => <- H.
+  by rewrite H -{2}H !mulgA.
 Qed.
 
 Lemma powerC' {G: group} (w: G) (x: int):
-  (power w x) @ w == w @ (power w x).
+  (w ^ x) * w \approx w * (w ^ x).
 Proof.
 elim: x => [|x H|x].
-- by rewrite power0 neutral_left neutral_right.
-- by rewrite powerS -{2}H associativity.
-- rewrite !power_inv powerS /= inverse_law => eq.
-  rewrite associativity -eq.
-  by rewrite -!associativity inverse_left inverse_right neutral_right.
+- by rewrite power0 mul1g mulg1.
+- by rewrite powerS -{2}H mulgA.
+- rewrite !power_inv powerS /= invgM => eq.
+  rewrite mulgA -eq.
+  by rewrite -!mulgA invgV invVg mulg1.
 Qed.
 
 Lemma powerC'' {G: group} (w: G) (x: int):
-  (power w x) @ (inv w) == (inv w) @ (power w x).
+  (w ^ x) * w^-1 \approx w^-1 * (w ^ x).
 Proof.
   case: x.
   - case => [|k].
-  -- by rewrite /power /= neutral_right neutral_left.
+  -- by rewrite /power /= mulg1 mul1g.
   -- rewrite powerS -{1}powerC'.
-    by rewrite -associativity inverse_left associativity
-               inverse_right neutral_left neutral_right.
+    by rewrite -mulgA invgV mulgA
+               invVg mul1g mulg1.
   - elim => [|n H].
-  -- by rewrite /power /= neutral_right.
-  -- by rewrite powerP -{2}H associativity.
+  -- by rewrite /power /= mulg1.
+  -- by rewrite powerP -{2}H mulgA.
 Qed.
 
 Lemma powerC {G: group} (w: G) (x y: int):
-  (power w x) @ (power w y) == (power w y) @ (power w x).
+  w ^ x * w ^ y \approx w ^ y * w ^ x.
 Proof.
   elim: x => [|n IH|n IH].
-  - by rewrite power0 neutral_left neutral_right.
-  - by rewrite powerS -associativity IH associativity -powerC' associativity.
-  - by rewrite powerP -associativity IH associativity -powerC'' associativity.
+  - by rewrite power0 mul1g mulg1.
+  - by rewrite powerS -mulgA IH mulgA -powerC' mulgA.
+  - by rewrite powerP -mulgA IH mulgA -powerC'' mulgA.
 Qed.
 
 Lemma powerS' {G: group} (w: G) (x: int):
-  power w (1 + x) == w @ (power w x).
+  w ^ (1 + x) \approx w * (w ^ x).
 Proof.
   case: x => n /=.
   - by rewrite /power /=.
   - case: n => [|n].
-  -- by rewrite /power /= neutral_right inverse_left.
-  -- rewrite /power /= !associativity inverse_left neutral_left.
+  -- by rewrite /power /= mulg1 invgV.
+  -- rewrite /power /= !mulgA invgV mul1g.
      by have ->: (n.+1 - 1 = n)%N by case: n.
 Qed.
 
 Lemma powerP' {G: group} (w: G) (x: int):
-  power w (-1 + x) == (inv w) @ (power w x).
+  w ^ (-1 + x) \approx w^-1 * (w ^ x).
 Proof.
   case: x => n /=.
   - case: n => [|n].
-  -- by rewrite /power /= neutral_right.
-  -- rewrite /power /= associativity inverse_right neutral_left.
+  -- by rewrite /power /= mulg1.
+  -- rewrite /power /= mulgA invVg mul1g.
      by have ->: (n.+1 - 1 = n)%N by case: n.
   - by rewrite /power /=.
 Qed.
 
 Lemma power_add {G: group} (w: G) (x y: int):
-  power w (x + y) == (power w x) @ (power w y).
+  w ^ (x + y) \approx (w ^ x) * (w ^ y).
 Proof.
 elim: x => [|x H|x H].
-- by rewrite add0r power0 neutral_left.
+- by rewrite add0r power0 mul1g.
 - have ->: x.+1%:Z + y = 1 + (x%:Z + y) by lia.
-  by rewrite powerS powerS' -associativity H.
+  by rewrite powerS powerS' -mulgA H.
 - have ->: - x.+1%:Z + y = -1 + (- x%:Z + y) by lia.
-  by rewrite powerP powerP' H associativity.
+  by rewrite powerP powerP' H mulgA.
 Qed.
 
 Lemma power_switch_sign {G: group} (w: G) (x y: int):
-  power (power w x) (- y) == power (power w (-x)) y.
+  (w ^ x) ^ (- y) \approx (w ^ (-x)) ^ y.
 Proof.
 elim: y => [|y|y].
 - by rewrite oppr0 !power0.
@@ -484,68 +523,70 @@ elim: y => [|y|y].
 Qed.
 
 Lemma powerC'_tower {G: group} (w: G) (x y: int):
-  power (power w x) y @ w == w @ power (power w x) y.
+  (w ^ x) ^ y * w \approx w * (power w x) ^ y.
 Proof.
 elim: y => [|y|y].
-- by rewrite power0 neutral_left neutral_right.
-- rewrite powerS -associativity => ->.
-  by rewrite associativity powerC' associativity.
-- rewrite powerP -associativity => ->.
-  by rewrite associativity -power_inv powerC' associativity.
+- by rewrite power0 mul1g mulg1.
+- rewrite powerS -mulgA => ->.
+  by rewrite mulgA powerC' mulgA.
+- rewrite powerP -mulgA => ->.
+  by rewrite mulgA -power_inv powerC' mulgA.
 Qed.
 
 Lemma powerC''_tower {G: group} (w: G) (x y: int):
-  power (power w x) y @ (inv w) == (inv w) @ power (power w x) y.
+  (w ^ x) ^ y * (w^-1) \approx (w^-1) * (w ^ x) ^ y.
 Proof.
 elim: y => [|y|y].
-- by rewrite power0 neutral_left neutral_right.
-- rewrite powerS -associativity => ->.
-  by rewrite associativity powerC'' associativity.
-- rewrite powerP -associativity => ->.
-  by rewrite associativity -power_inv powerC'' associativity.
+- by rewrite power0 mul1g mulg1.
+- rewrite powerS -mulgA => ->.
+  by rewrite mulgA powerC'' mulgA.
+- rewrite powerP -mulgA => ->.
+  by rewrite mulgA -power_inv powerC'' mulgA.
 Qed.
 
 Lemma power_mul {G: group} (w: G) (x y: int):
-  power w (x * y) == power (power w x) y.
+  w ^ (x * y) \approx (w ^ x) ^ y.
 Proof.
 elim: x => [|x|x].
 - by rewrite mul0r !power0 power_e.
 - rewrite powerS.
-  have ->: x.+1%:Z * y = x%:Z * y + y by lia.
+  have ->: (x.+1%:Z * y)%R = x%:Z * y + y by lia.
   rewrite power_add => ->.
   elim: y => [|y|y].
-  - by rewrite !power0 neutral_left.
+  - by rewrite !power0 mul1g.
   - rewrite !powerS => <-.
-    by rewrite !associativity -[w @ _]powerC' -![((_ @ w) @ _)]associativity
-            -powerC'_tower !associativity.
+    by rewrite !mulgA -[w * _]powerC' -![((_ * w) * _)]mulgA
+            -powerC'_tower !mulgA.
   - rewrite !power_switch_sign !powerP => <-.
-    rewrite powerS inverse_law -power_inv.
-    by rewrite associativity -[(_ @ _) @ inv w]associativity
-            -associativity powerC''_tower !associativity.
-- have ->: - x.+1%:Z * y = - x%:Z*y + (-y) by lia.
+    rewrite powerS invgM -power_inv.
+    by rewrite mulgA -[(_ * _) * inv w]mulgA
+            -mulgA powerC''_tower !mulgA.
+- have ->: (- x.+1%:Z * y)%R = - x%:Z*y + (-y) by lia.
   rewrite power_add => ->.
   elim: y => [|y|y].
-  - by rewrite !power0 neutral_left.
+  - by rewrite !power0 mul1g.
   - rewrite !powerS !powerP => <-.
-    by rewrite !associativity -[inv w @ _]powerC'' -![((_ @ inv w) @ _)]associativity
-            -powerC''_tower !associativity.
+    by rewrite !mulgA -[inv w * _]powerC''
+            -![((_ * inv w) * _)]mulgA
+            -powerC''_tower !mulgA.
   - have ->: (- - y%:Z) = y%:Z by lia.
     have ->: (- - y.+1%:Z) = y.+1%:Z by lia.
     rewrite powerS ![power _ (- y.+1%:Z)]powerP => <-.
-    rewrite powerP inverse_law inv_involutive.
-    by rewrite !associativity -[(_ @ _) @ w]associativity
-            -associativity  powerC'_tower  !associativity.
+    rewrite powerP invgM invgK.
+    by rewrite !mulgA -[(_ * _) * w]mulgA
+            -mulgA  powerC'_tower  !mulgA.
 Qed.
 
 Lemma power_proper_pos {G: group} (x y: G) (k: nat):
-  x == y -> power x k == power y k.
+  x \approx y -> x ^ k \approx y ^ k.
 Proof.
 move=> Heq.
 elim: k => [//|k IH].
 by rewrite !powerS IH Heq.
 Qed.
+
 Lemma power_proper {G: group} (x y: G) (k: int):
-  x == y -> power x k == power y k.
+  x \approx y -> x ^ k \approx y ^ k.
 Proof.
 move=> Heq.
 case: k => k.
@@ -555,20 +596,21 @@ by rewrite !power_inv power_proper_pos.
 Qed.
 Arguments power_proper {_ _ _}.
 
-Global Instance: forall G, Proper (eq ==> Logic.eq ==> eq) (@power G).
+Global Instance: forall G, Proper
+  (approx ==> eq ==> approx) (@power G).
 Proof.
   by move => G x y Hxy h k ->; apply power_proper.
 Qed.
 
 Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
-  f (power x k) == power (f x) k.
+  f (x ^ k) \approx (f x) ^ k.
 Proof.
 elim: k => [/=|k].
-  by rewrite morphism_preserve_e.
-by rewrite !powerS morphism_preserve_law => <-.
+  by rewrite morphism_preserve_one.
+by rewrite !powerS morphism_preserve_mul => <-.
 Qed.
 Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
-  f (power x k) == power (f x) k.
+  f (x ^ k) \approx (f x) ^ k.
 Proof.
 case: k => k.
   exact: morphism_preserve_power_pos.
@@ -579,7 +621,8 @@ Qed.
 
 
 #[short(type="deceqGroupType")]
-HB.structure Definition DecEqGroup := { G of isGroup G & hasEq G & isMonoid G & hasDecEq G }.
+HB.structure Definition DecEqGroup :=
+  { G of isGroup G & isSetoid G & isMonoid G & hasDecEq G }.
 
 HB.mixin Record isSubgroup (G: group) (H: group) := {
   subgroup_inj: injectiveMorphism H G;
@@ -605,16 +648,17 @@ coercion _ T {{ Type }} ExpectedType Solution :-
    seems difficult without triggering an infinite coercion chain. *)
 
 Definition in_subgroup {G: group} (K: subgroup G) (x: G) :=
-  exists x': K, subgroup_inj x' == x.
+  exists x': K, subgroup_inj x' \approx x.
 Notation "x '\insubgroup' K" := (in_subgroup K x) (at level 10).
 
 (* this definition is useful as due to non-forgetful inheritance, seeing a subgroup of a subgroup of a group as a subgroup of the group is not easy *)
 Definition in_subsubgroup (G: group) (H: subgroup G) (I: subgroup H) (x: G) :=
-  exists x': I, subgroup_inj (subgroup_inj x') == x.
-Notation "x '\insubsubgroup[' Subgroup ']' Subsubgroup" := (@in_subsubgroup _ Subgroup Subsubgroup x) (at level 10).
+  exists x': I, subgroup_inj (subgroup_inj x') \approx x.
+Notation "x '\insubsubgroup[' Subgroup ']' Subsubgroup" :=
+  (@in_subsubgroup _ Subgroup Subsubgroup x) (at level 10).
 
 Lemma in_subgroup_proper {Group: group} (Subgroup: subgroup Group) (x x': Group):
-  (x == x') ->
+  (x \approx x') ->
   (x \insubgroup Subgroup) ->
   (x' \insubgroup Subgroup).
 Proof.
@@ -624,16 +668,18 @@ by rewrite -Heq.
 Qed.
 
 Lemma in_subgroup_e {Group: group} {Subgroup: subgroup Group}:
-  e \insubgroup Subgroup.
-Proof. exists e; by rewrite morphism_preserve_e. Qed.
+  1 \insubgroup Subgroup.
+Proof. exists 1; by rewrite morphism_preserve_one. Qed.
 
 Lemma in_subgroup_law {Group: group} {Subgroup: subgroup Group} (x y: Group):
-  (x \insubgroup Subgroup) -> (y \insubgroup Subgroup) -> ((x @ y) \insubgroup Subgroup).
+  (x \insubgroup Subgroup) ->
+  (y \insubgroup Subgroup) ->
+  ((x * y) \insubgroup Subgroup).
 Proof.
 case=> [x' Hx'].
 case=> [y' Hy'].
-exists (x' @ y').
-by rewrite morphism_preserve_law -Hx' -Hy'.
+exists (x' * y').
+by rewrite morphism_preserve_mul -Hx' -Hy'.
 Qed.
 
 Lemma in_subgroup_inv {Group: group} {Subgroup: subgroup Group} (x: Group):
@@ -645,7 +691,7 @@ by rewrite -Hx' morphism_preserve_inv.
 Qed.
 
 Lemma in_subsubgroup_proper {G: group} (H: subgroup G) (I: subgroup H) (x x': G) :
-  x == x' ->
+  x \approx x' ->
   (x \insubsubgroup[H] I) ->
   (x' \insubsubgroup[H] I).
 Proof.
@@ -674,35 +720,37 @@ Section RightCoset.
 Context {G: group}.
 Variable H: subgroup G.
 
-Definition right_coset_eq (x y: G): Prop := in_subgroup H (x @ inv y).
+Definition right_coset_eq (x y: G): Prop :=
+  in_subgroup H (x * inv y).
 
 Lemma right_coset_eq': forall x y,
-  right_coset_eq x y <-> (exists w: H, (subgroup_inj w) @ y == x).
+  right_coset_eq x y <->
+  (exists w: H, (subgroup_inj w) * y \approx x).
 Proof.
   move => x y; split.
   - rewrite /right_coset_eq /in_subgroup.
     case => w Hw; exists w;
-    by rewrite Hw -associativity inverse_right neutral_right.
+    by rewrite Hw -mulgA invVg mulg1.
   - case => w Hw; exists w;
-    by rewrite -Hw -associativity inverse_left neutral_right.
+    by rewrite -Hw -mulgA invgV mulg1.
 Qed.
 
 Instance RightCosetEqReflexivity : Reflexive right_coset_eq.
 Proof.
-  move => x; rewrite right_coset_eq'; exists e;
-  by rewrite morphism_preserve_e neutral_left.
+  move => x; rewrite right_coset_eq'; exists 1;
+  by rewrite morphism_preserve_one mul1g.
 Qed.
 Instance RightCosetEqSymmetry : Symmetric right_coset_eq.
 Proof.
   move => x y; rewrite !right_coset_eq'.
   case => w Hw; exists (inv w).
-  by rewrite -morphism_preserve_inv -Hw associativity inverse_right neutral_left.
+  by rewrite -morphism_preserve_inv -Hw mulgA invVg mul1g.
 Qed.
 Instance RightCosetEqTransitivity : Transitive right_coset_eq.
 Proof.
   move => x y z; rewrite !right_coset_eq'.
-  move => [w1 H1] [w2 H2]; exists (w1 @ w2).
-  by rewrite morphism_preserve_law -associativity H2 H1.
+  move => [w1 H1] [w2 H2]; exists (w1 * w2).
+  by rewrite morphism_preserve_mul -mulgA H2 H1.
 Qed.
 Instance RightCosetEqEquivalence : Equivalence right_coset_eq := {}.
 End RightCoset.
@@ -721,10 +769,11 @@ HB.mixin Record isRightCosetRep
 }.
 
 #[short(type="rightCosetRep")]
-HB.structure Definition RightCosetRep (G: group) (H: subgroup G) :=
+HB.structure Definition RightCosetRep {G: group} (H: subgroup G) :=
   { f of isRightCosetRep G H f }.
 
-Lemma right_coset_eq_spec: forall G H (f: rightCosetRep G H) (x y: G),
+Lemma right_coset_eq_spec: forall G (H: subgroup G)
+  (f: rightCosetRep H) (x y: G),
   (right_coset_eq H x y) <-> (f x = f y).
 Proof.
   move => G H f x y; split.
@@ -735,9 +784,9 @@ Proof.
 Qed.
 
 HB.mixin Record isSubgroupCharacterizer (G: group) (P: G -> Type) := {
-  P_law: forall x y, P x -> P y -> P (x @ y);
-  P_neutral: P e;
-  P_inv: forall x, P x -> P (inv x);
+  P_law: forall x y, P x -> P y -> P (x * y);
+  P_neutral: P 1;
+  P_inv: forall x, P x -> P (x^-1);
 }.
 #[short(type = "subgroup_characterizer")]
 HB.structure Definition SubgroupCharacterizer (G: group) := { P of isSubgroupCharacterizer G P }.
@@ -754,65 +803,80 @@ Record subgroup_by := {
 
 Definition subgroupby_inj (x: subgroup_by): G := x.(sb_point).
 
-Definition subgroupby_eq (x y: subgroup_by) := (subgroupby_inj x) == (subgroupby_inj y).
+Definition subgroupby_eq (x y: subgroup_by) :=
+  (subgroupby_inj x) \approx (subgroupby_inj y).
 Lemma subgroupby_eq_refl: forall x, subgroupby_eq x x.
 Proof. by move=> x; rewrite /subgroupby_eq. Qed.
-Lemma subgroupby_eq_sym: forall x y, subgroupby_eq x y -> subgroupby_eq y x.
-Proof. move=> x y; rewrite /subgroupby_eq; by symmetry. Qed.
-Lemma subgroupby_eq_trans: forall x y z, subgroupby_eq x y -> subgroupby_eq y z -> subgroupby_eq x z.
-Proof. move=> x y z; rewrite /subgroupby_eq => ? ?; by transitivity (subgroupby_inj y). Qed.
+Lemma subgroupby_eq_sym: forall x y,
+  subgroupby_eq x y -> subgroupby_eq y x.
+Proof.
+  move=> x y; rewrite /subgroupby_eq; by symmetry.
+Qed.
+Lemma subgroupby_eq_trans: forall x y z,
+  subgroupby_eq x y -> subgroupby_eq y z -> subgroupby_eq x z.
+Proof.
+  move=> x y z; rewrite /subgroupby_eq => ? ?;
+  by transitivity (subgroupby_inj y).
+Qed.
 
-HB.instance Definition _ := hasEq.Build subgroup_by subgroupby_eq subgroupby_eq_refl subgroupby_eq_sym subgroupby_eq_trans.
+HB.instance Definition _ := isSetoid.Build subgroup_by subgroupby_eq subgroupby_eq_refl subgroupby_eq_sym subgroupby_eq_trans.
 
 Definition subgroupby_law (x y : subgroup_by): subgroup_by.
 Proof.
-exists (x.(sb_point) @ y.(sb_point)).
+exists (x.(sb_point) * y.(sb_point)).
 apply /P_law; exact /sb_point_characterization.
 Defined.
 
 Definition subgroupby_neutral: subgroup_by.
-Proof. exists e; exact: P_neutral. Defined.
+Proof. exists 1; exact: P_neutral. Defined.
 
-Lemma subgroupby_associativity: forall (x y z: subgroup_by), subgroupby_law x (subgroupby_law y z) == subgroupby_law (subgroupby_law x y) z.
-Proof. move=> x y z; by rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/= associativity. Qed.
-
-Lemma subgroupby_neutral_left: forall (x: subgroup_by), subgroupby_law subgroupby_neutral x == x.
-Proof. move=> x; by rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/= neutral_left. Qed.
-
-Lemma subgroupby_neutral_right: forall (x: subgroup_by), subgroupby_law x subgroupby_neutral == x.
-Proof. move=> x; by rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/= neutral_right. Qed.
-
-Lemma subgroupby_congruent_left: forall (x y z: subgroup_by), y == z -> subgroupby_law x y == subgroupby_law x z.
+Lemma subgroupby_mulgA: forall (x y z: subgroup_by),
+  subgroupby_law x (subgroupby_law y z) \approx subgroupby_law (subgroupby_law x y) z.
 Proof.
-move=> x y z ?.
-rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/=.
-exact: congruent_left.
+  move=> x y z;
+  by rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj /= mulgA.
 Qed.
 
-Lemma subgroupby_congruent_right: forall (x y z: subgroup_by), y == z -> subgroupby_law y x == subgroupby_law z x.
+Lemma subgroupby_mul1g: forall (x: subgroup_by), subgroupby_law subgroupby_neutral x \approx x.
+Proof. move=> x; by rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/= mul1g. Qed.
+
+Lemma subgroupby_mulg1: forall (x: subgroup_by), subgroupby_law x subgroupby_neutral \approx x.
+Proof. move=> x; by rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/= mulg1. Qed.
+
+Lemma subgroupby_mul_ext: Proper (approx ==> approx ==> approx) subgroupby_law.
 Proof.
-move=> x y z ?.
-rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/=.
-exact: congruent_right.
+move=> x y H x1 y1.
+rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/=.
+exact: mul_ext.
 Qed.
 
-HB.instance Definition _ := isMonoid.Build subgroup_by subgroupby_law subgroupby_neutral subgroupby_associativity subgroupby_neutral_left subgroupby_neutral_right subgroupby_congruent_left subgroupby_congruent_right.
+
+HB.instance Definition _ := isMonoid.Build
+  subgroup_by
+  subgroupby_neutral subgroupby_mulgA
+  subgroupby_mul1g subgroupby_mulg1 subgroupby_mul_ext.
 
 Definition subgroupby_inv: subgroup_by -> subgroup_by.
-Proof. move=> x; exists (inv x.(sb_point)); exact /P_inv /sb_point_characterization. Defined.
+Proof.
+  move=> x; exists (inv x.(sb_point)); exact /P_inv /sb_point_characterization.
+Defined.
 
-Lemma subgroupby_inverse_law: forall x y, subgroupby_inv (x @ y) == (subgroupby_inv y) @ (subgroupby_inv x).
-Proof. move=> x y; by rewrite /subgroupby_inv/=/eq/=/subgroupby_eq/subgroupby_inj/= inverse_law. Qed.
+Lemma subgroupby_invgM: forall x y,
+  subgroupby_inv (x * y) \approx (subgroupby_inv y) * (subgroupby_inv x).
+Proof.
+  move=> x y;
+  by rewrite /subgroupby_inv/=/approx/=/subgroupby_eq/subgroupby_inj/= invgM.
+Qed.
 
-Lemma subgroupby_inverse_left : forall x, x @ (subgroupby_inv x) == e.
-Proof. move=> x; by rewrite /subgroupby_inv/=/law/=/subgroupby_law/=/eq/=/subgroupby_eq/=/subgroupby_inj/= inverse_left. Qed.
+Lemma subgroupby_inverse_left : forall x, x * (subgroupby_inv x) \approx 1.
+Proof. move=> x; by rewrite /subgroupby_inv/=/mul/=/subgroupby_law/=/approx/=/subgroupby_eq/=/subgroupby_inj/= invgV. Qed.
 
-Lemma subgroupby_inverse_right : forall x, (subgroupby_inv x) @ x == e.
-Proof. move=> x; by rewrite /subgroupby_inv/=/law/=/subgroupby_law/=/eq/=/subgroupby_eq/=/subgroupby_inj/= inverse_right. Qed.
+Lemma subgroupby_inverse_right : forall x, (subgroupby_inv x) * x \approx 1.
+Proof. move=> x; by rewrite /subgroupby_inv/=/mul/=/subgroupby_law/=/approx/=/subgroupby_eq/=/subgroupby_inj/= invVg. Qed.
 
-HB.instance Definition _ := isGroup.Build subgroup_by subgroupby_inv subgroupby_inverse_law subgroupby_inverse_left subgroupby_inverse_right.
+HB.instance Definition _ := isGroup.Build subgroup_by subgroupby_inv subgroupby_invgM subgroupby_inverse_left subgroupby_inverse_right.
 
-Lemma subgroupby_inj_preserve_equiv: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
+Lemma subgroupby_inj_preserve_equiv: forall x y, x \approx y -> subgroupby_inj x \approx subgroupby_inj y.
 Proof. done. Qed.
 
 HB.instance Definition _ := 
@@ -820,7 +884,7 @@ HB.instance Definition _ :=
     subgroupby_inj 
     subgroupby_inj_preserve_equiv.
 
-Lemma subgroupby_inj_injectivity: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
+Lemma subgroupby_inj_injectivity: forall x y, x \approx y -> subgroupby_inj x \approx subgroupby_inj y.
 Proof. done. Qed.
 
 HB.instance Definition _ := 
@@ -828,9 +892,10 @@ HB.instance Definition _ :=
     subgroupby_inj 
     subgroupby_inj_injectivity.
 
-Lemma subgroupby_inj_preserve_e: subgroupby_inj e == e.
+Lemma subgroupby_inj_preserve_e: subgroupby_inj 1 \approx 1.
 Proof. done. Qed.
-Lemma subgroupby_inj_preserve_law: forall x y, subgroupby_inj (law x y) == law (subgroupby_inj x) (subgroupby_inj y).
+Lemma subgroupby_inj_preserve_law: forall x y,
+  subgroupby_inj (x * y) \approx (subgroupby_inj x) * (subgroupby_inj y).
 Proof. done. Qed.
 
 HB.instance Definition _ := 
@@ -851,16 +916,16 @@ Arguments sb_point {_ _}.
 Section SingletonSubgroup.
 Variable K: group.
 
-Definition singleton_subgroup_char (x: K): Type := (x == e).
+Definition singleton_subgroup_char (x: K): Type := (x \approx 1).
 
-Lemma ssc_neutral: singleton_subgroup_char e.
+Lemma ssc_neutral: singleton_subgroup_char 1.
 Proof. by rewrite /singleton_subgroup_char. Qed.
 
 Lemma ssc_inv (x: K): singleton_subgroup_char x -> singleton_subgroup_char (inv x).
-Proof. by rewrite /singleton_subgroup_char => ->; rewrite inv_e. Qed.
+Proof. by rewrite /singleton_subgroup_char => ->; rewrite invg1. Qed.
 
-Lemma ssc_law (x y: K): singleton_subgroup_char x -> singleton_subgroup_char y -> singleton_subgroup_char (x @ y).
-Proof. by rewrite /singleton_subgroup_char => -> ->; rewrite neutral_left. Qed.
+Lemma ssc_law (x y: K): singleton_subgroup_char x -> singleton_subgroup_char y -> singleton_subgroup_char (x * y).
+Proof. by rewrite /singleton_subgroup_char => -> ->; rewrite mul1g. Qed.
 
 HB.instance Definition _ := isSubgroupCharacterizer.Build K singleton_subgroup_char ssc_law ssc_neutral ssc_inv.
 
@@ -868,11 +933,11 @@ Definition singleton_subgroup := subgroup_by singleton_subgroup_char.
 
 Definition singleton_morphism: singleton_subgroup -> singleton_subgroup := id.
 
-Lemma sm_preserve_equiv: forall x y, x == y -> singleton_morphism x == singleton_morphism y.
+Lemma sm_preserve_equiv: forall x y, x \approx y -> singleton_morphism x \approx singleton_morphism y.
 Proof. done. Qed.
-Lemma sm_preserve_e: singleton_morphism e == e.
+Lemma sm_preserve_e: singleton_morphism 1 \approx 1.
 Proof. done. Qed.
-Lemma sm_preserve_law: forall x y, singleton_morphism (x @ y) == (singleton_morphism x) @ (singleton_morphism y).
+Lemma sm_preserve_law: forall x y, singleton_morphism (x * y) \approx (singleton_morphism x) * (singleton_morphism y).
 Proof. done. Qed.
 
 HB.instance Definition _ :=
@@ -898,15 +963,15 @@ Record is_in_intersection (x: G) : Prop := {
   intersection_in_right: x \insubgroup H2;
 }.
 
-Definition iii_P_law : forall (x y: G), is_in_intersection x -> is_in_intersection y -> is_in_intersection (x @ y).
+Definition iii_P_law : forall (x y: G), is_in_intersection x -> is_in_intersection y -> is_in_intersection (x * y).
 Proof.
 move=> x y [[x1 x1_eq] [x2 x2_eq]] [[y1 y1_eq] [y2 y2_eq]]; eexists.
-- by exists (x1 @ y1); rewrite morphism_preserve_law -x1_eq -y1_eq.
-- by exists (x2 @ y2); rewrite morphism_preserve_law -x2_eq -y2_eq.
+- by exists (x1 * y1); rewrite morphism_preserve_mul -x1_eq -y1_eq.
+- by exists (x2 * y2); rewrite morphism_preserve_mul -x2_eq -y2_eq.
 Qed.
 
-Definition iii_P_neutral : is_in_intersection e.
-Proof. by eexists; exists e; rewrite morphism_preserve_e. Qed.
+Definition iii_P_neutral : is_in_intersection 1.
+Proof. by eexists; exists 1; rewrite morphism_preserve_one. Qed.
 
 Definition iii_P_inv : forall (x: G), is_in_intersection x -> is_in_intersection (inv x).
 Proof.

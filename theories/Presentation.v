@@ -162,7 +162,7 @@ End Reduction.
 Module PresentationNotations.
 Notation "\epsilon" := ([::] : presented _)
   (at level 10, only parsing).
-Notation "\ε" := (\epsilon) (at level 10, only printing).
+Notation "\ε" := ([::] : presented _) (at level 10, only printing).
 Notation "x \mod P" := (x : presented P)
   (at level 10, only parsing).
 Notation "x % P" := (x \mod P)

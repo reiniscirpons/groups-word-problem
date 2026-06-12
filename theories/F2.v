@@ -6,6 +6,7 @@ Require Import Setoid Morphisms.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 
+Open Scope setoid_group_scope.
 Import PresentationNotations.
 
 Inductive InverseAlphabet (Sigma: eqType) :=
@@ -25,17 +26,17 @@ Definition inverse_alphabet_map {Sigma Gamma: eqType} (f: Sigma -> Gamma):
 Section InverseAlphabetEqType.
 Context {Sigma: eqType}.
 
-Definition InverseAlphabet_eq (u v: InverseAlphabet Sigma) :=
-  match (u, v) with
-  | (Base a, Base b) => (a == b)%B
-  | (Inverse a, Inverse b) => (a == b)%B
-  | _ => false
+Definition InverseAlphabet_beq (u v: InverseAlphabet Sigma) :=
+  match u, v with
+  | Base a, Base b => a == b
+  | Inverse a, Inverse b => a == b
+  | _, _ => false
   end.
 
-Lemma InverseAlphabet_eqP: eq_axiom InverseAlphabet_eq.
+Lemma InverseAlphabet_eqP: eq_axiom InverseAlphabet_beq.
 Proof.
 (* TODO(reiniscirpons): how do I make this proof nicer? *)
-rewrite /InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
+rewrite /InverseAlphabet_beq; case => x; case => y; apply (iffP idP) => //.
 - move/eqP => H; by rewrite H.
 - case => H; by rewrite H.
 - move/eqP => H; by rewrite H.
@@ -45,6 +46,8 @@ Qed.
 HB.instance Definition _ := hasDecEq.Build (InverseAlphabet Sigma) InverseAlphabet_eqP.
 End InverseAlphabetEqType.
 
+(* TODO(reinis): There was a better way to do this without explicit
+ * pickle. *)
 Section InverseAlphabetCountType.
 Context {Sigma: countType}.
 
@@ -154,7 +157,7 @@ Lemma FreeGroup_invlK : forall c: sigma FGP,
 Proof. by case. Qed.
 
 Lemma FreeGroup_invl_left : forall c: sigma FGP,
-  `[c; FreeGroup_invl c]_FGP == `[]_FGP.
+  [:: c; FreeGroup_invl c] \mod FGP \approx \epsilon.
 Proof.
   move=> c; apply: reduction_rule; case: c => a;
   rewrite /relations /= /free_group_relations mem_cat; apply /orP.
@@ -163,7 +166,7 @@ Proof.
 Qed.
 
 Lemma FreeGroup_invl_right : forall c: sigma FGP,
-  `[FreeGroup_invl c; c]_FGP == `[]_FGP.
+  [:: FreeGroup_invl c; c] \mod FGP \approx \epsilon.
 (* TODO(reiniscirpons): fix *)
 Proof.
   case => a /=.
@@ -184,28 +187,29 @@ HB.instance Definition _ :=
 
 (* NOTE(reiniscirpons): in theory we could do this more efficiently with the
  complete rewriting system *)
-Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
-  | [::] => `[]_FGP
+Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup :=
+  match w with
+  | [::] => \epsilon
   | c::w' => match (FreeGroup_norm w') with
-    | [::] => `[c]_FGP
+    | [::] => [:: c] \mod FGP
     | d::n =>
-      if (c == invl d)%B then n
+      if (c == d^~1)%B then n
       else c::(d::n)
     end
   end.
 
-Lemma FreeGroup_norm_e:
-  FreeGroup_norm e = e.
+Lemma FreeGroup_norm_one:
+  FreeGroup_norm 1 = 1.
 Proof. done. Qed.
 
 Lemma FreeGroup_norm_1: forall (c: sigma FGP),
-  FreeGroup_norm (`[c]_FGP) = (`[c]_FGP).
+  FreeGroup_norm ([::c] \mod FGP) = ([::c] \mod FGP).
 Proof.
   by case => c.
 Qed.
 
 Lemma FreeGroup_norm_correct w:
-  FreeGroup_norm w == w.
+  FreeGroup_norm w \approx w.
 Proof.
   elim: w => [//|c w IH /=]; rewrite (cons_law _ c w).
   case Hn: (FreeGroup_norm w) => [//|d w']; rewrite -IH Hn.
@@ -213,17 +217,17 @@ Proof.
   case Heq: (c == invl d)%B; last first.
   - by rewrite -cons_law.
   move/eqP: Heq => ->;
-  by rewrite (cons_law _ d) associativity invl_right.
+  by rewrite (cons_law _ d) mulgA invlVg mul1g.
 Qed.
 
 Definition FreeGroup_dec_eq (w w': FreeGroup): bool :=
-  ((FreeGroup_norm w) == (FreeGroup_norm w'))%B.
+  FreeGroup_norm w == FreeGroup_norm w'.
 
 Lemma FreeGroup_refl p: FreeGroup_dec_eq p p.
 Proof. by rewrite /FreeGroup_dec_eq. Qed.
 
 Lemma FreeGroup_dec_eq_to_eqprop w w':
-  (FreeGroup_dec_eq w w') -> (w == w').
+  FreeGroup_dec_eq w w' -> w \approx w'.
 Proof.
   by move=> eq;
   rewrite -[w]FreeGroup_norm_correct -[w']FreeGroup_norm_correct (eqP eq).
@@ -231,7 +235,7 @@ Qed.
 
 Lemma FreeGroup_norm_cat_back w1 w2 w3:
   FreeGroup_norm w1 = FreeGroup_norm w2 ->
-    FreeGroup_norm (w3 @ w1) = FreeGroup_norm (w3 @ w2).
+    FreeGroup_norm (w3 * w1) = FreeGroup_norm (w3 * w2).
 Proof.
   move=> H; by elim: w3 => [//|c w3 /= ->].
 Qed.
@@ -239,9 +243,9 @@ Qed.
 Lemma FreeGroup_norm_rcons w c:
   FreeGroup_norm (rcons w c) =
   match rev (FreeGroup_norm w) with
-  | [::] => `[c]_FGP
+  | [::] => [:: c] \mod FGP
   | d :: n => 
-      if (c == invl d)%B then rev n
+      if (c == d^~1)%B then rev n
       else rcons (rcons (rev n) d) c
   end.
 Proof.
@@ -294,27 +298,29 @@ Proof.
 Qed.
 
 Lemma FreeGroup_norm_inv w:
-  FreeGroup_norm (inv w) = inv (FreeGroup_norm w).
+  FreeGroup_norm (w^-1) = (FreeGroup_norm w)^-1.
 Proof.
   by rewrite /inv/=/inv_word/= -FreeGroup_norm_rev FreeGroup_norm_map_invl.
 Qed.
 
 Lemma FreeGroup_norm_cat w1 w2 w3:
-  FreeGroup_norm w1 = FreeGroup_norm w2 -> FreeGroup_norm (w1 @ w3) = FreeGroup_norm (w2 @ w3).
+  FreeGroup_norm w1 = FreeGroup_norm w2 ->
+  FreeGroup_norm (w1 * w3) = FreeGroup_norm (w2 * w3).
 Proof.
-rewrite -[w1 @ w3]revK -[w2 @ w3]revK.
+rewrite -[w1 * w3]revK -[w2 * w3]revK.
 rewrite ![FreeGroup_norm (rev (rev _))]FreeGroup_norm_rev => eq.
-have -> //: FreeGroup_norm (rev (w1 @ w3)) = FreeGroup_norm (rev (w2 @ w3)).
-rewrite /law/= !rev_cat; apply /FreeGroup_norm_cat_back.
+have -> //: FreeGroup_norm (rev (w1 * w3)) = FreeGroup_norm (rev (w2 * w3)).
+rewrite /mul/= !rev_cat; apply /FreeGroup_norm_cat_back.
 by rewrite !FreeGroup_norm_rev eq.
 Qed.
 
 Lemma FreeGroup_norm_unique w w':
-  w == w' -> FreeGroup_norm w = FreeGroup_norm w'.
+  w \approx w' -> FreeGroup_norm w = FreeGroup_norm w'.
 Proof.
 elim=> [[r1 r2] w1 w2|//|? ? _ -> //|? ? ? _ -> _ -> //].
 rewrite /relations /= /free_group_relations;
 rewrite mem_cat => /orP []; move/mapP => [a Henum [-> ->]];
+rewrite !catA;
 apply /FreeGroup_norm_cat /FreeGroup_norm_cat_back => /=;
 by rewrite eq_refl.
 Qed.
@@ -325,17 +331,17 @@ Proof.
   move => w; apply FreeGroup_norm_unique; by rewrite FreeGroup_norm_correct.
 Qed.
 
-Lemma FreeGroup_norm_law:
-  forall x y, FreeGroup_norm (x @ y) = FreeGroup_norm(FreeGroup_norm x @ FreeGroup_norm y).
+Lemma FreeGroup_norm_mul:
+  forall x y, FreeGroup_norm (x * y) = FreeGroup_norm(FreeGroup_norm x * FreeGroup_norm y).
 Proof.
   move => x y; apply FreeGroup_norm_unique; by rewrite !FreeGroup_norm_correct.
 Qed.
 
 Lemma FreeGroup_norm_cons_invl: forall c (w: FreeGroup),
-  FreeGroup_norm ([:: c, invl c & w]) = FreeGroup_norm w.
+  FreeGroup_norm ([:: c, c^~1 & w]) = FreeGroup_norm w.
 Proof.
   move => c w; apply FreeGroup_norm_unique;
-  by rewrite cons_law (cons_law _ _ w) associativity invl_left neutral_left.
+  by rewrite cons_law (cons_law _ _ w) mulgA invlgV mul1g.
 Qed.
 
 Lemma FreeGroup_norm_subseq: forall (w: FreeGroup),
@@ -353,7 +359,7 @@ Proof.
 Qed.
 
 Lemma FreeGroup_norm_minimality: forall (w: FreeGroup),
-  (forall x, w == x -> subseq w x) <-> w = FreeGroup_norm w.
+  (forall x, w \approx x -> subseq w x) <-> w = FreeGroup_norm w.
 Proof.
   move => w; split.
   - move => H; apply /subseq_anti /andP; split.
@@ -364,30 +370,26 @@ Proof.
 Qed.
 
 Lemma eqprop_to_FreeGroup_dec_eq w w':
-  (w == w') -> (FreeGroup_dec_eq w w').
+  (w \approx w') -> (FreeGroup_dec_eq w w').
 Proof. by move=> eq; exact /eqP /FreeGroup_norm_unique. Qed.
 
 Lemma FreeGroup_dec_eqP w w':
-  reflect (w == w') (FreeGroup_dec_eq w w').
+  reflect (w \approx w') (FreeGroup_dec_eq w w').
 Proof.
 apply /(iffP idP) => eq.
 - exact: FreeGroup_dec_eq_to_eqprop.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
 
-Global Instance : Proper (eq ==> eq_op) FreeGroup_norm.
+Global Instance : Proper (approx ==> eq) FreeGroup_norm.
 Proof.
   by move => x y; move/FreeGroup_norm_unique => ->.
 Qed.
 
 
 Lemma FreeGroup_norm_power1: forall c n,
-  FreeGroup_norm (power (`[c]_FGP) n) = power (`[c]_FGP) n.
+  FreeGroup_norm (power ([:: c] \mod FGP) n) = power ([:: c] \mod FGP) n.
 Proof.
-  (*move => c; elim => [//||] [//|n IH].*)
-  (* TODO: Why does it not allow me to do this rewrite despite FreeGroup_norm
-           being Proper? *)
-  (*- apply/eqP; rewrite {1}powerS powerC'.*)
   move => c; case; elim/nat_pairs_ind => [//|//|n IH1 _].
   - rewrite !powerS /= {}IH1; case: n; by case: c.
   - by case: c.
@@ -403,7 +405,7 @@ Section FreelyReduced.
 Variable (Sigma: finType).
 
 Definition freely_reduced (w: FreeGroup Sigma): Prop :=
-  forall p s c, w <> p ++ [:: invl c; c] ++ s.
+  forall p s c, w <> p ++ [:: c^~1; c] ++ s.
 
 Lemma freely_reduced_nil: freely_reduced [::].
 Proof. by case. Qed.
@@ -475,7 +477,7 @@ Proof.
   -- apply /subseq_anti /andP; split.
   --- rewrite Hps; apply cat_subseq => [//|]; by apply suffix_subseq.
   --- apply FreeGroup_norm_minimality => [//|].
-      by rewrite Hps !cat_law cons_law invl_right neutral_left.
+      by rewrite Hps !cat_law cons_law invlVg mul1g.
 Qed.
 
 Lemma freely_reduced_rev:
@@ -486,7 +488,7 @@ Proof.
 Qed.
 
 Lemma freely_reduced_power1: forall c n,
-  freely_reduced (power (`[c]_(FGP Sigma)) n).
+  freely_reduced (power ([:: c] \mod (FGP Sigma)) n).
 Proof.
   by move => c n; rewrite freely_reduced_correct FreeGroup_norm_power1.
 Qed.
@@ -509,10 +511,10 @@ Definition FreeGroup_alphabet_extension:
 
 Lemma FreeGroup_alphabet_extension_preserve_inv_on_sigma:
   forall (a: sigma (FGP Sigma)),
-    inv (FreeGroup_alphabet_extension a) == 
-    (FreeGroup_alphabet_extension) (invl a).
+    (FreeGroup_alphabet_extension a)^-1 \approx 
+    (FreeGroup_alphabet_extension) (a^~1).
 Proof.
-  case => [//|a]. by apply inv_involutive.
+  case => [//|a]. by apply invgK.
 Qed.
 
 Definition FreeGroup_universal_extension: (FreeGroup Sigma) -> G :=
@@ -522,20 +524,20 @@ Arguments FreeGroup_universal_extension / !_.
 Lemma FreeGroup_alphabet_extension_preserve_relations:
   forall u v,
     (u, v) \in relations (FGP Sigma) ->
-    FreeGroup_universal_extension u == FreeGroup_universal_extension v.
+    FreeGroup_universal_extension u \approx FreeGroup_universal_extension v.
 Proof.
   move => u v; rewrite mem_cat; case/orP; move/mapP => [a _ [-> ->]] /=;
-  rewrite associativity neutral_right.
-  - by rewrite inverse_left.
-  - by rewrite inverse_right.
+  rewrite mulgA mulg1.
+  - by rewrite invgV.
+  - by rewrite invVg.
 Qed.
 
 HB.instance Definition _ := isRelationPreservingMorphism.Build
   (FGP Sigma) G
   FreeGroup_universal_extension
   FreeGroup_alphabet_extension_preserve_relations
-  (extension_preserve_e _ _ FreeGroup_alphabet_extension)
-  (extension_preserve_law _ _ FreeGroup_alphabet_extension).
+  (extension_preserve_one _ _ FreeGroup_alphabet_extension)
+  (extension_preserve_mul _ _ FreeGroup_alphabet_extension).
 
 (* TODO(reiniscirpons): Is it possible to make Rocq treat sigma
   (FreeGroup_presentation Sigma) and InverseAlphabet Sigma as the same? *)
@@ -557,5 +559,5 @@ Notation "\hat f" := (FreeGroup_universal_extension f) (at level 5).
 
 Lemma hat_cons: forall (Sigma: finType) (G: group) (f: Sigma -> G)
   (a: sigma (FGP Sigma)) w,
-  \hat f (a::w) = FreeGroup_alphabet_extension f a @ (\hat f w).
+  \hat f (a::w) = FreeGroup_alphabet_extension f a * (\hat f w).
 Proof. done. Qed.

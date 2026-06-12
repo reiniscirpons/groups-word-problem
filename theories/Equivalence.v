@@ -19,16 +19,16 @@ HB.mixin Record isSetoid T := {
     approx x y -> approx y z -> approx x z;
 }.
 #[short(type = "setoid")]
-HB.structure Definition _ := { T of isSetoid T }.
+HB.structure Definition Setoid := { T of isSetoid T }.
 
 
 Hint Resolve approx_refl : core.
 
-Infix "\approx" := approx (at level 70, no associativity).
-Infix "≈" := approx (at level 70, no associativity).
+Infix "\approx" := approx (at level 70, no associativity, only parsing).
+Infix "≈" := approx (at level 70, no associativity, only printing).
 Notation "x \approx y :> T" :=
-  ((x: T) \approx (y: T)) (at level 70, no associativity).
-Notation "x ≈ y :> T" := (x \approx y :> T).
+  ((x: T) \approx (y: T)) (at level 70, no associativity, only parsing).
+Notation "x ≈ y :> T" := (x \approx y :> T) (only printing).
 
 (* Defining Rocq relation classes.
    This enables the `reflexivity`/`symmetry`/`transitivity` tactics to work with `eqType`s. *)

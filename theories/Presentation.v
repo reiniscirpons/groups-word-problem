@@ -6,6 +6,7 @@ From mathcomp Require Import seq eqtype fintype.
 
 From GWP Require Import Equivalence EquivalenceAlgebra.
 
+Open Scope setoid_group_scope.
 
 (* a rewriting rule u -> v *)
 Definition relation (Sigma: Type) := ((seq Sigma) * (seq Sigma)) % type.
@@ -22,7 +23,6 @@ Structure presentation := Pres {
 }.
 
 Section WordProblem.
-Local Infix "@" := cat (at level 50).
 
 Variable P: presentation.
 
@@ -40,7 +40,7 @@ Let finalWord (r: relation) : word := snd r.
 Inductive Derivation : word -> word -> Prop :=
   | Derivation_reduction (r: relation) (a c: word) :
       isRelationOf r ->
-      Derivation (a @ (initialWord r) @ c) (a @ (finalWord r) @ c)
+      Derivation (a ++ (initialWord r) ++ c) (a ++ (finalWord r) ++ c)
   | Derivation_refl (u: word): Derivation u u
   | Derivation_symm (u u': word) : Derivation u u' -> Derivation u' u
   | Derivation_trans (u v w: word) :
@@ -77,7 +77,7 @@ Lemma M_trans : forall x y z, eq x y -> eq y z -> eq x z.
 Proof. exact: Derivation_trans. Qed.
 
 (* HB bug: having a duplicate (P: presentation) results in a Ocaml assertion failure *)
-HB.instance Definition _ := @hasEq.Build M eq M_refl M_symm M_trans.
+HB.instance Definition _ := @isSetoid.Build M eq M_refl M_symm M_trans.
 End PresentedEq.
 
 (* All presented structures have a monoid structure *)
@@ -87,87 +87,103 @@ Variable P: presentation.
 
 Local Notation M := (presented P).
 
+
 Let concat := @cat (sigma P).
 Let epsilon : seq (sigma P) := nil.
 
-Infix ".@" := (concat: M -> M -> M) (at level 50).
+Local Infix ".@" := (concat: M -> M -> M) (at level 50).
 
-Let associativity : forall (x y z : M), x .@ (y .@ z) == (x .@ y) .@ z.
+Let concatA : forall (x y z : M),
+  x .@ (y .@ z) \approx (x .@ y) .@ z.
 Proof. by move=> x y w; rewrite /concat catA. Qed.
-Let neutral_left : forall (x: M), epsilon .@ x == x.
+Let concat1s : forall (x: M),
+  epsilon .@ x \approx x.
 Proof. by move=> x; rewrite /concat /=. Qed.
-Let neutral_right : forall (x: M), x .@ epsilon == x.
+Let concats1 : forall (x: M),
+  x .@ epsilon \approx x.
 Proof. by move=> x; rewrite /concat cats0. Qed.
 
-Let congruent_left: forall (a u v: M),
-  u == v -> a .@ u == a .@ v.
+Let concat_extl: forall (u v a: M),
+  u \approx v -> a .@ u \approx a .@ v.
 Proof.
-move=> a u v; elim => [|//||].
+move=> u v a; elim => [|//||].
 - move=> r c b H.
-  rewrite /concat -!(catA c) !(catA a) !(catA (a ++ c)).
+  rewrite /concat !(catA a).
   apply: (Derivation_reduction _ (r.1, r.2)).
   by move: H; case r.
 - by symmetry.
 - by move=> ? v'; transitivity (a .@ v').
 Qed.
 
-Let congruent_right: forall (b u v: M),
-  u == v -> u .@ b == v .@ b.
+Let concat_extr: forall (u v b: M),
+  u \approx v -> u .@ b \approx v .@ b.
 Proof.
-move=> b u v; elim => [|//||].
-- move=> r a c H.
-  rewrite /concat -!(catA a) -!(catA _ _ b) !(catA a).
+move=> u v a; elim => [|//||].
+- move=> r c b H.
+  rewrite /concat -!catA.
   apply: (Derivation_reduction _ (r.1, r.2)).
   by move: H; case r.
 - by symmetry.
-- by move=> ? a; transitivity (a .@ b).
+- by move=> ? v'; transitivity (v' .@ a).
 Qed.
 
-HB.instance Definition _ := isMonoid.Build M concat epsilon associativity neutral_left neutral_right congruent_left congruent_right.
+HB.instance Definition _ := isMonoid.Build M
+  concat epsilon
+  concatA concat1s concats1
+  concat_extl concat_extr.
 End PresentedMonoid.
 
-Lemma reduction {P: presentation}:
-  forall (a b u v: presented P),
-  (u, v) \in relations P -> a @ u @ b == a @ v @ b.
-Proof. by move=> a b u v H; apply: (Derivation_reduction _ (u, v)); done. Qed.
 
-Lemma reduction_rule {P: presentation}:
-  forall (u v: presented P),
-  (u, v) \in relations P -> u == v.
+Section Reduction.
+
+Context {P: presentation}.
+Local Notation M := (presented P).
+
+Lemma reduction:
+  forall (a b u v: M),
+  (u, v) \in relations P -> a * u * b \approx a * v * b.
 Proof.
-move=> u v Hin.
-transitivity (e @ u @ e).
-  by symmetry; apply: neutral_right.
-transitivity (e @ v @ e); last first.
-  by apply: neutral_right.
-exact: (reduction e e).
+  move=> a b u v H; rewrite /mul /= -!catA.
+  by apply: (Derivation_reduction _ (u, v)).
 Qed.
 
+Lemma reduction_rule: forall (u v: presented P),
+  (u, v) \in relations P -> u \approx v.
+Proof.
+move=> u v Hin.
+transitivity (1 * u * 1)%sg;
+  first by rewrite mul1g mulg1.
+transitivity (1 * v * 1)%sg;
+  last by rewrite mul1g mulg1.
+exact: (reduction 1 1)%sg.
+Qed.
 
+End Reduction.
 Module PresentationNotations.
-Notation "`[ ]_ P" := ([::] : presented P)
-  (at level 10, format "`[  ]_ P").
-Notation "`[ x ]_ P" := ([:: x] : presented P)
-  (at level 10, format "`[ x ]_ P").
-Notation "`[ x ; y ; .. ; z ]_ P" :=
-  ((x :: (cons y .. [:: z] ..)) : presented P)
-  (format "`[ '[' x ; '/' y ; '/' .. ; '/' z ']' ]_ P").
+Notation "\epsilon" := ([::] : presented _)
+  (at level 10, only parsing).
+Notation "\ε" := (\epsilon) (at level 10, only printing).
+Notation "x \mod P" := (x : presented P)
+  (at level 10, only parsing).
+Notation "x % P" := (x \mod P)
+  (at level 10, only printing, format "x % P").
 End PresentationNotations.
+
 
 Import PresentationNotations.
 
 (* NOTE(reiniscirpons): Declaring cat and cons to multiplication
    law conversions to simplify future lemmas. *)
 Lemma cat_law: forall P (x y: presented P),
-    (x ++ y: presented P) = x @ y.
+  (x ++ y) \mod P = x * y.
 Proof. by []. Qed.
 
 Lemma cons_law: forall P (a: sigma P) (x: presented P),
-    (a :: x: presented P) = `[a]_P @ x.
+  (a :: x) \mod P = [:: a] \mod P * x.
 Proof. by []. Qed.
 
 Lemma rcons_law: forall P (a: sigma P) (x: presented P),
-    (rcons x a: presented P) = x @ `[a]_P.
+  (rcons x a) \mod P = x * [:: a] \mod P.
 Proof. move => P a; by elim => [//|b w /= ->]. Qed.
 
 (* Show that preserving relations and multiplication is enough to define
@@ -179,23 +195,24 @@ HB.factory Record isRelationPreservingMorphism
     (* & isMonoidMorphism (presented P) B f*)
     := {
     morphism_preserve_relations: 
-      forall u v, (u, v) \in relations P -> f u == f v;
+      forall u v, (u, v) \in relations P -> f u \approx f v;
     morphism_preserve_e:
-      f e == e;
+      f 1 \approx 1;
     morphism_preserve_law:
-      forall x y, f (x @ y) == (f x) @ (f y);
+      forall x y, f (x * y) \approx (f x) * (f y);
 }.
 
 HB.builders Context (P: presentation) (M: monoid) f of 
   isRelationPreservingMorphism P M f.
 
-  Fact f_preserve_equiv: forall x y, x == y -> f x == f y.
+  Fact f_preserve_equiv: forall x y,
+    x \approx y -> f x \approx f y.
   Proof.
     move => x y; elim => [[u v] p s |//||] /=.
     - move/morphism_preserve_relations => H.
       by rewrite !morphism_preserve_law H.
-    - move => u v _ H; by apply symm.
-    - move => u v w _ H1 _ H2; by apply trans with (f v).
+    - move => u v _ H; by apply approx_sym.
+    - move => u v w _ H1 _ H2; by apply approx_trans with (f v).
   Qed.
 
   HB.instance Definition _ :=
@@ -217,30 +234,31 @@ Arguments extension / !_.
 
 Lemma extension_cons:
   forall (a: sigma P) (w: presented P),
-  extension (a::w) = (f a) @ (extension w).
+  extension (a::w) = (f a) * (extension w).
 Proof. done. Qed.
 
 Lemma extension_universality:
   forall (varphi: morphism (presented P) M),
-    (forall a: sigma P, varphi (`[a]_P) == f a) -> 
+    (forall a: sigma P, varphi ([::a] \mod P) \approx f a) -> 
     (forall w: presented P, 
-      varphi w == extension w).
+      varphi w \approx extension w).
 Proof.
   move => varphi Heq; elim => [|a w' IH].
-  - exact morphism_preserve_e.
-  by rewrite {1}cons_law morphism_preserve_law extension_cons IH Heq.
+  - exact morphism_preserve_one.
+  by rewrite {1}cons_law morphism_preserve_mul extension_cons IH Heq.
 Qed.
 
-Lemma extension_preserve_e: extension e == e.
+Lemma extension_preserve_one: extension 1 \approx 1.
 Proof. done. Qed.
 
-Lemma extension_preserve_1: forall (c: sigma P), extension (`[c]_P) == f c.
+Lemma extension_preserve_singleton:
+  forall (c: sigma P), extension ([:: c] \mod P) \approx f c.
 Proof.
-  by move => c /=; rewrite neutral_right.
+  by move => c /=; rewrite mulg1.
 Qed.
 
-Lemma extension_preserve_law: forall (x y: presented P),
-  extension (x @ y) == (extension x) @ (extension y).
+Lemma extension_preserve_mul: forall (x y: presented P),
+  extension (x * y) \approx (extension x) * (extension y).
 Proof.
   move => x y; by rewrite /extension -prod_cat map_cat.
 Qed.
@@ -251,8 +269,8 @@ Qed.
 HB.instance Definition _ := 
   isMonoidMorphism.Build _ _
     extension
-    extension_preserve_e
-    extension_preserve_law.
+    extension_preserve_one
+    extension_preserve_mul.
 
 End ExtensionToMonoidMorphism.
 Arguments extension {_ _} _ / !_. 
@@ -260,14 +278,18 @@ Arguments extension {_ _} _ / !_.
 HB.mixin Record hasInvertibleLetters (P: presentation) := {
   invl : sigma P -> sigma P;
   invlK : forall c, invl (invl c) = c;
-  invl_left : forall c, `[c]_P @ `[invl c]_P == e;
-  invl_right : forall c, `[invl c]_P @ `[c]_P == e;
+  invlgV : forall c, [::c] \mod P * [:: invl c] \mod P \approx 1;
+  invlVg : forall c, [:: invl c] \mod P * [:: c] \mod P \approx 1;
 }.
 #[short(type="invertiblePresentationType")]
-HB.structure Definition InvertiblePresentation := { P & hasInvertibleLetters P }.
+HB.structure Definition InvertiblePresentation :=
+  { P & hasInvertibleLetters P }.
 
-Lemma invl_inj: forall (P: invertiblePresentationType) (x y: sigma P),
-  invl x = invl y <-> x = y.
+Notation "c ^~1" := (invl c): setoid_group_scope.
+
+Lemma invl_inj:
+  forall (P: invertiblePresentationType) (x y: sigma P),
+    x^~1 = y^~1 <-> x = y.
 Proof.
   split => [H|-> //]; by rewrite -(invlK x) -(invlK y) H.
 Qed.
@@ -279,24 +301,25 @@ Notation G := (presented P).
 
 Definition inv_word (w: G) : G := map invl (rev w).
 
-Lemma inv_word_law : forall x y: G, inv_word (x @ y) == (inv_word y) @ (inv_word x).
-Proof. by move=> x y; rewrite /inv_word/=/law/= !map_rev map_cat rev_cat. Qed.
+Lemma inv_word_mul : forall x y: G, inv_word (x * y) \approx (inv_word y) * (inv_word x).
+Proof. by move=> x y; rewrite /inv_word/=/mul/= !map_rev map_cat rev_cat. Qed.
 
-Lemma inv_word_left : forall w: G, w @ (inv_word w) == e.
+Lemma inv_word_left : forall w: G, w * (inv_word w) \approx 1.
 Proof.
-elim=> [|a w IH]; first exact: neutral_left.
-rewrite /inv_word/law/= rev_cons map_rcons -rcons_cat -cats1 -cat1s.
-have: `[a]_P @ ((w: presented P) @ inv_word w) @ `[invl a]_P == e;
+elim=> [|a w IH]; first exact: mul1g.
+rewrite /inv_word/mul/= rev_cons map_rcons -rcons_cat -cats1 -cat1s.
+have: [:: a] \mod P * (w \mod P * inv_word w) * [:: a^~1] \mod P \approx 1;
   last by done.
-by rewrite IH invl_left.
+by rewrite IH invlgV.
 Qed.
 
-Lemma inv_word_right : forall w: G, (inv_word w) @ w == e.
+Lemma inv_word_right : forall w: G, (inv_word w) * w \approx 1.
 Proof.
-elim=> [|a w IH]; first exact: neutral_left.
-rewrite /inv_word/law/= rev_cons map_rcons cat_rcons -cat1s -(cat1s a) !(catA _ _ w).
-have: (inv_word w) @ (`[invl a]_P @ `[a]_P) @ w == e; last by done.
-by rewrite invl_right neutral_right IH.
+elim=> [|a w IH]; first exact: mul1g.
+rewrite /inv_word/mul/= rev_cons map_rcons cat_rcons -cat1s -(cat1s a) !(catA _ _ w).
+have: (inv_word w) * ([:: a^~1] \mod P * [:: a]\mod P) * w \approx 1;
+  last by done.
+by rewrite invlVg mulg1 IH.
 Qed.
 
 (* TODO(reiniscirpons): In general many of the prior lemmas we have developed
@@ -309,13 +332,13 @@ Qed.
    theory is there.
 *)
 Lemma inv_word_cons:
-  forall w a, inv_word (a::w) = (inv_word w) ++ [:: invl a].
+  forall w a, inv_word (a::w) = (inv_word w) ++ [:: a^~1].
 Proof.
   by move => w a; rewrite /inv_word rev_cons map_rcons cats1.
 Qed.
 
 Lemma inv_word_rcons:
-  forall w a, inv_word (rcons w a) = invl a :: inv_word w.
+  forall w a, inv_word (rcons w a) =  a^~1 :: inv_word w.
 Proof.
   by move => w a; rewrite /inv_word rev_rcons.
 Qed.
@@ -335,31 +358,31 @@ Proof.
 Qed.
 
 
-HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
+HB.instance Definition _ := isGroup.Build G inv_word inv_word_mul inv_word_left inv_word_right.
 
 End InvertiblePresentedGroup.
 
-Section Cancelation.
+Section Cancellation.
 
 Variable P: invertiblePresentationType.
 Notation G := (presented P).
 
 Variable a x y : G.
 
-Lemma cancel_left : a @ x == a @ y -> x == y.
+Lemma cancel_left : a * x \approx a * y -> x \approx y.
 Proof.
 move=> H.
-rewrite -(neutral_left x) -(neutral_left y) -(inverse_right a) -!associativity.
+rewrite -(mul1g x) -(mul1g y) -(invVg a) -!mulgA.
 by rewrite H.
 Qed.
 
-Lemma cancel_right : x @ a == y @ a -> x == y.
+Lemma cancel_right : x * a \approx y * a -> x \approx y.
 Proof.
 move=> H.
-rewrite -(neutral_right x) -(neutral_right y) -(inverse_left a) !associativity.
+rewrite -(mulg1 x) -(mulg1 y) -(invgV a) !mulgA.
 by rewrite H.
 Qed.
 
-End Cancelation.
+End Cancellation.
 Arguments cancel_left {_}.
 Arguments cancel_right {_}.

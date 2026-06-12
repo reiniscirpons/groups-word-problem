@@ -8,6 +8,7 @@ Import GRing.Theory.
 
 From GWP Require Import Utils Equivalence.
 
+Open Scope nat_scope.
 Open Scope int_scope.
 Open Scope ring_scope.
 
@@ -18,6 +19,7 @@ Reserved Notation "*%sg" (at level 0).
 Declare Scope setoid_group_scope.
 Delimit Scope setoid_group_scope with sg.
 Local Open Scope setoid_group_scope.
+Bind Scope setoid_group_scope with Setoid.sort.
 
 HB.mixin Record isMonoid M of isSetoid M := {
   mul: M -> M -> M;
@@ -28,7 +30,10 @@ HB.mixin Record isMonoid M of isSetoid M := {
     mul one x \approx x;
   mulg1: forall x,
     mul x one \approx x;
-  mul_ext: Proper (approx ==> approx ==> approx) mul;
+  mul_extl: forall x y z,
+    x \approx y -> mul z x \approx mul z y;
+  mul_extr: forall x y z,
+    x \approx y -> mul x z \approx mul y z;
 }.
 #[short(type="monoid")]
 HB.structure Definition Monoid := { G of isMonoid G & isSetoid G }.
@@ -42,9 +47,13 @@ Local Notation "1" := (@one _) : setoid_group_scope.
 Section ProperMonoid.
 HB.declare Context G of isSetoid G & isMonoid G.
 
-Global Instance :
-  Proper (approx ==> approx ==> approx) (mul : G -> G -> G).
-Proof. exact: mul_ext. Qed.
+Global Instance : Proper
+  (approx ==> approx ==> approx) (mul: G -> G -> G).
+Proof.
+move=> a b eq_ab u v eq_uv; transitivity (a * v).
+- exact: mul_extl.
+- exact: mul_extr.
+Qed.
 
 End ProperMonoid.
 
@@ -391,7 +400,7 @@ Definition power {G: group} (w: G) (k: int) : G :=
   | Negz k => iter k.+1 (fun acc => w^-1 * acc) 1 (* Negx 0 is -1 *)
   end.
 
-Notation "x ^ n" := (power x n) : setoid_group_scope.
+Local Notation "x ^ n" := (power x n) : setoid_group_scope.
 
 Lemma power0 {G: group} (w: G): w ^ 0 = 1.
 Proof. done. Qed.
@@ -619,7 +628,6 @@ rewrite !power_inv -morphism_preserve_inv.
 by rewrite morphism_preserve_power_pos.
 Qed.
 
-
 #[short(type="deceqGroupType")]
 HB.structure Definition DecEqGroup :=
   { G of isGroup G & isSetoid G & isMonoid G & hasDecEq G }.
@@ -843,18 +851,28 @@ Proof. move=> x; by rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgro
 Lemma subgroupby_mulg1: forall (x: subgroup_by), subgroupby_law x subgroupby_neutral \approx x.
 Proof. move=> x; by rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/= mulg1. Qed.
 
-Lemma subgroupby_mul_ext: Proper (approx ==> approx ==> approx) subgroupby_law.
+Lemma subgroupby_mul_extl: forall (x y z: subgroup_by),
+  x \approx y -> subgroupby_law z x \approx subgroupby_law z y.
 Proof.
-move=> x y H x1 y1.
+move=> x y H.
 rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/=.
-exact: mul_ext.
+exact: mul_extl.
+Qed.
+
+Lemma subgroupby_mul_extr: forall (x y z: subgroup_by),
+  x \approx y -> subgroupby_law x z \approx subgroupby_law y z.
+Proof.
+move=> x y H.
+rewrite /subgroupby_law/= /approx/= /subgroupby_eq/= /subgroupby_inj/=.
+exact: mul_extr.
 Qed.
 
 
 HB.instance Definition _ := isMonoid.Build
-  subgroup_by
+  subgroup_by subgroupby_law
   subgroupby_neutral subgroupby_mulgA
-  subgroupby_mul1g subgroupby_mulg1 subgroupby_mul_ext.
+  subgroupby_mul1g subgroupby_mulg1
+  subgroupby_mul_extl subgroupby_mul_extr.
 
 Definition subgroupby_inv: subgroup_by -> subgroup_by.
 Proof.
@@ -987,3 +1005,9 @@ HB.instance Definition _ := isSubgroupCharacterizer.Build G is_in_intersection i
 Definition intersection := subgroup_by is_in_intersection.
 
 End SubgroupIntersection.
+
+Notation "*%g" := (@mul _) : function_scope.
+Notation "x * y" := (mul x y) : setoid_group_scope.
+Notation "1" := (@one _) : setoid_group_scope.
+Notation "x ^-1" := (inv x) : setoid_group_scope.
+Notation "x ^ n" := (power x n) : setoid_group_scope.

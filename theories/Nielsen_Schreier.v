@@ -1146,7 +1146,7 @@ HB.instance Definition _ :=
 (* Note(mathis): the type annotations are necessary *)
 Definition second_reduce_step (gens: vec) :=
   let igens := enumerate gens in
-  let potential_reduc := allpairs (fun a b => (a, b)) igens igens in
+  let potential_reduc := filter (fun '((ix, x), (iy, y)) => ix != iy) (allpairs (fun a b => (a, b)) igens igens) in
   flatten (map (fun '(((ix, x), (iy, y)) : (nat * word) * (nat * word)) => pmap
       (fun '(k, xy) =>
         if ((xy < x)%O) then
@@ -1168,6 +1168,8 @@ Proof.
   case: (boolP (w < px)%O) => [Ht | Hf]; last first.
   + by move/negbTE in Hf; rewrite Hf in weq.
   rewrite Ht in weq; move: weq => [eqk eqixpix eqiypiy eqxyw].
+
+  rewrite mem_filter in pin; move/andP: pin => [diffpixpiy pin].
 
   move/allpairsP: pin => [[[qix qx] [qiy qy]] [q1in q2in [eqpixqix eqpxqx eqpiyqiy eqpyqy]]].
   rewrite /= in q1in q2in.
@@ -1230,8 +1232,12 @@ Proof.
   case: (boolP (w < px)%O) => [Ht | Hf]; last first.
   + by move/negbTE in Hf; rewrite Hf in weq.
   rewrite Ht in weq; move: weq => [eqk eqixpix eqiypiy eqxyw].
+  rewrite mem_filter in pin; move/andP: pin => [diffpixpiy pin].
   move/allpairsP: pin => [[[qix qx] [qiy qy]] [q1in q2in [eqpixqix eqpxqx eqpiyqiy eqpyqy]]].
   rewrite /= in q1in q2in.
+
+  have diffixiy : ix <> iy.
+    by rewrite eqixpix eqiypiy; apply/eqP.
 
   have szx : (ix < size gens)%N.
       by rewrite eqixpix eqpixqix (@bound_enumerate _ e 0 gens qix qx q1in).
@@ -1249,7 +1255,7 @@ Proof.
   case: eqP => [Hkt | Hdiff1] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
 
-    have Hleq : (t1 (t2 (t1 gens iy) ix iy (second_reduce_step_neq gens k ix iy xy t Heq)) iy <=
+    have Hleq : (t1 (t2 (t1 gens iy) ix iy diffixiy) iy <=
       set_nth e gens ix (FreeGroup_norm (nth e gens ix @ inv (nth e gens iy))) :> vec)%O.
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
         rewrite t1_preserve_size t2_preserve_size t1_preserve_size.
@@ -1267,8 +1273,8 @@ Proof.
           apply /trans. apply /congruent_left; apply /FreeGroup_norm_correct.
           apply /symm /FreeGroup_norm_correct.
           + by apply/eqP.
-        + by apply /not_eq_sym /(second_reduce_step_neq gens k ix iy xy t Heq).
-        + by apply /not_eq_sym /(second_reduce_step_neq gens k ix iy xy t Heq).
+        + by apply /not_eq_sym /diffixiy.
+        + by apply /not_eq_sym /diffixiy.
         by apply: CmpOrder.cmp_refl.
       - apply /CmpOrder.cmp_congr_left.
         apply /(@FreeGroup_norm_unique _ _ (nth e (set_nth e gens ix (FreeGroup_norm (nth e gens ix @ inv (nth e gens iy)))) i)).
@@ -1304,7 +1310,7 @@ Proof.
   case: eqP => [Hkt | Hdiff2] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
 
-    have Hleq : (t2 (t1 gens ix) ix iy (second_reduce_step_neq gens k ix iy xy t Heq) <=
+    have Hleq : (t2 (t1 gens ix) ix iy diffixiy <=
       set_nth e gens ix (FreeGroup_norm (inv(nth e gens ix) @ nth e gens iy)) :> vec)%O.
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
         rewrite t2_preserve_size t1_preserve_size.
@@ -1322,7 +1328,7 @@ Proof.
           apply /congruent_right; apply /FreeGroup_norm_correct.
           apply /symm /FreeGroup_norm_correct.
           + by apply/eqP.
-        + by apply /(second_reduce_step_neq gens k ix iy xy t Heq).
+        + by apply /diffixiy.
         by apply: CmpOrder.cmp_refl.
       - apply /CmpOrder.cmp_congr_left.
         apply /(@FreeGroup_norm_unique _ _ (nth e (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ nth e gens iy))) i)).
@@ -1334,7 +1340,7 @@ Proof.
             by [].
             + by rewrite -Hyt; apply/eqP.
             + by  rewrite -Hyt; apply/not_eq_sym.
-            + by apply /(second_reduce_step_neq gens k ix iy xy t Heq).
+            + by apply /diffixiy.
           - rewrite t2_neutral; last first.
             + by apply/not_eq_sym.
             rewrite t1_neutral; last first.
@@ -1358,7 +1364,7 @@ Proof.
     rewrite -eqk in win; rewrite Hkt in win.
 
     have Hleq : (t1 (t2 (t1 (t1 gens iy) ix) ix iy
-      (second_reduce_step_neq gens k ix iy xy t Heq)) iy <=
+      diffixiy) iy <=
       set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy))) :> vec)%O.
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
       rewrite [size (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy))))] eq_size_setnth.
@@ -1366,7 +1372,7 @@ Proof.
       + by [].
       move => i ibound.
       have happrox: (nth e (t1 (t2 (t1 (t1 gens iy) ix) ix iy
-                    (second_reduce_step_neq gens k ix iy xy t Heq)) iy) i) ==
+                    diffixiy) iy) i) ==
                     nth e (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy)))) i.
         case: (i =P ix) => [Hxt | Hxf].
         - rewrite Hxt t1_neutral.
@@ -1379,9 +1385,9 @@ Proof.
             rewrite ifT.
             + by [].
             + by [].
-            + by apply /(second_reduce_step_neq gens k ix iy xy t Heq).
-            + by apply /not_eq_sym /(second_reduce_step_neq gens k ix iy xy t Heq).
-            + by apply /not_eq_sym /(second_reduce_step_neq gens k ix iy xy t Heq).
+            + by apply /diffixiy.
+            + by apply /not_eq_sym /diffixiy.
+            + by apply /not_eq_sym /diffixiy.
         - case: (i =P iy) => [Hyt | Hyf].
           - rewrite Hyt.
             rewrite t1_inv t2_neutral.
@@ -1390,7 +1396,7 @@ Proof.
             rewrite ifF.
             by apply /FreeGroup_norm_correct.
             + by rewrite Hyt in Hxf; apply/eqP.
-            +1-2 : by apply /(second_reduce_step_neq gens k ix iy xy t Heq).
+            +1-2 : by apply /diffixiy.
           - rewrite t1_neutral; last first.
             + by apply /not_eq_sym.
             rewrite t2_neutral; last first.
@@ -1440,53 +1446,6 @@ Proof.
     by move: (leq_ltn_trans kofb kinb).
 Qed.
 
-
-
-(*
-  case: (boolP (k == 0)) => [Ht | Hf] //=.
-    - case (boolP ((length (FreeGroup_norm ((x @ y) @ z)) <=
-            length (FreeGroup_norm x) +
-            length (FreeGroup_norm z) -
-            length (FreeGroup_norm y))%N)) => [HifT | Habs]; last first.
-      - move/negbTE in Habs.
-        by rewrite Habs in opteq.
-      rewrite HifT in opteq.
-
-      case (boolP ((FreeGroup_norm (x @ y) < x)%O)) => [HifoT | Habs]; last first.
-      - move/negbTE in Habs; rewrite Habs in opteq.
-        case (boolP ((FreeGroup_norm (y @ z) < z)%O)) => [Habsl | Habsr].
-        - by rewrite Habsl in opteq; move/eqP in Ht; rewrite Ht in opteq.
-        - by move/negbTE in Habsr; rewrite Habsr in opteq.
-      rewrite HifoT in opteq; move: opteq => [eqk eqixjx eqiyjy].
-    
-      rewrite /t2 lt_set_nth_sizelexi //=.
-      + by rewrite eqixjx eqjxia eqiaiw; apply (@bound_enumerate _ e 0 gens iw w q1in).
-      + by apply: decreasing_stepLeft; rewrite -eqk; apply: Heq.
-    - case (boolP ((length (FreeGroup_norm ((x @ y) @ z)) <=
-            length (FreeGroup_norm x) +
-            length (FreeGroup_norm z) -
-            length (FreeGroup_norm y))%N)) => [HifT | Habs]; last first.
-      - move/negbTE in Habs.
-        by rewrite Habs in opteq.
-      rewrite HifT in opteq.
-      case (boolP ((FreeGroup_norm (x @ y) < x)%O)) => [Habs | HifoF].
-      - rewrite Habs in opteq; move: opteq => [eqk _ _].
-        by rewrite eqk in Hf.
-      move/negbTE in HifoF; rewrite HifoF in opteq.
-      case (boolP ((FreeGroup_norm (y @ z) < z)%O)) => [HifoT | Habs]; last first.
-      - by move/negbTE in Habs; rewrite Habs in opteq.
-      rewrite HifoT in opteq.
-      move: opteq => [eqk eqixjz eqiyjy].
-      have ixbound : (ix < size gens)%N.
-        rewrite eqixjz eqjzic.
-        by apply (@bound_enumerate _ e 0 _ ic c).
-      have iybound : (iy < size gens)%N.
-        rewrite eqiyjy eqjyib eqibiu.
-        by apply (@bound_enumerate _ e 0 _ iu u).
-
-      
-Qed.
-*)
 
 Next Obligation.
 Proof.

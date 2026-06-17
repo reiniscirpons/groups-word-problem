@@ -9,6 +9,6 @@ theories/LM2.v
 theories/Presentation.v
 theories/ReductionUtils.v
 theories/Utils.v
-theories/sizelexi.v
-theories/well_founded.v
-theories/preorder.v
+theories/Sizelexi.v
+theories/WellFounded.v
+theories/Preorder.v

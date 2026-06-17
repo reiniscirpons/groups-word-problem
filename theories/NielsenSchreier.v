@@ -418,6 +418,133 @@ Proof.
   by rewrite Hw Hxy.
 Qed.
 
+Lemma prod_congr (u v : vec) (eqsz: size u = size v) (Happrox: forall i, (i < size u)%N -> (nth e u i == nth e v i)):
+  prod u == prod v.
+Proof.
+  elim: u v eqsz Happrox => [| w].
+  + rewrite /=; move => v eqsz0 Happrox.
+    have eqv: v = [::].
+      by apply size0nil.
+    by rewrite eqv /=.
+  + move => l IH v eqsz Happrox.
+    rewrite /= in eqsz.
+    have eqv: v = (nth e v 0) :: (drop 1 v).
+      rewrite -(@drop_nth _ e _ _); first by rewrite drop0.
+      + by rewrite -eqsz.
+    rewrite eqv /prod /=.
+    have eqszt: size l = size (drop 1 v).
+      by rewrite size_drop; lia.
+    apply /trans.
+    + apply /congruent_left /IH; first by apply eqszt.
+      move => i ibound.
+      rewrite nth_drop.
+      have eqi: (1+i < size (w::l))%N.
+        by rewrite /=; lia.
+      move: (Happrox (1+i) (eqi)) => Hinst.
+      by rewrite -nth_behead /= in Hinst.
+    + apply /congruent_right.
+      by apply: (Happrox 0).
+Qed.
+
+Lemma igs_set_nth (v: vec) (i: nat) (ibound: (i < size v)%N) (x: FreeGroup Sigma):
+  (x == nth e v i) -> forall y, in_generated_subgroup (set_nth e v i x) y <-> in_generated_subgroup v y.
+Proof.
+  move => approxxnth y.
+  have eqsz: size (set_nth e v i x) = size v.
+    by rewrite size_set_nth; apply/maxn_idPr.
+  split.
+  - move => Hin; rewrite /in_generated_subgroup in Hin; move: Hin => [w approxw].
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen in approxw.
+    rewrite eqsz in w approxw.
+    exists(w).
+    + rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen.
+      apply /trans.
+      apply /prod_congr.
+      have eqsz_seq: size (map (fun c : InverseAlphabet 'I_(size v) =>
+                      match c with
+                      | Base a => nth e v a
+                      | Inverse a => inv (nth e v a)
+                      end) w) = size (map (fun c : InverseAlphabet 'I_(size v) =>
+                      match c with
+                      | Base a => nth e (set_nth e v i x) a
+                      | Inverse a => inv (nth e (set_nth e v i x) a)
+                      end) w).
+        by rewrite !size_map.
+      + by rewrite eqsz_seq.
+      + move => k kbound.
+        have hbound : (0 < size v)%N.
+          by apply: (leq_ltn_trans (leq0n i) ibound).
+        rewrite !(@nth_map _ (Base (Ordinal (hbound)))).
+        case: (nth (Base (Ordinal (n:=size v) (m:=0) hbound)) w k).
+        + move => s.
+          pose s':= nat_of_ord s.
+          case: (s' =P i) => [Ht | Hf].
+          - rewrite /s' in Ht; rewrite Ht  nth_set_nth /=.
+            rewrite ifT //=.
+            by apply symm.
+          - rewrite /s' in Hf; rewrite nth_set_nth /=.
+            rewrite ifF; last by apply/eqP.
+            by apply refl.
+        + move => s.
+          pose s':= nat_of_ord s.
+          case: (s' =P i) => [Ht | Hf].
+          - rewrite /s' in Ht; rewrite Ht  nth_set_nth /=.
+            rewrite ifT //=.
+            by apply /symm; rewrite approxxnth.
+          - rewrite /s' in Hf; rewrite nth_set_nth /=.
+            rewrite ifF; last by apply/eqP.
+            by apply refl.
+        1-2: by rewrite size_map in kbound.
+      + by  assumption.
+  - move => Hin; rewrite /in_generated_subgroup in Hin; move: Hin => [w approxw].
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen in approxw.
+    rewrite -eqsz in w approxw.
+    exists(w).
+    + rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen.
+      apply /trans.
+      apply /symm /prod_congr.
+      have eqsz_seq: size (map (fun c : InverseAlphabet 'I_(size (set_nth e v i x)) =>
+                      match c with
+                      | Base a => nth e v a
+                      | Inverse a => inv (nth e v a)
+                      end) w) = size (map (fun c : InverseAlphabet 'I_(size (set_nth e v i x)) =>
+                      match c with
+                      | Base a => nth e (set_nth e v i x) a
+                      | Inverse a => inv (nth e (set_nth e v i x) a)
+                      end) w).
+        by rewrite !size_map.
+      + by apply eqsz_seq.
+      + move => k kbound.
+        have hbound : (0 < size (set_nth e v i x))%N.
+          rewrite size_set_nth.
+          by lia.
+        rewrite !(@nth_map _ (Base (Ordinal (hbound)))).
+        case: (nth (Base (Ordinal hbound)) w k).
+        + move => s.
+          pose s':= nat_of_ord s.
+          case: (s' =P i) => [Ht | Hf].
+          - rewrite /s' in Ht; rewrite Ht  nth_set_nth /=.
+            rewrite ifT //=.
+            by apply symm.
+          - rewrite /s' in Hf; rewrite nth_set_nth /=.
+            rewrite ifF; last by apply/eqP.
+            by apply refl.
+        + move => s.
+          pose s':= nat_of_ord s.
+          case: (s' =P i) => [Ht | Hf].
+          - rewrite /s' in Ht; rewrite Ht  nth_set_nth /=.
+            rewrite ifT //=.
+            by apply /symm; rewrite approxxnth.
+          - rewrite /s' in Hf; rewrite nth_set_nth /=.
+            rewrite ifF; last by apply/eqP.
+            by apply refl.
+        1-2: by rewrite size_map in kbound.
+      + by  assumption.
+Qed.
+
+    
+
+
 Lemma norm_igs (v : vec) (x : FreeGroup Sigma) (H: in_generated_subgroup v (FreeGroup_norm x)):
   in_generated_subgroup v x.
 Proof.
@@ -529,8 +656,7 @@ Proof.
   rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension in Hx.
   have: forall y, y \in [seq match c with
     | Base a => nth_gen gens a
-    | Inverse a => inv (nth_gen gens
-    a)
+    | Inverse a => inv (nth_gen gens a)
     end
     | c <- wx] -> in_generated_subgroup (t1 gens i) y.
   move => y.
@@ -676,56 +802,6 @@ Proof.
       move/negPn in Hniinf.
       by [].
 Qed.
-
-Lemma t2_conj_t1 (gens : vec) (ix iy : nat) (hboundx: (ix < size gens)%N) (hboundy: (iy < size gens)%N) (h: ix <> iy):
-  forall k, nth e (t1 (t1 (t2 (t1 (t1 gens iy) ix) ix iy h) ix) iy) k == nth e (set_nth e gens ix (FreeGroup_norm (nth e gens iy @ nth e gens ix))) k.
-Proof.
-  have tszeq : size (t1 (t1 (t2 (t1 (t1 gens iy) ix) ix iy h) ix) iy) = size gens.
-    by rewrite t1_preserve_size t1_preserve_size t2_preserve_size t1_preserve_size t1_preserve_size.
-  have szeq : size (set_nth e gens ix (FreeGroup_norm (nth e gens iy @ nth e gens ix))) = size gens.
-    rewrite size_set_nth /maxn.
-    case (boolP (ix.+1 < size gens)%N) => [Ht | Hf].
-      - by rewrite Ht.
-      move/negbTE in Hf; rewrite Hf; rewrite ltnNge in Hf; move/negbFE in Hf.
-      by apply/eqP; rewrite eqn_leq Hf hboundx.
-  move => k.
-  case (k =P iy) => [HyT | HyF] //=.
-    - rewrite HyT t1_inv nth_set_nth /=.
-      rewrite ifF; last first.
-      + by apply/negbTE /eqP /not_eq_sym.
-      rewrite t1_neutral; last first.
-      + by [].
-      rewrite t2_neutral; last first.
-      + by [].
-      rewrite t1_neutral; last first.
-      + by [].
-      by rewrite t1_inv !FreeGroup_norm_inv FreeGroup_norm_involutive inv_involutive FreeGroup_norm_correct.
-    - case (k =P ix) => [HxT | HxF]; last first.
-      - rewrite nth_set_nth /=.
-        rewrite ifF; last first.
-        + by apply/negbTE /eqP.
-        rewrite !t1_neutral.
-        rewrite t2_neutral.
-        rewrite !t1_neutral.
-        by [].
-        1-5: by apply /not_eq_sym.
-      - rewrite HxT t1_neutral.
-        rewrite nth_set_nth /=.
-        rewrite ifT; last first.
-        + by [].
-        rewrite t1_inv.
-        have Hinter : FreeGroup_norm (inv (nth e (t2 (t1 (t1 gens iy) ix) ix iy h) ix)) == inv (nth e (t2 (t1 (t1 gens iy) ix) ix iy h) ix).
-          by apply: FreeGroup_norm_correct.
-        rewrite Hinter.
-        rewrite -t2_change t1_inv t1_neutral.
-        rewrite t1_neutral.
-        rewrite t1_inv.
-        rewrite inverse_law !FreeGroup_norm_inv !inv_involutive FreeGroup_norm_law.
-        by apply /symm /FreeGroup_norm_correct.
-        by [].
-        1-2: by apply: not_eq_sym.
-Qed.
-
 
 Lemma t2_include_subgroup (gens: vec) (i j : nat) (Hibound: (i < size gens)%N) (Hjbound: (j < size gens)%N) (h: i <> j):
   forall x, (in_generated_subgroup gens x -> in_generated_subgroup (t2 gens i j h) x).
@@ -1434,7 +1510,7 @@ Proof.
     + by apply: Hleq.
     + by apply: Hlt.
 
-    (* the else case, cannot happen *)
+    (* the else case cannot happen *)
     exfalso.
     have kofb: (k > 3)%N.
       by lia.

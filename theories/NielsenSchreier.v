@@ -302,6 +302,235 @@ Definition t1 (v: vec) (i : nat) :=
 End Nielsen_Construction.
 
 
+Section WordSplitting.
+
+Context {Sigma: finType}.
+Notation word := (FreeGroup Sigma).
+Notation vec := (seq word).
+
+Variable gens : vec.
+
+Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
+
+
+Lemma prefix_size {T: eqType} (x y z: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
+  prefix x y.
+Proof.
+  apply/prefixP.
+  move/prefixP: prefxz => [s eqs].
+  move/prefixP: prefyz => [s' eqs'].
+  have prefcat: prefix x (y ++ s').
+    by apply/prefixP; exists (s); rewrite -eqs.
+  
+
+
+Fixpoint lprefix (x y : FreeGroup Sigma) := match x, y with
+  | [::], _ => [::]
+  | _, [::] => [::]
+  | a::t, b::t' =>
+    if (a == b) then
+      a::(lprefix t t')
+    else [::]
+  end.
+
+Lemma lprefix_neutral (a a': sigma (FGP Sigma)) (diff: a <> a') (l l': seq _):
+  lprefix (a::l) (a'::l') = [::].
+Proof.
+  rewrite /lprefix /=.
+  rewrite ifF //.
+  by apply/eqP.
+Qed.
+
+Lemma lprefix0nil (x: FreeGroup Sigma):
+  lprefix x [::] = [::].
+Proof.
+  rewrite /lprefix /=.
+  case: x => //.
+Qed.
+
+Lemma lprefix_cons (a: sigma (FGP Sigma)) (l l': seq _):
+  lprefix (a::l) (a::l') = a::(lprefix l l').
+Proof.
+  rewrite {1}/lprefix /=.
+  rewrite ifT //.
+Qed.
+
+Lemma lprefix_cat (v t t': FreeGroup Sigma):
+  lprefix (v ++ t) (v ++ t') = v ++ (lprefix t t').
+Proof.
+  elim: v => [|a l IH].
+  - by rewrite !cat0s.
+  - by rewrite [lprefix ((a :: l) ++ t) ((a :: l) ++ t')]lprefix_cons cat_cons IH.
+Qed.
+
+Definition lKprefix (x y : FreeGroup Sigma) :=
+  lprefix (inv x) y.
+
+Lemma lprefix_correct_right (x y: FreeGroup Sigma):
+  prefix (lprefix x y) y.
+Proof.
+  elim: x y => [y| a l prefixly y].
+  - by rewrite /=; apply /prefix0s.
+  - elim: y => [| a' l' prefixall'] //.
+    case: (a =P a') => [Ht | Hf].
+    + by rewrite Ht lprefix_cons prefix_cons (prefixly l') andbC /=.
+    + rewrite lprefix_neutral; first by apply /prefix0s.
+      by assumption.
+Qed.
+
+Lemma lprefixC (x y : FreeGroup Sigma):
+  lprefix x y = lprefix y x.
+Proof.
+  elim: x y => [y | a l prefixly y].
+  - by rewrite /= lprefix0nil.
+  - case: y => [//| a' l'].
+    case: (a =P a') => [Ht | Hf].
+      - by rewrite Ht !lprefix_cons (prefixly l').
+      - rewrite !lprefix_neutral //=.
+        by apply /not_eq_sym.
+Qed.
+
+Lemma lprefix_correct_left (x y: FreeGroup Sigma):
+  prefix (lprefix x y) x.
+Proof.
+  by rewrite lprefixC lprefix_correct_right.
+Qed.
+
+Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
+  freely_reduced x.
+Proof.
+  rewrite /freely_reduced /=.
+  move => p s c.
+  move => Habs.
+  move/infixP: sub => [s0 [s0' eqy]].
+  rewrite Habs -[(p ++ [:: invl (c: sigma(FGP Sigma)),  c  & s]) ++ s0']catA !cat_cons catA in eqy.
+  have hcontradict: y <> (s0 ++ p) ++ [:: invl (c: sigma(FGP Sigma)), c & s ++ s0'].
+    rewrite /freely_reduced in fry.
+    apply (fry (s0 ++ p) (s ++ s0') c).
+  contradiction.
+Qed.
+
+Lemma freely_reduced_inv (x: FreeGroup Sigma) (frx: freely_reduced x):
+  freely_reduced (inv x).
+Proof.
+  rewrite /inv /= /inv_word map_rev.
+  apply freely_reduced_rev.
+  elim: x frx => [ frx| a l IH frx].
+  - by rewrite /=.
+  - rewrite map_cons.
+    elim: l IH frx  => [IH frx|a' l' IH IH' frx].
+    - by rewrite /=; apply freely_reduced_cons1.
+    - rewrite /=.
+      apply /freely_reduced_cons2.
+      + move => Habs.
+        have Hcontradict: invl (invl a) = invl a'.
+          by rewrite invlK in Habs; apply f_equal.
+        rewrite invlK in Hcontradict.
+        rewrite /freely_reduced in frx.
+        move: (frx ([::]) (l') (a')) => frabs.
+        rewrite Hcontradict cat0s in frabs.
+        by [].
+      + apply IH'.
+        apply (@freely_reducedW _ ([:: a, a' &l'])) => //.
+        apply/infixP.
+        exists ([:: a]);
+        exists ([::]).
+        by rewrite cats0.
+Qed.
+
+Lemma inv_cons (a : sigma (FGP Sigma)) (t : FreeGroup Sigma):
+  inv (a :: t :> FreeGroup Sigma) = rcons (inv t) (invl a).
+Proof.
+  by rewrite /inv /= /inv_word map_rev map_cons rev_cons map_rev.
+Qed. 
+
+
+Lemma lKprefix_split (x y: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y):
+  exists (w w': FreeGroup Sigma), (
+    x == w ++ inv (lKprefix x y :> FreeGroup Sigma) /\
+    y == (lKprefix x y) ++ w' /\
+    freely_reduced (w ++ w')
+  ).
+Proof.
+  have prefixx: prefix (lKprefix x y) (inv x).
+    by rewrite /lKprefix lprefix_correct_left.
+  have prefixy: prefix (lKprefix x y) y.
+    by rewrite /lKprefix lprefix_correct_right.
+  move/prefixP: prefixx => [s' eqs'].
+  move/prefixP: prefixy => [sy' eqsy'].
+  have approx: (x == inv (lKprefix x y ++ s' :> FreeGroup Sigma)).
+    rewrite -eqs'.
+    by apply /symm /inv_involutive.
+  rewrite /inv /= inv_word_cat in approx.
+  exists (inv (s':>FreeGroup Sigma)).
+  exists (sy':>FreeGroup Sigma).
+  split.
+  - by [].
+  split.
+  - by rewrite {1}eqsy'.
+  case: s' eqs' approx => [eqs' appro | a l eqx approx].
+  - rewrite /=.
+    have yinfix: infix sy' y.
+      apply/infixP.
+      exists (lKprefix x y).
+      exists ([::]).
+      by rewrite cats0.
+    by apply (@freely_reducedW _ y).
+  - case: sy' eqsy' => [eqsy'|].
+    - rewrite cats0; apply freely_reduced_inv.
+      have frinvx: freely_reduced (inv x).
+        by apply freely_reduced_inv.
+      apply (@freely_reducedW _ (inv x)) => //.
+      apply/infixP.
+      exists (lKprefix x y).
+      exists [::].
+      by rewrite cats0.
+    - move => a' l' eqy.
+      rewrite inv_cons.
+      apply freely_reduced_cat; last first.
+      + apply (@freely_reducedW _ y) => //.
+        apply/infixP.
+        exists (lKprefix x y).
+        exists ([::]).
+        by rewrite cats0.
+      + rewrite -inv_cons.
+        apply freely_reduced_inv.
+        apply (@freely_reducedW _ (inv x)).
+        + by apply freely_reduced_inv.
+        apply/infixP.
+        exists (lKprefix x y).
+        exists ([::]).
+        by rewrite cats0.
+      + (* the only part about the function *)
+        move => Habs.
+        have eqaa': invl (invl a) = invl (invl a').
+          by rewrite (@f_equal _ _ invl _ (invl a')).
+        rewrite !invlK  in eqaa'.
+        rewrite eqaa' in eqx.
+        have heq: lprefix (inv x) y = (lKprefix x y) ++ (lprefix (a'::l) (a'::l')).
+          by rewrite {1}eqx {2}eqy lprefix_cat lprefix_cons.
+        rewrite lprefix_cons /lKprefix in heq.
+        have eqszabs: size (lprefix (inv x) y) = size (lprefix (inv x) y ++ a' :: lprefix l l').
+          by rewrite (@f_equal _ _ size _ (lprefix (inv x) y ++ a' :: lprefix l l')).
+        rewrite size_cat /= in eqszabs.
+        by lia.
+Qed.
+
+Definition lKprefix_all (y: FreeGroup Sigma) :=
+  head [::] (
+    sort (fun a b => (size a <= size b)%N) (
+      filter (fun a => a != y) (
+        map (fun x => lKprefix x y) U
+      )
+    )
+  ).
+
+Lemma lKprefix_all_correct (y: FreeGroup Sigma):
+    forall x, (x \in U) -> prefix (lKprefix x y) (lKprefix_all y).
+
+
+
+End WordSplitting.
 
 
 Section Nielsen_Axiom.

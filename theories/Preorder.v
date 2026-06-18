@@ -6,7 +6,7 @@ From mathcomp Require Import seq preorder order eqtype choice.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat.
 From mathcomp Require Import eqtype seq fintype all_algebra div.
 
-From GWP Require Import Equivalence EquivalenceAlgebra Presentation F2 well_founded sizelexi.
+From GWP Require Import Equivalence EquivalenceAlgebra Presentation F2 WellFounded Sizelexi.
 
 Local Open Scope order_scope.
 

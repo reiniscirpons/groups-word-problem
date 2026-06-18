@@ -17,7 +17,7 @@ From HB Require Import structures.
 From mathcomp Require Import all_boot all_order.
 
 
-From GWP Require Import well_founded.
+From GWP Require Import WellFounded.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

@@ -13,7 +13,7 @@ From mathcomp Require Import ring lra zify.
 
 Import GRing.Theory.
 
-From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation F2 GeneratedSubgroup sizelexi well_founded preorder.
+From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation F2 GeneratedSubgroup Sizelexi WellFounded Preorder.
 
 Open Scope ring_scope.
 
@@ -304,27 +304,31 @@ End Nielsen_Construction.
 
 Section WordSplitting.
 
-Context {Sigma: finType}.
-Notation word := (FreeGroup Sigma).
-Notation vec := (seq word).
+Section lprefix.
 
-Variable gens : vec.
+Context {T: eqType}.
 
-Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
-
-
-Lemma prefix_size {T: eqType} (x y z: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
+Lemma prefix_size (x y z: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
   prefix x y.
 Proof.
-  apply/prefixP.
   move/prefixP: prefxz => [s eqs].
   move/prefixP: prefyz => [s' eqs'].
   have prefcat: prefix x (y ++ s').
     by apply/prefixP; exists (s); rewrite -eqs.
-  
+  rewrite prefixE take_cat in prefcat.
+  case: (boolP (size x < size y)%N) => [Ht | Hf].
+  - rewrite Ht in prefcat.
+    by rewrite prefixE.
+  - have eqsz: size x = size y.
+      apply/eqP; rewrite eqn_leq.
+      by rewrite sz; rewrite ltnNge negbK in Hf; rewrite Hf.
+    rewrite eqsz in prefcat.
+    rewrite ifF in prefcat; last by apply: ltnn.
+    rewrite subnn take0 cats0 in prefcat; move/eqP in prefcat.
+    by rewrite prefcat prefix_refl.
+Qed.
 
-
-Fixpoint lprefix (x y : FreeGroup Sigma) := match x, y with
+Fixpoint lprefix (x y : seq T) := match x, y with
   | [::], _ => [::]
   | _, [::] => [::]
   | a::t, b::t' =>
@@ -333,7 +337,7 @@ Fixpoint lprefix (x y : FreeGroup Sigma) := match x, y with
     else [::]
   end.
 
-Lemma lprefix_neutral (a a': sigma (FGP Sigma)) (diff: a <> a') (l l': seq _):
+Lemma lprefix_neutral (a a': T) (diff: a <> a') (l l': seq _):
   lprefix (a::l) (a'::l') = [::].
 Proof.
   rewrite /lprefix /=.
@@ -341,21 +345,21 @@ Proof.
   by apply/eqP.
 Qed.
 
-Lemma lprefix0nil (x: FreeGroup Sigma):
+Lemma lprefix0nil (x: seq T):
   lprefix x [::] = [::].
 Proof.
   rewrite /lprefix /=.
   case: x => //.
 Qed.
 
-Lemma lprefix_cons (a: sigma (FGP Sigma)) (l l': seq _):
+Lemma lprefix_cons (a: T) (l l': seq _):
   lprefix (a::l) (a::l') = a::(lprefix l l').
 Proof.
   rewrite {1}/lprefix /=.
   rewrite ifT //.
 Qed.
 
-Lemma lprefix_cat (v t t': FreeGroup Sigma):
+Lemma lprefix_cat (v t t': seq T):
   lprefix (v ++ t) (v ++ t') = v ++ (lprefix t t').
 Proof.
   elim: v => [|a l IH].
@@ -363,10 +367,7 @@ Proof.
   - by rewrite [lprefix ((a :: l) ++ t) ((a :: l) ++ t')]lprefix_cons cat_cons IH.
 Qed.
 
-Definition lKprefix (x y : FreeGroup Sigma) :=
-  lprefix (inv x) y.
-
-Lemma lprefix_correct_right (x y: FreeGroup Sigma):
+Lemma lprefix_correct_right (x y: seq T):
   prefix (lprefix x y) y.
 Proof.
   elim: x y => [y| a l prefixly y].
@@ -378,7 +379,7 @@ Proof.
       by assumption.
 Qed.
 
-Lemma lprefixC (x y : FreeGroup Sigma):
+Lemma lprefixC (x y : seq T):
   lprefix x y = lprefix y x.
 Proof.
   elim: x y => [y | a l prefixly y].
@@ -390,11 +391,26 @@ Proof.
         by apply /not_eq_sym.
 Qed.
 
-Lemma lprefix_correct_left (x y: FreeGroup Sigma):
+Lemma lprefix_correct_left (x y: seq T):
   prefix (lprefix x y) x.
 Proof.
   by rewrite lprefixC lprefix_correct_right.
 Qed.
+
+End lprefix.
+
+Context {Sigma: finType}.
+Notation word := (FreeGroup Sigma).
+Notation vec := (seq word).
+
+Variable gens : vec.
+
+Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
+
+Hypothesis Ufred : forall u, (u \in U) -> freely_reduced u.
+
+Definition lKprefix (x y : FreeGroup Sigma) :=
+  lprefix (inv x) y.
 
 Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
   freely_reduced x.
@@ -516,9 +532,111 @@ Proof.
         by lia.
 Qed.
 
+
+Lemma invol_unique (x: FreeGroup Sigma):
+  (x == inv x) -> x == e.
+Proof.
+  have: forall n (y: FreeGroup Sigma), (size y = n)%N -> y == inv y -> y == e.
+    (* 2. Apply well-founded induction on the natural number n *)
+    elim/ltn_ind=> n IH y Hsize Hinv.
+    (* Case analysis on the size of the word *)
+    case: n IH Hsize => [| [| n']] IH.
+    - move=> /size0nil -> //.
+      
+    - move=> Hsize.
+      case: y Hinv Hsize => [// | a l approx sz].
+      rewrite /= in sz; move/succn_inj: sz => /size0nil sz0.
+      rewrite sz0 in approx.
+      have fra: [:: a] = FreeGroup_norm [:: a].
+        by [].
+      have frainv: inv ([:: a]: FreeGroup Sigma) = FreeGroup_norm (inv ([::a ]: FreeGroup Sigma)).
+        by [].
+      have: [:: a] = inv ([:: a]: FreeGroup Sigma).
+        by rewrite fra frainv (@FreeGroup_norm_unique _ _ (inv ([::a]: FreeGroup Sigma))) //=.
+      move => habs; rewrite /inv /= /inv_word /= in habs.
+      have habs': nth a [:: a] 0 = nth a [:: invl a] 0.
+        by rewrite habs.
+      rewrite /= in habs'.
+      exfalso.
+      rewrite /invl /= /FreeGroup_invl in habs'.
+      by case: a approx fra frainv habs habs' => approx fra frainv habs habs' //=.
+      
+    - (* Case n = n' + 2: x has at least 2 letters *)
+      move=> Hsize.
+      (* Deconstruct x into first letter, middle body, and last letter *)
+      case: y Hinv Hsize => [//| a l approx szl].
+      have lt0sz: (size l > 0)%N.
+          rewrite /= in szl.
+          case: szl => szl.
+          by rewrite szl ltn0Sn.
+      have eql': forall l, (0 < size l)%N -> l = rcons (take (size l - 1) l) (nth a l (size l -1)).
+        move => l' lt0szl'.
+        rewrite -take_nth.
+        have ->: (size l' -1 ).+1 = size l'.
+          by rewrite subn1 prednK.
+        by rewrite take_size.
+        by rewrite subn1 ltn_predL.
+
+      set s := FreeGroup_norm ((a :: l): word).
+      have leqsn'2: (size s <= n'.+2)%N.
+        rewrite -szl.
+        by apply: size_subseq; apply: FreeGroup_norm_subseq.
+
+      have approxs: ((a :: l):>FreeGroup Sigma) == s.
+        by apply /symm /FreeGroup_norm_correct.
+
+      have eqsinvs: s = inv s.
+        by rewrite -FreeGroup_norm_inv; apply FreeGroup_norm_unique.
+
+      case: (boolP (size s > 0)%N) => [eqszs | eqs0]; last first.
+      + rewrite ltnNge negbK leqn0 in eqs0; move/eqP: eqs0 => /size0nil eqs0.
+        apply/FreeGroup_dec_eqP; rewrite /FreeGroup_dec_eq.
+        change (FreeGroup_norm (a::l)) with s.
+        by rewrite eqs0.
+      case: s eqsinvs eqszs leqsn'2 approxs => [//| a' l'] eqsinvs eqszs leqsn'2 approxs.
+      case: (boolP (size l' > 0)%N) => [eqszl'| habs];  last first.
+      + rewrite ltnNge negbK leqn0 in habs; move/eqP: habs => /size0nil eqs0.
+        rewrite eqs0 in eqsinvs; move: eqsinvs => habs.
+        rewrite /inv /= /inv_word /= in habs.
+        have habs': nth a' [:: a'] 0 = nth a' [:: invl a'] 0.
+          by rewrite habs.
+        rewrite /= in habs'.
+        exfalso.
+        rewrite /invl /= /FreeGroup_invl in habs'.
+        by case: a' eqszs habs habs' leqsn'2 approxs => habs habs' leqsn'2 approxs //=.
+
+      move: (eql' l' eqszl') => decl'; rewrite decl' in eqsinvs.
+      rewrite /inv/=/inv_word/= rev_cons rev_rcons map_rcons map_cons rcons_cons in eqsinvs.
+      case: eqsinvs => eqhead /rcons_inj [eqtail eqlast].
+      rewrite /= in leqsn'2.
+      have middle_trivial: (take (size l'-1) l' :> FreeGroup Sigma) == e.
+        apply: IH; last first.
+        by rewrite {1}eqtail.
+        by apply: erefl.
+        rewrite size_take.
+        rewrite ifT.
+        + apply: ltn_trans; last first.
+          + by apply: leqsn'2.
+           + 1-2: by rewrite subn1 ltn_predL.
+
+      have tail_simpl: (l' :> FreeGroup Sigma) == [:: invl a'].
+        rewrite decl' rcons_law eqlast congruent_right.
+        + by apply: neutral_left.
+        + by assumption.
+
+      have s_trivial: ((a'::l'):>FreeGroup Sigma) == e.
+        by rewrite cons_law tail_simpl invl_left.
+      apply: trans.
+      + by apply: approxs.
+      + by assumption.
+
+  move => H approx; apply: (H  (size x) x (erefl) approx).
+Qed.
+
+
 Definition lKprefix_all (y: FreeGroup Sigma) :=
   head [::] (
-    sort (fun a b => (size a <= size b)%N) (
+    sort (fun a b => (size b <= size a)%N) (
       filter (fun a => a != y) (
         map (fun x => lKprefix x y) U
       )
@@ -526,7 +644,14 @@ Definition lKprefix_all (y: FreeGroup Sigma) :=
   ).
 
 Lemma lKprefix_all_correct (y: FreeGroup Sigma):
-    forall x, (x \in U) -> prefix (lKprefix x y) (lKprefix_all y).
+  forall x, (lKprefix_all y != [::]) -> (x \in U) -> prefix (lKprefix x y) (lKprefix_all y).
+Proof.
+  move => x.
+  rewrite /lKprefix_all.
+
+  have prefxy: prefix (lKprefix x y) y.
+    by rewrite /lKprefix lprefix_correct_right.
+Admitted.
 
 
 

@@ -308,7 +308,7 @@ Section lprefix.
 
 Context {T: eqType}.
 
-Lemma prefix_size (x y z: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
+Lemma prefix_size (z x y: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
   prefix x y.
 Proof.
   move/prefixP: prefxz => [s eqs].
@@ -326,6 +326,28 @@ Proof.
     rewrite ifF in prefcat; last by apply: ltnn.
     rewrite subnn take0 cats0 in prefcat; move/eqP in prefcat.
     by rewrite prefcat prefix_refl.
+Qed.
+
+Lemma prefix_eq (x y: seq T) (Hpref: prefix x y) (Hsz: size x = size y):
+  x = y.
+Proof.
+  move/prefixP: Hpref => [s' eqy].
+  rewrite eqy.
+  have snil: s' = [::].
+    apply: size0nil; move/(@f_equal _ _ size _ (x ++ s')) in eqy.
+    rewrite size_cat Hsz in eqy.
+    by lia.
+  by rewrite snil cats0.
+Qed.
+
+Lemma cat_prefix (x y w w': seq T):
+  prefix x y -> x ++ w = y ++ w' -> suffix w' w.
+Proof.
+  move=> /prefixP [v ->] Heq.
+  rewrite -catA in Heq.
+  move/eqP in Heq; rewrite eqseq_cat // eqxx /= in Heq; move/eqP in Heq.
+  apply/suffixP.
+  by exists v.
 Qed.
 
 Fixpoint lprefix (x y : seq T) := match x, y with
@@ -406,8 +428,6 @@ Notation vec := (seq word).
 Variable gens : vec.
 
 Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
-
-Hypothesis Ufred : forall u, (u \in U) -> freely_reduced u.
 
 Definition lKprefix (x y : FreeGroup Sigma) :=
   lprefix (inv x) y.
@@ -537,7 +557,6 @@ Proof.
         by lia.
 Qed.
 
-
 Lemma invol_unique (x: FreeGroup Sigma):
   (x == inv x) -> x == e.
 Proof.
@@ -638,27 +657,93 @@ Proof.
   move => H approx; apply: (H  (size x) x (erefl) approx).
 Qed.
 
+Lemma lKprefix_e (y: FreeGroup Sigma):
+  lKprefix y y = y -> y == e.
+Proof.
+  move => H.
+  rewrite /lKprefix in H.
+  have pref: prefix y (inv y).
+    by rewrite -{1}H; apply: lprefix_correct_left.
+  have eqsz: size (inv y) = size y.
+    by rewrite /inv/=/inv_word/= map_rev size_rev size_map.
+  have eqyinvy: y = inv y.
+    by apply: prefix_eq.
+  have approxy: y == inv y.
+    by rewrite -eqyinvy.
+  by apply: invol_unique.
+Qed.
+
 
 Definition lKprefix_all (y: FreeGroup Sigma) :=
-  head [::] (
-    sort (fun a b => (size b <= size a)%N) (
-      filter (fun a => a != y) (
-        map (fun x => lKprefix x y) U
-      )
+  sort (fun a b => (size b <= size a)%N) (
+    filter (fun a => a != y) (
+      map (fun x => lKprefix x y) U
     )
   ).
 
-Lemma lKprefix_all_correct (y: FreeGroup Sigma):
-  forall x, (lKprefix_all y != [::]) -> (x \in U) -> prefix (lKprefix x y) (lKprefix_all y).
+Lemma lKprefix_allW (y: FreeGroup Sigma) :
+  forall z, z \in (lKprefix_all y) -> z \in [seq lKprefix x y | x <- U].
 Proof.
-  move => x.
-  rewrite /lKprefix_all.
+  move => z zin.
+  by rewrite /lKprefix_all mem_sort mem_filter in zin; move/andP: zin => [condz zin].
+Qed.
 
-  have prefxy: prefix (lKprefix x y) y.
-    by rewrite /lKprefix lprefix_correct_right.
-Admitted.
+Lemma lKprefix_all_nil (y : FreeGroup Sigma):
+  (y \in U) -> lKprefix_all y = [::] -> y == e.
+Proof.
+  move => yinU H; rewrite /lKprefix_all in H. move/(@f_equal _ _ size _ [::]) in H; rewrite size_sort /= in H.
+  rewrite size_filter in H; move/eqP in H.
+  rewrite -[(count (fun a : presented (FGP Sigma) => a != y) [seq lKprefix x y  | x <- U] == 0%N)%B]negbK -lt0n in H.
+  rewrite -has_count in H; move/hasPn in H.
+  set l := [seq lKprefix x y | x <- U].
+  have inmap: lKprefix y y \in l.
+    by apply/mapP; exists (y).
+  have eqpref: ~~ (lKprefix y y != y).
+    by apply: H.
+  rewrite negbK in eqpref; move/eqP in eqpref.
+  by apply: lKprefix_e.
+Qed.
 
 
+Lemma lKprefix_all_split (y: FreeGroup Sigma) (yinU: y \in U) (Hnontrivial: FreeGroup_norm y <> e): {w: FreeGroup Sigma |
+  w \in lKprefix_all y /\
+  ((lKprefix_all y != [::]) -> (forall x, (lKprefix x y != y) -> (x \in U) -> prefix (lKprefix x y) w))}.
+Proof.
+  case eqt: (lKprefix_all y) => [| a l].
+  + have habs: y == e  by apply: lKprefix_all_nil.
+    have habs': FreeGroup_norm y = FreeGroup_norm e.
+      by apply: FreeGroup_norm_unique.
+    rewrite /= in habs'.
+    contradiction.
+  rewrite /lKprefix_all; rewrite /lKprefix_all in eqt.
+  set t := sort (fun a b : seq (sigma (FGP Sigma)) => (size b <= size a)%N) [seq a <- [seq lKprefix x y  | x <- U]  | a != y].
+  exists (a); split; first by apply: mem_head.
+  move => hnonNil x lKdiff xinU.
+  have aint: a \in t.
+    by rewrite /t eqt mem_head.
+  rewrite mem_sort in aint.
+  rewrite mem_filter in aint; move/andP: aint => [conda ain].
+  move/mapP: ain => [z zinU eqza].
+
+  have H_ordered : sorted (fun a b => (size b <= size a)%N) (a :: l).
+    rewrite -eqt.
+    apply: sort_sorted.
+    move => c b; by apply: leq_total.
+  rewrite sorted_pairwise in H_ordered; last first.
+  + move => k m n leqkm leqnk.
+    by apply: (leq_trans leqnk).
+  rewrite pairwise_cons in H_ordered; move/andP: H_ordered => [hmax _].
+  have all_ext: all (fun b => (size b <= size a)%N) (a::l).
+    by rewrite /all; apply/andP; split.
+
+  apply: (prefix_size y); first by apply: lprefix_correct_right.
+  by rewrite eqza; apply: lprefix_correct_right.
+  move/allP in all_ext.
+  apply: all_ext.
+
+  rewrite -eqt mem_sort mem_filter; apply/andP; split; first by [].
+  by apply/mapP; exists (x).
+Qed.
 
 End WordSplitting.
 

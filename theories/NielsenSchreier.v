@@ -463,8 +463,8 @@ Qed.
 
 Lemma lKprefix_split (x y: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y):
   exists (w w': FreeGroup Sigma), (
-    x == w ++ inv (lKprefix x y :> FreeGroup Sigma) /\
-    y == (lKprefix x y) ++ w' /\
+    x = w ++ inv (lKprefix x y :> FreeGroup Sigma) /\
+    y = (lKprefix x y) ++ w' /\
     freely_reduced (w ++ w')
   ).
 Proof.
@@ -474,9 +474,14 @@ Proof.
     by rewrite /lKprefix lprefix_correct_right.
   move/prefixP: prefixx => [s' eqs'].
   move/prefixP: prefixy => [sy' eqsy'].
-  have approx: (x == inv (lKprefix x y ++ s' :> FreeGroup Sigma)).
+  have approx: (x = inv (lKprefix x y ++ s' :> FreeGroup Sigma)).
     rewrite -eqs'.
+    have ->: x = FreeGroup_norm x.
+      by apply/freely_reduced_correct.
+    rewrite -!FreeGroup_norm_inv (@FreeGroup_norm_unique  _ _ (inv (inv x))).
+    + by [].
     by apply /symm /inv_involutive.
+
   rewrite /inv /= inv_word_cat in approx.
   exists (inv (s':>FreeGroup Sigma)).
   exists (sy':>FreeGroup Sigma).

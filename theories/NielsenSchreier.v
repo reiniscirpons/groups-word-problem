@@ -451,6 +451,18 @@ Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
 Definition lKprefix (x y : FreeGroup Sigma) :=
   lprefix (inv x) y.
 
+Lemma size_inv (x: FreeGroup Sigma):
+  size (inv x) = size x.
+Proof.
+  by rewrite /inv/=/inv_word/= size_map size_rev.
+Qed.
+
+Lemma inv_cat (x y: FreeGroup Sigma):
+  inv (x ++ y :> FreeGroup Sigma) = inv y ++ inv x.
+Proof.
+  by rewrite /inv/=/inv_word/= map_rev map_cat rev_cat -!map_rev.
+Qed.
+
 Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
   freely_reduced x.
 Proof.
@@ -764,10 +776,27 @@ Proof.
   by apply/mapP; exists (x).
 Qed.
 
+Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
 Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
   (sz (x @ y) >= sz(x))%N.
 Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
   (sz(x @ y) >= sz(y))%N.
+
+Lemma non_trivialC (x y: FreeGroup Sigma):
+  non_trivial x y -> non_trivial y x.
+Proof.
+  move => H; rewrite /non_trivial -FreeGroup_norm_e; move => habs.
+  have approx: y @ x == e.
+    apply: (trans _ (FreeGroup_norm (y @ x))).
+    + by apply /symm /FreeGroup_norm_correct.
+    + by rewrite -FreeGroup_norm_e habs.
+    move/(congruent_right (inv x)) in approx.
+    rewrite -associativity neutral_left inverse_left neutral_right in approx.
+    move/(congruent_left x) in approx.
+    rewrite inverse_left in approx.
+    apply: H.
+    by rewrite -FreeGroup_norm_e (@FreeGroup_norm_unique _ _ e).
+Qed.
 
 Lemma lKprefix_contra (x y: FreeGroup Sigma)
 (frx: freely_reduced x) (fry: freely_reduced y):
@@ -792,7 +821,7 @@ Proof.
 Qed.
 
 Lemma lKsize_right (x y: FreeGroup Sigma) (xinU: x \in U) (frx: freely_reduced x)
-              (yinU: y \in U) (fry: freely_reduced y) (non_trivial: lKprefix x y <> y):
+              (yinU: y \in U) (fry: freely_reduced y) (ntrivial: non_trivial x y):
   (size (lKprefix x y) * 2 <= (size y))%N.
 Proof.
   move: (lKprefix_split x y frx fry) => [w [w' [eqx [eqy frprod]]]].
@@ -804,9 +833,6 @@ Proof.
   rewrite -eqwcatw' in eqprod.
 
   move/(@f_equal _ _ size _ (w++w')) in eqprod; rewrite size_cat in eqprod.
-  have ntrivial: FreeGroup_norm (x @ y) <> e.
-    move => Habs.
-    by apply: (non_trivial (lKprefix_contra x y frx fry Habs)).
   move: (N1_left x y xinU yinU ntrivial) => leqsz.
   rewrite freely_reduced_correct in frx.
   rewrite /sz eqprod -frx eqx size_cat leq_add2l /inv/=/inv_word/= size_map size_rev in leqsz.
@@ -814,32 +840,153 @@ Proof.
   by rewrite muln2 -addnn leq_add2l.
 Qed.
 
-Lemma triplet_lt (x y z: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y) (frz: freely_reduced z)
-  (xinU: x \in U) (yinU: y \in U) (zinU: z \in U) (non_trvxy: non_trivial):
-
-  (((x @ y) < x :> word)%O) \/ (((inv z @ inv y :> word) < (inv z))%O).
+Lemma lKsize_left (x y: FreeGroup Sigma) (xinU: x \in U) (frx: freely_reduced x)
+  (yinU: y \in U) (fry: freely_reduced y) (ntrivial: non_trivial x y):
+  (size (lKprefix x y) * 2 <= (size x))%N.
 Proof.
-  case: (boolP ((p: seqlexi _) < (q: seqlexi _))%O) => [Ht | Hf].
-  - right.
-    admit.
-  - left.
-    rewrite -Order.TotalTheory.leNgt Order.POrderTheory.le_eqVlt in Hf.
-    move/orP: Hf => [/eqP Heq | Hlt].
-    + rewrite Heq cat_law in eqy.
-      have habs: y == e.
-        by rewrite eqy inverse_left.
-      move/FreeGroup_norm_unique in habs.
-      rewrite freely_reduced_correct in fry.
-      rewrite -fry FreeGroup_norm_e in habs.
-      have eqsz0: size y = 0.
-        by move/(@f_equal _ _ size) in habs.
-      rewrite -cat_law in eqy; move/(@f_equal _ _ size) in eqy; rewrite size_cat eqsz0 in eqy; move/eqP in eqy.
-      rewrite eq_sym addn_eq0 in eqy; move/andP: eqy => [/eqP habs' _].
-      contradiction.
-    rewrite /Order.lt /= /CmpOrder.cmp_lt /CmpOrder.transform  /=.
+  move: (lKprefix_split x y frx fry) => [w [w' [eqx [eqy frprod]]]].
+  have eqprod: (x @ y) == w ++ w'.
+    by rewrite eqx {2}eqy !cat_law -associativity [inv (lKprefix x y :> FreeGroup Sigma) @ ((lKprefix x y :> FreeGroup Sigma) @ w')]associativity inverse_right neutral_left.
+  move/FreeGroup_norm_unique in eqprod.
+  have eqwcatw': w ++ w' = FreeGroup_norm (w ++ w').
+    by rewrite -freely_reduced_correct.
+  rewrite -eqwcatw' in eqprod.
+
+  move/(@f_equal _ _ size _ (w++w')) in eqprod; rewrite size_cat in eqprod.
+  move: (N1_right x y xinU yinU ntrivial) => leqsz.
+  rewrite freely_reduced_correct in fry.
+  rewrite /sz eqprod -fry eqy size_cat leq_add2r in leqsz.
+  rewrite {2}eqx size_cat.
+  by rewrite /inv/=/inv_word/= size_map size_rev muln2 -addnn leq_add2r.
+Qed.
+
+
+Lemma triplet_lt (x y z: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y) (frz: freely_reduced z)
+  (xinU: x \in U) (yinU: y \in U) (zinU: z \in U) (non_trvxy: non_trivial x y) (non_trvyz: non_trivial y z):
+
+  (((x @ y) < x :> word)%O) \/ ((((inv z @ inv y :> word) < (inv z))%O) \/ (exists u, u <> [::] /\ y = (lKprefix x y)  ++ u ++ inv (lKprefix y z :> FreeGroup Sigma))).
+Proof.
+  move: (lKprefix_split x y frx fry) => [a [w' [eqx [eqy frxy]]]].
+  move: (lKsize_right x y xinU frx yinU fry non_trvxy) => Hszxy.
+  move: (lKsize_left x y xinU frx yinU fry non_trvxy) => Hszx.
+
+  move: (lKprefix_split y z fry frz) => [v [c [eqy' [eqz fryz]]]].
+  move: (lKsize_right y z yinU fry zinU frz non_trvyz) => Hszz.
+  move: (lKsize_left y z yinU fry zinU frz non_trvyz) => Hszyz.
+
+  have leqszprefv: ((size v >= size (lKprefix x y))%N).
+    rewrite -(leq_pmul2l (ltn0Sn 1)).
+    apply: (@leq_trans (size y)).
+    + by rewrite mulnC.
+    move/(f_equal size) in eqy'; rewrite size_cat in eqy'.
+    move/(congr1 (muln 2)) in eqy'; rewrite mulnDr /inv/=/inv_word/= size_map size_rev in eqy'.
+    by rewrite -(@leq_add2r (2 * size (lKprefix y z))) -eqy' leq_add2l plusE addn0 mulnC.
+
+  have leqszprefa: ((size a >= size (lKprefix x y))%N).
+    rewrite -(leq_pmul2l (ltn0Sn 1)).
+    apply: (@leq_trans (size x)).
+    + by rewrite mulnC.
+    move/(f_equal size) in eqx; rewrite size_cat in eqx.
+    move/(congr1 (muln 2)) in eqx; rewrite mulnDr /inv/=/inv_word/= size_map size_rev in eqx.
+    by rewrite -(@leq_add2r (2 * size (lKprefix x y))) -eqx leq_add2l plusE addn0 mulnC.
+
+  have leqszprefc: ((size c >= size (lKprefix y z))%N).
+    rewrite -(leq_pmul2l (ltn0Sn 1)).
+    apply: (@leq_trans (size z)).
+    + by rewrite mulnC.
+    move/(f_equal size) in eqz; rewrite size_cat in eqz.
+    move/(congr1 (muln 2)) in eqz; rewrite mulnDr in eqz.
+    by rewrite -(@leq_add2l (2 * size (lKprefix y z))) -eqz mul2n -addnn mul2n -addnn leq_add2r addnn -muln2.
+
+  have pref_lprefv: prefix (lKprefix x y) v.
+    apply: (prefix_size y).
+    + by rewrite /lKprefix lprefix_correct_right.
+    + by rewrite eqy' prefix_prefix.
+    + by apply: leqszprefv.
+  move/prefixP: pref_lprefv => [u eqv].
+  rewrite eqv in eqy'.
+
+  case: (u =P [::]) => [Hempty | Hf]; last first.
+  - right; right.
+    exists(u); split; first by assumption.
+    + by rewrite -catA in eqy'; apply: eqy'.
+  rewrite Hempty cats0 in eqy'.
+
+  move: eqy' eqy.
+  set p := lKprefix x y.
+  set q := lKprefix y z.
+  move => eqy' eqy.
+
+  have eqsz: size p = size q.
+    move/(f_equal size) in eqy'; rewrite size_cat in eqy'.
+    rewrite eqy' muln2 -addnn /inv/=/inv_word/= size_map size_rev leq_add2r in Hszyz.
+    rewrite eqy' muln2 -addnn leq_add2l /inv/=/inv_word/= size_map size_rev in Hszxy.
+    apply: anti_leq.
+    + by rewrite Hszxy Hszyz.
+  
+  case: ((p =P q)) => [Heq | Hdistinct].
+  - rewrite Heq cat_law in eqy'.
+    have habs: y == e.
+      by rewrite eqy' inverse_left.
+    move/FreeGroup_norm_unique in habs.
+    rewrite freely_reduced_correct in fry.
+    rewrite -fry FreeGroup_norm_e in habs.
+    move: (N0 y yinU) => habs'; rewrite -fry in habs'.
+    contradiction.
+
+  - rewrite /Order.lt /= /CmpOrder.cmp_lt /CmpOrder.transform  /=.
     set t := FreeGroup_norm (x @ y).
-    have ->: t = a ++ inv q.
-      rewrite FreeGroup_norm_unique.
+    have eqw'invq: w' = inv (q :> FreeGroup Sigma).
+      rewrite eqy in eqy'.
+      move/eqP in eqy'; rewrite eqseq_cat //= in eqy'.
+      by move/andP: eqy' => [_ /eqP G].
+
+    have dect: t = a ++ inv (q :> FreeGroup Sigma).
+      rewrite eqw'invq freely_reduced_correct in frxy.
+      rewrite frxy.
+      apply: (FreeGroup_norm_unique).
+      by rewrite eqx {2}eqy /p -associativity [inv (lKprefix x y :> FreeGroup Sigma) @ (lKprefix x y ++ w')]associativity inverse_right neutral_left eqw'invq.
+    rewrite freely_reduced_correct in frx.
+
+    have ->: FreeGroup_norm (inv z @ inv y) = inv (p ++ c :> FreeGroup Sigma).
+      rewrite eqv Hempty cats0 freely_reduced_correct in fryz.
+      rewrite fryz -FreeGroup_norm_inv.
+      apply: FreeGroup_norm_unique.
+      rewrite {1}eqy' /inv/= inv_word_law /= inv_word_cat /= inv_word_involutive /=.
+      by rewrite eqz /= inv_word_law /= -associativity [( _ @ ((q :> FreeGroup Sigma) @ _))]associativity inverse_right neutral_left {1}/p.
+    rewrite freely_reduced_correct in frz.
+    rewrite FreeGroup_norm_inv -frz eqz.
+
+    (* *)
+    have eqsz_inv: size p = size (inv (q:> FreeGroup Sigma)).
+      by rewrite size_inv -eqsz.
+    have leqsz_inv: (size (inv (q:> FreeGroup Sigma)) <= size a)%N.
+      by rewrite -eqsz_inv.
+    have leqsz_invinv: (size (inv (p:>FreeGroup Sigma)) <= size (inv c))%N.
+      by rewrite !size_inv eqsz.
+    have leqsz_invq: (size (inv (q:> FreeGroup Sigma)) <= size (inv c))%N.
+      by rewrite !size_inv.
+    have eqsz_inv': size (inv (p: FreeGroup Sigma)) = size (inv (q :> FreeGroup Sigma)).
+      by rewrite !size_inv eqsz.
+    move: (@CmpOrder.half_oversized _ a p (inv (q:>FreeGroup Sigma)) leqszprefa leqsz_inv eqsz_inv) => eq_firsthalfx.
+    move: (@CmpOrder.half_oversized _ (inv c) (inv (p: FreeGroup Sigma)) (inv (q :> FreeGroup Sigma)) leqsz_invinv leqsz_invq eqsz_inv') => eq_firsthalfz.
+    rewrite -frx eqx dect.
+
+    rewrite !inv_cat.
+
+    case: (boolP (p < q :> seqlexi _)%O) => [Ht | Hf].
+    - right; left.
+      rewrite lt_sizelexiE; apply/orP; right; apply/andP; split; first by done.
+      set c' := CmpOrder.half (inv c ++ inv (p:>FreeGroup Sigma)).
+      set p' := inv (CmpOrder.upperhalf (inv c ++ inv (p:>FreeGroup Sigma)):>FreeGroup Sigma).
+      set q' := inv (CmpOrder.upperhalf (inv c ++ inv (lKprefix y z:> FreeGroup Sigma)):>FreeGroup Sigma).
+
+      case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
+      - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last by assumption.
+        rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
+        case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
+        - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct -eq_firsthalfz; last by assumption.
+          rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
 
 
 End WordSplitting.

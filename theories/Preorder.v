@@ -5,6 +5,7 @@ From HB Require Import structures.
 From mathcomp Require Import seq preorder order eqtype choice.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat.
 From mathcomp Require Import eqtype seq fintype all_algebra div.
+From mathcomp Require Import ring lra zify.
 
 From GWP Require Import Equivalence EquivalenceAlgebra Presentation F2 WellFounded Sizelexi.
 
@@ -108,6 +109,55 @@ End CmpSyntax.
 Module CmpOrder.
 Section CmpOrder.
 
+Definition half {T: eqType} (w: seq T) :=
+  let len := size w in
+  take (divn (len + 1) 2) w.
+
+Definition upperhalf {T: eqType} (w: seq T) :=
+  let len := size w in
+  drop (divn (len - 1) 2) w.
+
+Lemma half_oversized {T: eqType} (a u v : seq T) (leua: (size u <= size a)%N) (luva: (size v <= size a)%N) (eqsz: size u = size v):
+  CmpOrder.half (a ++ u) = CmpOrder.half (a ++ v).
+Proof.
+  have eqsz_simpl: forall m w: seq T, ((size (m ++ w) + 1) %/ 2 < size m)%N = false -> (size w <= size m)%N -> ((size (m ++ w) + 1) %/2 = size m)%N.
+    move => m w Heq2 Hleq.
+    rewrite ltn_divLR //= in Heq2.
+    rewrite size_cat muln2 -addnn -addnA ltn_add2l addn1  in Heq2.
+    move/negbT in Heq2.
+    rewrite -ltnNge ltnS in Heq2.
+    case: (eqVneq (size m) (size w)) => [Heq | Hneq].
+    - by rewrite size_cat Heq addnn -muln2 divnMDl // divn_small // addn0.
+    - have Heq : size m = (size w).+1.
+        rewrite eq_sym in Hneq.
+        by apply/eqP; rewrite eqn_leq Heq2 (ltn_neqAle _ _) Hneq Hleq.
+      by rewrite size_cat Heq addnS addSn addn0 addnn -muln2 -addn2 divnMDl // divnn /= addn1.
+
+  have sz0: forall m w: seq T, ((size (m ++ w) + 1) %/ 2 < size m)%N = false -> (size w <= size m)%N -> ((size (m ++ w) + 1) %/2 - size m = 0)%N.
+    move => m w Heq2 Hleq.
+    rewrite eqsz_simpl; by lia.
+  
+  rewrite /CmpOrder.half !take_cat.
+
+  case: ifP => [_ | Heq1].
+  case: ifP => [_ | Heq2].
+  by rewrite !size_cat eqsz.
+  + rewrite sz0 //. 
+    rewrite take0 cats0.
+    rewrite eqsz_simpl //.
+    by rewrite take_size.
+    + by rewrite size_cat eqsz; rewrite size_cat in Heq2.
+
+  case: ifP => [Heq1' | Heq2].
+  + rewrite sz0 //.
+    rewrite take0 cats0.
+    rewrite eqsz_simpl //.
+    by rewrite take_size.
+    + by rewrite size_cat; rewrite size_cat eqsz in Heq1.
+  + rewrite !sz0 //.
+    by rewrite !take0 !cats0.
+Qed.
+
 Definition type (disp : Order.disp_t) T (Normalisation : seq T -> seq T) (inv: seq T -> seq T) := seq T.
 Definition type_ (disp : Order.disp_t) (T : orderType disp) :=
   type (cmp_display disp) T.
@@ -127,19 +177,63 @@ Context (T : orderType disp) (Normalisation: seq.seq T -> seq.seq T) (inv: seq.s
 
 Hypothesis lt_wf : well_founded (@Order.lt _ T).
 
-Definition half (w: seq T Normalisation inv) :=
-  let len := size w in
-  take (divn (len + 1) 2) w.
-
-Definition upperhalf (w: seq T Normalisation inv) :=
-  let len := size w in
-  drop (divn (len - 1) 2) w.
-
 Definition min_word (w w': seq T Normalisation inv) :=
   if ((w <= w')%O) then w else w'.
 
 Definition max_word (w w': seq T Normalisation inv) :=
   if ((w <= w')%O) then w' else w.
+
+Lemma min_word_correct (w w' : seq T Normalisation inv) :
+  (w <= w')%O -> min_word w w' = w.
+Proof.
+  move => H.
+  rewrite /min_word.
+  rewrite ifT //.
+Qed.
+
+Lemma min_wordC (w w' : seq T Normalisation inv) :
+  min_word w w' = min_word w' w.
+Proof.
+  rewrite /min_word.
+  rewrite /Order.le /=.
+  case: ifP => [Ht | Hf].
+  case: ifP => [Ht' | Hf'].
+  + apply: sizelexi_anti; apply/andP; split; by done.
+  + by [].
+  case: ifP => [Ht' | Hf'].
+  + by [].
+  + move: (@sizelexi_total disp T w w') => Ht.
+    rewrite Hf /= in Ht.
+    move: (@sizelexi_total disp T w' w) => Ht'.
+    rewrite Hf' /= in Ht'.
+    apply: sizelexi_anti; apply/andP; split; by done.
+Qed.  
+
+Lemma max_word_correct (w w' : seq T Normalisation inv) :
+  (w <= w')%O -> max_word w w' = w'.
+Proof.
+  move => H.
+  rewrite /max_word.
+  rewrite ifT //.
+Qed.
+
+Lemma max_wordC (w w' : seq T Normalisation inv) :
+  max_word w w' = max_word w' w.
+Proof.
+  rewrite /max_word.
+  rewrite /Order.le /=.
+  case: ifP => [Ht | Hf].
+  case: ifP => [Ht' | Hf'].
+  + apply: sizelexi_anti; apply/andP; split; by done.
+  + by [].
+  case: ifP => [Ht' | Hf'].
+  + by [].
+  + move: (@sizelexi_total disp T w w') => Ht.
+    rewrite Hf /= in Ht.
+    move: (@sizelexi_total disp T w' w) => Ht'.
+    rewrite Hf' /= in Ht'.
+    apply: sizelexi_anti; apply/andP; split; by done.
+Qed.  
 
 Definition transform (w: seq T Normalisation inv) :=
   let l1 := (half (Normalisation w)) in

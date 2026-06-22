@@ -186,17 +186,6 @@ Proof.
     by rewrite Hleq orbC.
 Qed.
 
-(* Total Orders *)
-
-(*
-Fact sizelexi_total : total sizelexi.
-Proof.
-rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
-by case: (leP (u : seqlexi _) v) => //= /ltW.
-Qed.
-(*HB.instance Definition _  := Order.POrder_isTotal.Build sizelexidisplay
-                               (seq T) sizelexi_total.*)
-*)
 End SizeLexi.
 
 
@@ -290,3 +279,29 @@ End SizelexiWF.
 
 Lemma sizelexi_nat_wf : well_founded (@Order.lt _ (seq nat)).
 Proof. exact: sizelexi_wf wf_ltnat. Qed.
+
+Section SizeLexiOrder.
+
+Context {d : Order.disp_t} {T : orderType d}.
+Implicit Types (u v w x y : seq T).
+
+(* Total Orders *)
+
+
+Fact sizelexi_anti : antisymmetric (@sizelexi d T).
+Proof.
+move=> u v /andP[/orP[ltsz | /andP[/eqP eqsz leuv]]].
+  move/orP => []; first by rewrite (leq_gtF (ltnW ltsz)).
+  by rewrite (gtn_eqF ltsz).
+move=> /orP[| /andP[_ levu]]; first by rewrite eqsz ltnn.
+by apply/eqP; rewrite (eq_le (u : seqlexi _)) leuv levu.
+Qed.
+
+
+Fact sizelexi_total : total (@sizelexi d T).
+Proof.
+rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
+by case: (leP (u : seqlexi _) v) => //= /ltW.
+Qed.
+
+End SizeLexiOrder.

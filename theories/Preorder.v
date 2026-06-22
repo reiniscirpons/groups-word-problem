@@ -108,7 +108,7 @@ End CmpSyntax.
 Module CmpOrder.
 Section CmpOrder.
 
-Definition type (disp : Order.disp_t) T (Normalisation : seq T -> seq T) := seq T.
+Definition type (disp : Order.disp_t) T (Normalisation : seq T -> seq T) (inv: seq T -> seq T) := seq T.
 Definition type_ (disp : Order.disp_t) (T : orderType disp) :=
   type (cmp_display disp) T.
 
@@ -117,42 +117,42 @@ Context {disp disp' : Order.disp_t}.
 Local Notation seq := (type disp').
 
 
-#[export] HB.instance Definition _ (T : eqType) := Equality.on (seq T id).
-#[export] HB.instance Definition _ (T : choiceType) := Choice.on (seq T id).
-#[export] HB.instance Definition _ (T : countType) := Countable.on (seq T id).
+#[export] HB.instance Definition _ (T : eqType) := Equality.on (seq T id id).
+#[export] HB.instance Definition _ (T : choiceType) := Choice.on (seq T id id).
+#[export] HB.instance Definition _ (T : countType) := Countable.on (seq T id id).
 
 Section Preorder.
 
-Context (T : orderType disp) (Normalisation: seq.seq T -> seq.seq T).
+Context (T : orderType disp) (Normalisation: seq.seq T -> seq.seq T) (inv: seq.seq T -> seq.seq T).
 
 Hypothesis lt_wf : well_founded (@Order.lt _ T).
 
-Definition half (w: seq T Normalisation) :=
+Definition half (w: seq T Normalisation inv) :=
   let len := size w in
   take (divn (len + 1) 2) w.
 
-Definition upperhalf (w: seq T Normalisation) :=
+Definition upperhalf (w: seq T Normalisation inv) :=
   let len := size w in
   drop (divn (len - 1) 2) w.
 
-Definition min_word (w w': seq T Normalisation) :=
+Definition min_word (w w': seq T Normalisation inv) :=
   if ((w <= w')%O) then w else w'.
 
-Definition max_word (w w': seq T Normalisation) :=
+Definition max_word (w w': seq T Normalisation inv) :=
   if ((w <= w')%O) then w' else w.
 
-Definition transform (w: seq T Normalisation) :=
+Definition transform (w: seq T Normalisation inv) :=
   let l1 := (half (Normalisation w)) in
-  let l2 := (upperhalf (Normalisation w)) in
+  let l2 := (inv (upperhalf (Normalisation w))) in
   [:: min_word l1 l2; max_word l1 l2].
 
-Definition cmp_le (w w': seq T Normalisation) :=
+Definition cmp_le (w w': seq T Normalisation inv) :=
   (transform w <= transform w')%O.
 
-Definition cmp_lt (w w': seq T Normalisation) :=
+Definition cmp_lt (w w': seq T Normalisation inv) :=
   (transform w < transform w')%O.
 
-Lemma lt_le_def (w w': seq T Normalisation) : cmp_lt w w' = cmp_le w w' && ~~ cmp_le w' w.
+Lemma lt_le_def (w w': seq T Normalisation inv) : cmp_lt w w' = cmp_le w w' && ~~ cmp_le w' w.
 Proof.
   elim: w w' => [|x1 s1 H] [|x2 s2] // /=.
 Qed.
@@ -176,7 +176,7 @@ Proof.
   by apply: H_ylez.
 Qed.
 
-Lemma cmp_congr_left (u w w' : seq T Normalisation):
+Lemma cmp_congr_left (u w w' : seq T Normalisation inv):
   (Normalisation u) = (Normalisation w) -> (cmp_le w w')%O -> (cmp_le u w')%O.
 Proof.
   move => equw leww'.
@@ -184,7 +184,7 @@ Proof.
 Qed.
 
 
-Fact cmp_wf: well_founded (fun x y : seq T Normalisation => cmp_lt x y).
+Fact cmp_wf: well_founded (fun x y : seq T Normalisation inv => cmp_lt x y).
 Proof.
   rewrite /cmp_lt /=.
   apply: (@wf_f _ _ cmp_lt (Order.lt) transform).
@@ -193,7 +193,7 @@ Proof.
 Qed.
 
 #[export]
-HB.instance Definition _ := isPreorder.Build disp' (seq T Normalisation) lt_le_def cmp_refl cmp_trans.
+HB.instance Definition _ := isPreorder.Build disp' (seq T Normalisation inv) lt_le_def cmp_refl cmp_trans.
 
 End Preorder.
 
@@ -216,8 +216,8 @@ Section DefaultCmpOrder.
 Context {disp: disp_t}.
 Notation seqcmp := (seqcmp_with (cmp_display disp)).
 
-HB.instance Definition _ (T : orderType disp) (Normalisation: seq T -> seq T) :=
-  Preorder.copy (seq T) (seqcmp T Normalisation).
+HB.instance Definition _ (T : orderType disp) (Normalisation: seq T -> seq T) (inv: seq T -> seq T) :=
+  Preorder.copy (seq T) (seqcmp T Normalisation inv).
 
 Context {Sigma: finType}.
 

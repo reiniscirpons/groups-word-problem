@@ -64,13 +64,7 @@ Qed.
 
 HB.instance Definition _  := Order.Le_isPreorder.Build sizelexidisplay
                                (seq T) sizelexi_refl sizelexi_trans.
-(*Fact sizelexi_total : total sizelexi.
-Proof.
-rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
-by case: (leP (u : seqlexi _) v) => //= /ltW.
-Qed.*)
-(*HB.instance Definition _  := Order.POrder_isTotal.Build sizelexidisplay
-                               (seq T) sizelexi_total.*)
+
 Fact nil_bot u : ([::] <= u)%O.
 Proof.
 rewrite /Order.le /= /sizelexi /= eq_sym.
@@ -192,6 +186,17 @@ Proof.
     by rewrite Hleq orbC.
 Qed.
 
+(* Total Orders *)
+
+(*
+Fact sizelexi_total : total sizelexi.
+Proof.
+rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
+by case: (leP (u : seqlexi _) v) => //= /ltW.
+Qed.
+(*HB.instance Definition _  := Order.POrder_isTotal.Build sizelexidisplay
+                               (seq T) sizelexi_total.*)
+*)
 End SizeLexi.
 
 

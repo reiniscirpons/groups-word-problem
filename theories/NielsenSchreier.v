@@ -302,6 +302,25 @@ Definition t1 (v: vec) (i : nat) :=
 End Nielsen_Construction.
 
 
+
+Section Definitions.
+
+Context {Sigma: finType}.
+Notation word := (FreeGroup Sigma).
+Notation vec := (seq word).
+
+Context {gens U : vec}.
+
+Definition bound (x: nat) := (x < size U)%N.
+Definition non_trivial (x y : (FreeGroup Sigma)) := FreeGroup_norm (x @ y) <> e.
+Definition sz (w: (FreeGroup Sigma)) := (size (FreeGroup_norm w)).
+
+Definition cmp_ordered_word := seqcmp (InverseAlphabet_display) (sigma (FGP Sigma)) (FreeGroup_norm) (inv_word (FGP Sigma)).
+HB.instance Definition _ :=
+  Order.Preorder.copy (FreeGroup Sigma) (cmp_ordered_word).
+
+End Definitions.
+
 Section WordSplitting.
 
 Section lprefix.
@@ -745,6 +764,84 @@ Proof.
   by apply/mapP; exists (x).
 Qed.
 
+Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(x))%N.
+Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz(x @ y) >= sz(y))%N.
+
+Lemma lKprefix_contra (x y: FreeGroup Sigma)
+(frx: freely_reduced x) (fry: freely_reduced y):
+  FreeGroup_norm (x @ y) = e -> lKprefix x y = y.
+Proof.
+  move => approx.
+  rewrite -FreeGroup_norm_e in approx.
+  move/(FreeGroup_norm_cat _ _ e (inv y)) in approx.
+  have eqfn: FreeGroup_norm ((x @ y) @ inv y) = FreeGroup_norm (x).
+    apply: FreeGroup_norm_unique.
+    by rewrite -associativity inverse_left neutral_right.
+  have eqfinv: FreeGroup_norm (e @ inv y) = FreeGroup_norm (inv y).
+    apply: FreeGroup_norm_unique.
+    by rewrite neutral_left.
+  rewrite eqfn eqfinv FreeGroup_norm_inv in approx.
+  rewrite !freely_reduced_correct in frx fry.
+  rewrite -frx -fry in approx. 
+  have eqinvx: inv x = y.
+    rewrite approx fry -!FreeGroup_norm_inv (@FreeGroup_norm_unique _ _ (y)); first by [].
+    by apply: inv_involutive.
+  by rewrite /lKprefix eqinvx -[y]cats0 lprefix_cat lprefix0nil.
+Qed.
+
+Lemma lKsize_right (x y: FreeGroup Sigma) (xinU: x \in U) (frx: freely_reduced x)
+              (yinU: y \in U) (fry: freely_reduced y) (non_trivial: lKprefix x y <> y):
+  (size (lKprefix x y) * 2 <= (size y))%N.
+Proof.
+  move: (lKprefix_split x y frx fry) => [w [w' [eqx [eqy frprod]]]].
+  have eqprod: (x @ y) == w ++ w'.
+    by rewrite eqx {2}eqy !cat_law -associativity [inv (lKprefix x y :> FreeGroup Sigma) @ ((lKprefix x y :> FreeGroup Sigma) @ w')]associativity inverse_right neutral_left.
+  move/FreeGroup_norm_unique in eqprod.
+  have eqwcatw': w ++ w' = FreeGroup_norm (w ++ w').
+    by rewrite -freely_reduced_correct.
+  rewrite -eqwcatw' in eqprod.
+
+  move/(@f_equal _ _ size _ (w++w')) in eqprod; rewrite size_cat in eqprod.
+  have ntrivial: FreeGroup_norm (x @ y) <> e.
+    move => Habs.
+    by apply: (non_trivial (lKprefix_contra x y frx fry Habs)).
+  move: (N1_left x y xinU yinU ntrivial) => leqsz.
+  rewrite freely_reduced_correct in frx.
+  rewrite /sz eqprod -frx eqx size_cat leq_add2l /inv/=/inv_word/= size_map size_rev in leqsz.
+  rewrite {2}eqy size_cat.
+  by rewrite muln2 -addnn leq_add2l.
+Qed.
+
+Lemma triplet_lt (x y z: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y) (frz: freely_reduced z)
+  (xinU: x \in U) (yinU: y \in U) (zinU: z \in U) (non_trvxy: non_trivial):
+
+  (((x @ y) < x :> word)%O) \/ (((inv z @ inv y :> word) < (inv z))%O).
+Proof.
+  case: (boolP ((p: seqlexi _) < (q: seqlexi _))%O) => [Ht | Hf].
+  - right.
+    admit.
+  - left.
+    rewrite -Order.TotalTheory.leNgt Order.POrderTheory.le_eqVlt in Hf.
+    move/orP: Hf => [/eqP Heq | Hlt].
+    + rewrite Heq cat_law in eqy.
+      have habs: y == e.
+        by rewrite eqy inverse_left.
+      move/FreeGroup_norm_unique in habs.
+      rewrite freely_reduced_correct in fry.
+      rewrite -fry FreeGroup_norm_e in habs.
+      have eqsz0: size y = 0.
+        by move/(@f_equal _ _ size) in habs.
+      rewrite -cat_law in eqy; move/(@f_equal _ _ size) in eqy; rewrite size_cat eqsz0 in eqy; move/eqP in eqy.
+      rewrite eq_sym addn_eq0 in eqy; move/andP: eqy => [/eqP habs' _].
+      contradiction.
+    rewrite /Order.lt /= /CmpOrder.cmp_lt /CmpOrder.transform  /=.
+    set t := FreeGroup_norm (x @ y).
+    have ->: t = a ++ inv q.
+      rewrite FreeGroup_norm_unique.
+
+
 End WordSplitting.
 
 
@@ -760,10 +857,8 @@ Let U := [seq w | w <- gens] ++ [seq (inv w) | w <- gens].
 
 Let F := generatedSubgroup gens. 
 
-Definition bound (x: nat) := (x < size U)%N.
-Definition non_trivial (x y : (FreeGroup Sigma)) := FreeGroup_norm (x @ y) <> e.
 Local Notation nthgen := (nth e U).
-Definition sz (w: (FreeGroup Sigma)) := (size (FreeGroup_norm w)).
+Notation bound := (@bound Sigma U).
 
 Hypothesis N0: forall k, (bound k) -> FreeGroup_norm (nth e gens k) <> e.
 Hypothesis N1_left: forall n m, (bound n) -> (bound m) -> (non_trivial (nthgen n) (nthgen m)) ->
@@ -1657,10 +1752,6 @@ Proof.
     by apply: H_ibound.
     by apply: Heq_nthmap.
 Qed.
-
-Definition cmp_ordered_word := seqcmp (InverseAlphabet_display) (sigma (FGP Sigma)) FreeGroup_norm.
-HB.instance Definition _ :=
-  Order.Preorder.copy (FreeGroup Sigma) (cmp_ordered_word).
 
 
 (* Note(mathis): the type annotations are necessary *)

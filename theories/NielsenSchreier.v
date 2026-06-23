@@ -315,7 +315,7 @@ Definition bound (x: nat) := (x < size U)%N.
 Definition non_trivial (x y : (FreeGroup Sigma)) := FreeGroup_norm (x @ y) <> e.
 Definition sz (w: (FreeGroup Sigma)) := (size (FreeGroup_norm w)).
 
-Definition cmp_ordered_word := seqcmp (InverseAlphabet_display) (sigma (FGP Sigma)) (FreeGroup_norm) (inv_word (FGP Sigma)).
+Definition cmp_ordered_word := seqcmp (InverseAlphabet_display) (sigma (FGP Sigma)) (FreeGroup_norm) (inv :> FreeGroup Sigma -> FreeGroup Sigma).
 HB.instance Definition _ :=
   Order.Preorder.copy (FreeGroup Sigma) (cmp_ordered_word).
 
@@ -367,6 +367,75 @@ Proof.
   move/eqP in Heq; rewrite eqseq_cat // eqxx /= in Heq; move/eqP in Heq.
   apply/suffixP.
   by exists v.
+Qed.
+
+Lemma prefix_leq_lexi  {disp: Order.disp_t} {A : preorderType disp} (x y: seq A) :
+  prefix x y -> (x <= y :> seqlexi _)%O.
+Proof.
+  move: x.
+  elim: y => [x prefx | a l IH].
+  + rewrite prefixs0 in prefx; move/eqP in prefx.
+    by rewrite prefx.
+  + case => [// | a' l' prefx].
+    rewrite prefix_cons in prefx; move/andP: prefx => [eqa'a prefixl'l].
+    rewrite lexi_cons; apply/andP; split; first by move/eqP in eqa'a; rewrite eqa'a.
+    apply/implyP => leqaa'.
+    by apply: IH.
+Qed.
+
+Lemma prefix_lt_lexi {disp: Order.disp_t} {A : preorderType disp} (x y z t : seq A) :
+  x != [::] -> size x = size z -> prefix x y -> prefix z t ->
+  (x < z :> seqlexi _)%O -> (y < t :> seqlexi _)%O.
+Proof.
+  move: t x z.
+  elim: y => [x z t| a l].
+  + move => _ eqsz prefx prefzt ltxz.
+    rewrite prefixs0 in prefx; move/eqP in prefx.
+    rewrite prefx in ltxz.
+    apply: Order.PreorderTheory.lt_le_trans.
+    + by apply: ltxz.
+    + by apply: prefix_leq_lexi.
+  move => IH t; elim: t => [ | a' l' IH'] x z hdiff eqsz prefx preft Hlt.
+  + rewrite prefixs0 in preft; move/eqP in preft.
+    have habs: ([::] <= x :> seqlexi _)%O.
+      by apply: lexi0s.
+    have habs': ([::] < [::] :> seqlexi A)%O.
+      apply: Order.PreorderTheory.le_lt_trans.
+      + by apply: habs.
+      + by rewrite preft in Hlt; apply: Hlt.
+    rewrite Order.PreorderTheory.ltxx in habs'.
+    by exfalso.
+  + case: x prefx Hlt hdiff eqsz => [// | b s prefx Hlt hdiff eqsz].
+  + case: z preft Hlt eqsz => [// | b' s'] preft Hlt eqsz.
+    - rewrite prefix_cons in prefx; rewrite prefix_cons in preft; move/andP: prefx preft => [/eqP eqba prefsl] /andP [/eqP eqb'a' prefs'l'].
+      rewrite /Order.lt /= in Hlt; move/andP: Hlt => [lebb' imp_le].
+      rewrite /Order.lt /=; apply/andP; split.
+      + by rewrite -eqba -eqb'a'.
+      apply/implyP => lea'a; move/implyP in imp_le.
+      rewrite -eqb'a' -eqba in lea'a; move: (imp_le lea'a) => less'.
+      rewrite /= in eqsz; case: eqsz => eqsz.
+      case: (boolP ((size s) == 0)%B) => [/eqP Habs | Hf].
+      + rewrite Habs in eqsz.
+        move/size0nil in Habs; symmetry in eqsz; move/size0nil in eqsz.
+        rewrite Habs eqsz in less'.
+        have  Habs': ([::] < [::] :> seqlexi A)%O.
+          by rewrite /Order.lt /=.
+        rewrite Order.PreorderTheory.ltxx in Habs'.
+        by exfalso.
+      + have sdiff0: s != [::].
+          by apply/negP; move => /eqP habs; rewrite habs /= in Hf.
+        by apply: (IH l' s s').
+Qed.
+
+Lemma size_take_simpl (s t: seq T) (k: nat) (eqsz: size s = size t):
+  size (take k s) = size (take k t).
+Proof.
+  rewrite size_take.
+  case: ifP => [Ht | Hf].
+  + rewrite eqsz in Ht.
+    rewrite size_take ifT //.
+  + rewrite eqsz in Hf.
+    rewrite size_take ifF //.
 Qed.
 
 Fixpoint lprefix (x y : seq T) := match x, y with
@@ -461,6 +530,20 @@ Lemma inv_cat (x y: FreeGroup Sigma):
   inv (x ++ y :> FreeGroup Sigma) = inv y ++ inv x.
 Proof.
   by rewrite /inv/=/inv_word/= map_rev map_cat rev_cat -!map_rev.
+Qed.
+
+Lemma inv_drop (x: FreeGroup Sigma) (k: nat):
+  inv (drop k x:>FreeGroup Sigma) = take (size x - k) (inv x).
+Proof.
+  by rewrite /inv/=/inv_word/= rev_drop map_take.
+Qed.
+
+Lemma inv_eq_invol (x : FreeGroup Sigma):
+  inv (inv x) = x.
+Proof.
+  rewrite /inv/=/inv_word/= !map_rev revK.
+  elim: x => [// | a l IH].
+  by rewrite map_cons invlK IH.
 Qed.
 
 Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
@@ -968,9 +1051,29 @@ Proof.
       by rewrite !size_inv.
     have eqsz_inv': size (inv (p: FreeGroup Sigma)) = size (inv (q :> FreeGroup Sigma)).
       by rewrite !size_inv eqsz.
+    have leqszp_inv: (size (inv (p:> FreeGroup Sigma)) <= size a)%N.
+      by rewrite size_inv.
+    have eqszp: size p = size (inv (p :> FreeGroup Sigma)).
+      by symmetry; apply: size_inv.
     move: (@CmpOrder.half_oversized _ a p (inv (q:>FreeGroup Sigma)) leqszprefa leqsz_inv eqsz_inv) => eq_firsthalfx.
     move: (@CmpOrder.half_oversized _ (inv c) (inv (p: FreeGroup Sigma)) (inv (q :> FreeGroup Sigma)) leqsz_invinv leqsz_invq eqsz_inv') => eq_firsthalfz.
+    move: (@CmpOrder.half_oversized _ a p (inv (p:>FreeGroup Sigma)) leqszprefa leqszp_inv eqszp) => eq_firsthalfpx.
     rewrite -frx eqx dect.
+
+    have rsize: forall n, (n - (n - 1) %/ 2 >= (n + 1) %/ 2)%N.
+      by lia.
+
+    have divn_leq_succ: forall n, (n <= ((n + 1)%/2)*2)%N.
+      by lia.
+
+    have pnotnil: p != [::].
+      apply/negP => /eqP habs.
+      rewrite habs /= in eqsz; symmetry in eqsz; move/size0nil in eqsz.
+      by rewrite eqsz habs in Hdistinct.
+    have qnotnil: q != [::].
+      apply/negP => /eqP habs.
+      rewrite habs /= in eqsz; move/size0nil in eqsz.
+      by rewrite eqsz habs in Hdistinct.
 
     rewrite !inv_cat.
 
@@ -981,14 +1084,227 @@ Proof.
       set p' := inv (CmpOrder.upperhalf (inv c ++ inv (p:>FreeGroup Sigma)):>FreeGroup Sigma).
       set q' := inv (CmpOrder.upperhalf (inv c ++ inv (lKprefix y z:> FreeGroup Sigma)):>FreeGroup Sigma).
 
+      set t1 := (take (size (inv c ++ inv (p:>FreeGroup Sigma)) - (size (inv c ++ inv (p:>FreeGroup Sigma)) - 1) %/ 2) (inv (inv c ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t2 := (take (size (inv c ++ inv (q:>FreeGroup Sigma)) - (size (inv c ++ inv (q:>FreeGroup Sigma)) - 1) %/ 2) (inv (inv c ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
+
+      have eqt1p': t1 = p'.
+        by rewrite /t1 /p' /CmpOrder.upperhalf inv_drop.
+      have eqt2q': t2 = q'.
+        by rewrite /t2 /q' /CmpOrder.upperhalf inv_drop.
+
+      have sz_simpl : forall k, (k = size q) -> (k <= (size c + size q - ((size c + size q) - 1)%/2))%N.
+        move => k eqk.
+        apply: leq_trans; last first.
+        + apply: rsize.
+        + have csz: size z = size c + size p.
+            by rewrite eqz size_cat -eqsz addnC.
+          rewrite -(@leq_pmul2l 2) //.
+          rewrite mul2n mul2n.
+          apply: (@leq_trans (size z)); first by rewrite eqk -muln2.
+          by rewrite eqz !size_cat addnC -muln2 divn_leq_succ.
+
+      have prefpt1: prefix p t1.
+        rewrite prefixE take_takel.
+        rewrite inv_cat !inv_eq_invol take_cat.
+        rewrite ifF; last by apply: ltnn.
+        by rewrite subnn take0 cats0.
+        rewrite !size_cat !size_inv !eqsz.
+        by apply: sz_simpl.
+
+      have prefqt2: prefix q t2.
+        rewrite prefixE take_takel.
+        rewrite inv_cat !inv_eq_invol take_cat.
+        rewrite ifF; last by apply: ltnn.
+        by rewrite subnn take0 cats0.
+        rewrite !size_cat !size_inv.
+        by apply: sz_simpl.
+
+      have lt_t1_t2: (t1 < t2 :> seqlexi _)%O.
+        apply: (prefix_lt_lexi p t1 q t2 pnotnil eqsz prefpt1 prefqt2 Ht).
+      have slt_t1_t2: (t1 < t2)%O.
+        rewrite lt_sizelexiE; apply/orP; right; apply/andP; split.
+        + apply/eqP; rewrite /t1 /t2 !size_cat !size_inv !eqsz; apply: size_take_simpl.
+          by rewrite !inv_cat !inv_eq_invol !size_cat eqsz.
+        + by apply: lt_t1_t2.
+
       case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
       - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last by assumption.
         rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
         case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
         - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct -eq_firsthalfz; last by assumption.
           rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
+          rewrite /p' /q' /CmpOrder.upperhalf !inv_drop.
+          rewrite /Order.lt /=.
+
+          apply/andP; split.
+          + rewrite le_sizelexiE; apply/orP; right; apply/andP; split.
+            + by rewrite !inv_cat !inv_eq_invol !size_cat !size_inv eqsz; apply/eqP; apply: size_take_simpl; rewrite !size_cat eqsz.
+            + by apply: Order.PreorderTheory.ltW.
+          + apply/implyP.
+            move => habs; exfalso.
+            
+            have habs': (t2 < t2)%O.
+              apply: Order.PreorderTheory.le_lt_trans.
+              rewrite /Order.le /= in habs.
+              + by apply: habs.
+              + by apply: slt_t1_t2.
+            by rewrite Order.PreorderTheory.ltxx in habs'.
+        - move: (@sizelexi_total _ _ q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
+
+          rewrite CmpOrder.min_word_correct -eq_firsthalfz; last by assumption.
+          rewrite CmpOrder.max_word_correct; last by assumption.
+          rewrite /Order.lt /=.
+
+          apply/andP; split; first by assumption.
+          apply/implyP => _; apply/andP; split; first by assumption.
+          apply/implyP => habs.
+          by rewrite /Order.le /= geqq'c' in habs.
+      - move: (@sizelexi_total _ _ p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
+        rewrite CmpOrder.min_word_correct; last by assumption.
+        rewrite CmpOrder.max_word_correct; last by assumption.
+        case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
+        + have leq'p': (q' <= p')%O.
+            apply: Order.PreorderTheory.le_trans.
+            + by apply: leqq'c'.
+            + by apply: Htotal.
+          rewrite -eqt1p' -eqt2q' in leq'p'.
+          have habs': (t2 < t2)%O.
+            apply: Order.PreorderTheory.le_lt_trans.
+            + by apply: leq'p'.
+            + by apply: slt_t1_t2.
+          by rewrite Order.PreorderTheory.ltxx in habs'.
+        + move: (@sizelexi_total _ _ q' c') => Hqtotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Hqtotal.
+          rewrite -!eq_firsthalfz.
+          rewrite CmpOrder.min_word_correct; last by assumption.
+          rewrite CmpOrder.max_word_correct; last by assumption.
+
+          rewrite /Order.lt /=; apply/andP; split; first by done.
+          apply/implyP => _; apply/andP; split; first by rewrite -eqt1p' -eqt2q'; apply: Order.PreorderTheory.ltW.
+          apply/implyP => habs; rewrite -eqt1p' -eqt2q' in habs.
+          have habs': (t2 < t2)%O.
+            apply: Order.PreorderTheory.le_lt_trans.
+            + by apply: habs.
+            + by apply: slt_t1_t2.
+          by rewrite Order.PreorderTheory.ltxx in habs'.
 
 
+
+    - rewrite -Order.TotalTheory.leNgt in Hf.
+      have Ht: (q < p :> seqlexi _)%O.
+        by move/eqP in Hdistinct; rewrite Order.POrderTheory.lt_def; apply/andP; split.
+
+      left.
+      rewrite lt_sizelexiE; apply/orP; right; apply/andP; split; first by done.
+      set c' := CmpOrder.half (a ++ p).
+      set p' := inv (CmpOrder.upperhalf (a ++ inv (lKprefix x y:>FreeGroup Sigma)):>FreeGroup Sigma).
+      set q' := inv (CmpOrder.upperhalf (a ++ inv (q:> FreeGroup Sigma)):>FreeGroup Sigma).
+
+      set t1 := (take (size (a ++ inv (p:>FreeGroup Sigma)) - (size (a ++ inv (p:>FreeGroup Sigma)) - 1) %/ 2) (inv (a ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t2 := (take (size (a ++ inv (q:>FreeGroup Sigma)) - (size (a ++ inv (q:>FreeGroup Sigma)) - 1) %/ 2) (inv (a ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
+
+      have eqt1p': t1 = p'.
+        by rewrite /t1 /p' /CmpOrder.upperhalf inv_drop.
+      have eqt2q': t2 = q'.
+        by rewrite /t2 /q' /CmpOrder.upperhalf inv_drop.
+
+      have sz_simpl : forall k, (k = size q) -> (k <= (size a + size q - ((size a + size q) - 1)%/2))%N.
+        move => k eqk.
+        apply: leq_trans; last first.
+        + apply: rsize.
+        + have csz: size x = size a + size p.
+            by rewrite eqx size_cat size_inv.
+          rewrite -(@leq_pmul2l 2) //.
+          rewrite mul2n mul2n.
+          apply: (@leq_trans (size x)); first by rewrite eqk -eqsz -muln2.
+          by rewrite eqx -eqsz !size_cat size_inv addnC -muln2  divn_leq_succ.
+
+      have prefpt1: prefix p t1.
+        rewrite prefixE take_takel.
+        rewrite inv_cat !inv_eq_invol take_cat.
+        rewrite ifF; last by apply: ltnn.
+        by rewrite subnn take0 cats0.
+        rewrite !size_cat !size_inv !eqsz.
+        by apply: sz_simpl.
+
+      have prefqt2: prefix q t2.
+        rewrite prefixE take_takel.
+        rewrite inv_cat !inv_eq_invol take_cat.
+        rewrite ifF; last by apply: ltnn.
+        by rewrite subnn take0 cats0.
+        rewrite !size_cat !size_inv.
+        by apply: sz_simpl.
+
+      have lt_t1_t2: (t2 < t1 :> seqlexi _)%O.
+        apply: (prefix_lt_lexi q t2 p t1 qnotnil (symmetry eqsz) prefqt2 prefpt1 Ht).
+      have slt_t1_t2: (t2 < t1)%O.
+        rewrite lt_sizelexiE; apply/orP; right; apply/andP; split.
+        + apply/eqP; rewrite /t1 /t2 !size_cat !size_inv !eqsz; apply: size_take_simpl.
+          by rewrite !inv_cat !inv_eq_invol !size_cat eqsz.
+        + by apply: lt_t1_t2.
+
+      case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
+      - rewrite -eq_firsthalfx -eq_firsthalfpx.
+        rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last by assumption.
+        rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
+        case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
+        - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last by assumption.
+          rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
+          rewrite /p' /q' /CmpOrder.upperhalf !inv_drop.
+          rewrite /Order.lt /=.
+
+          apply/andP; split.
+          + rewrite le_sizelexiE; apply/orP; right; apply/andP; split.
+            + by rewrite !inv_cat !inv_eq_invol !size_cat !size_inv eqsz; apply/eqP; apply: size_take_simpl; rewrite !size_cat eqsz.
+            + by apply: Order.PreorderTheory.ltW.
+          + apply/implyP.
+            move => habs; exfalso.
+            
+            have habs': (t2 < t2)%O.
+              apply: Order.PreorderTheory.lt_le_trans.
+              rewrite /Order.le /= in habs.
+              + by apply: slt_t1_t2.
+              + by apply: habs.
+            by rewrite Order.PreorderTheory.ltxx in habs'.
+        - move: (@sizelexi_total _ _ p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
+
+          rewrite CmpOrder.min_word_correct; last by assumption.
+          rewrite CmpOrder.max_word_correct; last by assumption.
+          rewrite /Order.lt /=.
+
+          apply/andP; split; first by assumption.
+          apply/implyP => _; apply/andP; split; first by assumption.
+          apply/implyP => habs.
+          by rewrite /Order.le /= geqp'c' in habs.
+      - rewrite -eq_firsthalfx -eq_firsthalfpx.
+        move: (@sizelexi_total _ _ q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
+        rewrite CmpOrder.min_word_correct; last by assumption.
+        rewrite CmpOrder.max_word_correct; last by assumption.
+        case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
+        + have leq'p': (p' <= q')%O.
+            apply: Order.PreorderTheory.le_trans.
+            + by apply: leqp'c'.
+            + by apply: Htotal.
+          rewrite -eqt1p' -eqt2q' in leq'p'.
+          have habs': (t2 < t2)%O.
+            apply: Order.PreorderTheory.lt_le_trans.
+            + by apply: slt_t1_t2.
+            + by apply: leq'p'.
+          by rewrite Order.PreorderTheory.ltxx in habs'.
+        + move: (@sizelexi_total _ _ p' c') => Hqtotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Hqtotal.
+          rewrite CmpOrder.min_word_correct; last by assumption.
+          rewrite CmpOrder.max_word_correct; last by assumption.
+
+          rewrite /Order.lt /=; apply/andP; split; first by done.
+          apply/implyP => _; apply/andP; split; first by rewrite -eqt1p' -eqt2q'; apply: Order.PreorderTheory.ltW.
+          apply/implyP => habs; rewrite -eqt1p' -eqt2q' in habs.
+          have habs': (t2 < t2)%O.
+            apply: Order.PreorderTheory.lt_le_trans.
+            + by apply: slt_t1_t2.
+            + by apply: habs.
+          by rewrite Order.PreorderTheory.ltxx in habs'.
+Qed.
+
+            
 End WordSplitting.
 
 

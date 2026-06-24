@@ -54,6 +54,8 @@ Proof. exact: disp. Qed.
 Fact InverseAlphabet_display: Order.disp_t.
 Proof. exact: Order.Disp tt tt. Qed.
 
+Fact prod_display: Order.disp_t.
+Proof. exact: Order.Disp tt tt. Qed.
 
 Module Import CmpSyntax.
 
@@ -240,54 +242,108 @@ Definition transform (w: seq T Normalisation inv) :=
   let l2 := (inv (upperhalf (Normalisation w))) in
   [:: min_word l1 l2; max_word l1 l2].
 
+Definition sz w := size (Normalisation w).
+
 Definition cmp_le (w w': seq T Normalisation inv) :=
-  (transform w <= transform w')%O.
+  (sz w < sz w')%N || ((sz w == sz w') && (transform w <= transform w')%O).
 
 Definition cmp_lt (w w': seq T Normalisation inv) :=
-  (transform w < transform w')%O.
+  (sz w < sz w')%N || ((sz w == sz w') && (transform w < transform w')%O).
 
-Lemma lt_le_def (w w': seq T Normalisation inv) : cmp_lt w w' = cmp_le w w' && ~~ cmp_le w' w.
+Lemma cmp_lt_le_def (w w': seq T Normalisation inv) : cmp_lt w w' = cmp_le w w' && ~~ cmp_le w' w.
 Proof.
-  elim: w w' => [|x1 s1 H] [|x2 s2] // /=.
+  case: (boolP (sz w < sz w')%N) => [Ht | Hf] /=.
+  - rewrite /cmp_lt /cmp_le /= Ht /=.
+    have H_nvleu: (sz w' <= sz w)%B = false.
+      by apply: ltn_geF.
+    have H_nvlte: ((sz w' < sz w)%N)%B = false.
+      apply/negP; move => H; move/negP in H_nvleu.
+      move/ltnW in H.
+      contradiction.
+    have H_nvequ: (sz w' == sz w)%B = false.
+      rewrite eq_sym ltn_eqF => [ // | ].
+      by rewrite Ht.
+    by rewrite H_nvlte H_nvequ /=.
+  - move/negPf in Hf.
+    rewrite /cmp_le /cmp_lt Hf /=.
+    case: (boolP (sz w == sz w')) => [HeqT | HeqF]; rewrite /=; last first.
+      - by [].
+      - rewrite eq_sym in HeqT.
+        rewrite HeqT /=.
+        have H_nlt: ((sz w' < sz w)%N)%B = false.
+          move/eqP: HeqT => ->.
+          by rewrite ltnn.
+        rewrite H_nlt /=.
+        by elim: w w' Hf HeqT H_nlt => [|x1 u H] [|x2 v] // /=.
 Qed.
-
-
 
 Fact cmp_refl: reflexive cmp_le.
 Proof.
   move => x.
-  rewrite /cmp_le.
+  rewrite /cmp_le; apply/orP; right; apply/andP; split; first by done.
   by apply: sizelexi_refl.
 Qed.
 
+Lemma cmp_sz_le u v : cmp_le u v -> sz u <= sz v.
+Proof. by move=> /orP[/ltnW | /andP[/eqP -> _]]. Qed.
+
 Fact cmp_trans: transitive cmp_le.
 Proof.
-  move => x y z H_xley H_ylez.
-  rewrite /cmp_le in H_xley H_ylez.
-  rewrite /cmp_le.
-  apply: sizelexi_trans.
-  by apply: H_xley.
-  by apply: H_ylez.
+  move=> v u w /orP[ltsz /cmp_sz_le | /andP[/eqP eqszuv leuv]].
+  by move=> /(leq_trans ltsz) {}ltsz; apply/orP; left.
+  move=> /orP[ltsz | /andP[/eqP eqszvw levw]].
+    by apply/orP; left; rewrite eqszuv.
+  apply/orP; right; rewrite eqszuv eqszvw eqxx /=.
+  exact: (le_trans leuv levw).
 Qed.
 
 Lemma cmp_congr_left (u w w' : seq T Normalisation inv):
   (Normalisation u) = (Normalisation w) -> (cmp_le w w')%O -> (cmp_le u w')%O.
 Proof.
   move => equw leww'.
-  by rewrite /cmp_le /transform !equw; apply: leww'.
+  have eqszuw: sz u = sz w.
+    by rewrite /sz equw.
+  by rewrite /cmp_le /transform !equw !eqszuw; apply: leww'.
 Qed.
 
+Lemma wf_prodlexi {T1 T2 : eqType} (le1: T1 -> T1 -> bool)
+    (lt1 : T1 -> T1 -> bool) (Hanti: forall x y, le1 x y = (x == y) || (lt1 x y)) (Hrefl: reflexive le1) (lt2 : T2 -> T2 -> bool)
+    (wf1 : well_founded lt1) (wf2 : well_founded lt2) :
+  well_founded (fun (p q : T1 * T2) => 
+    le1 p.1 q.1 && (le1 q.1 p.1 ==> lt2 p.2 q.2)).
+Proof.
+  move => [a b]; move: b.
+  elim/(well_founded_induction wf1): a => u0 IH1 b.
+  elim/(well_founded_induction wf2): b => u1 IH2.
+  apply: Acc_intro => [[x y] Pc].
+  move/andP: Pc => [Hle Himp]; rewrite /= in Hle Himp.
+  rewrite Hanti in Hle; move/orP in Hle; case: Hle => [/eqP Heq | Hlt]; last first.
+    by apply: (IH1 x Hlt y).
+    by rewrite Heq in Himp; move/implyP in Himp; move: (Himp (Hrefl u0)) => Hlt; rewrite Heq; apply: (IH2 y Hlt).
+Qed.
 
 Fact cmp_wf: well_founded (fun x y : seq T Normalisation inv => cmp_lt x y).
 Proof.
+  pose g w := (sz w, transform w) : nat *lexi[prod_display] _.
   rewrite /cmp_lt /=.
-  apply: (@wf_f _ _ cmp_lt (Order.lt) transform).
-  by move => x y; rewrite /cmp_lt.
-  apply /sizelexi_wf /sizelexi_wf /lt_wf.
+  apply: (@wf_f _ _ _ (Order.lt) g).
+    move => x y; rewrite /cmp_lt /g; move => hcmp; rewrite ltEprodlexi /=; apply/andP; split.
+    + case: (boolP (sz x < sz y)%N) => [Ht | Hf].
+      - by apply: ltnW.
+      - move/negPf in Hf; rewrite Hf /= in hcmp; move/andP: hcmp => [/eqP eqsz _].
+        by rewrite eqsz.
+    + apply/implyP => lesz; change (sz y <= sz x) with (sz y <= sz x)%N in lesz.
+      by rewrite leqNgt in lesz; move/negPf in lesz; rewrite lesz /= in hcmp; move/andP: hcmp => [_ H].
+
+    apply: wf_prodlexi; first by apply: leq_eqVlt.
+    by done.
+    by apply: wf_ltnat.
+    rewrite /Order.lt /=.
+    apply /sizelexi_wf /sizelexi_wf  /lt_wf.
 Qed.
 
 #[export]
-HB.instance Definition _ := isPreorder.Build disp' (seq T Normalisation inv) lt_le_def cmp_refl cmp_trans.
+HB.instance Definition _ := isPreorder.Build disp' (seq T Normalisation inv) cmp_lt_le_def cmp_refl cmp_trans.
 
 End Preorder.
 

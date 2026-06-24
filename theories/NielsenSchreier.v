@@ -821,7 +821,7 @@ Qed.
 
 Lemma lKprefix_all_split (y: FreeGroup Sigma) (yinU: y \in U) (Hnontrivial: FreeGroup_norm y <> e): {w: FreeGroup Sigma |
   w \in lKprefix_all y /\
-  ((lKprefix_all y != [::]) -> (forall x, (lKprefix x y != y) -> (x \in U) -> prefix (lKprefix x y) w))}.
+  ((forall x, (lKprefix x y != y) -> (x \in U) -> prefix (lKprefix x y) w))}.
 Proof.
   case eqt: (lKprefix_all y) => [| a l].
   + have habs: y == e  by apply: lKprefix_all_nil.
@@ -832,7 +832,7 @@ Proof.
   rewrite /lKprefix_all; rewrite /lKprefix_all in eqt.
   set t := sort (fun a b : seq (sigma (FGP Sigma)) => (size b <= size a)%N) [seq a <- [seq lKprefix x y  | x <- U]  | a != y].
   exists (a); split; first by apply: mem_head.
-  move => hnonNil x lKdiff xinU.
+  move => x lKdiff xinU.
   have aint: a \in t.
     by rewrite /t eqt mem_head.
   rewrite mem_sort in aint.
@@ -1076,9 +1076,21 @@ Proof.
       by rewrite eqsz habs in Hdistinct.
 
     rewrite !inv_cat.
+    rewrite Hempty cats0 in eqv.
 
     case: (boolP (p < q :> seqlexi _)%O) => [Ht | Hf].
-    - right; left.
+    - right; left; apply/orP; right; apply/andP; split; rewrite /CmpOrder.sz /= -inv_cat.
+      + have -> : FreeGroup_norm (inv (lKprefix y z ++ c :> FreeGroup Sigma) @ inv y) = inv (v ++ c :> FreeGroup Sigma).
+          rewrite freely_reduced_correct in fryz; rewrite fryz -FreeGroup_norm_inv.
+          apply: FreeGroup_norm_unique; rewrite -inverse_law.
+          have ->: y @ (lKprefix y z ++ c) == v++c.
+            rewrite {1}eqy.
+            by rewrite associativity -[(p ++ w' :> FreeGroup Sigma) @ lKprefix y z]associativity eqw'invq inverse_right neutral_right eqv.
+          by done.
+        rewrite eqz in frz.
+        by rewrite FreeGroup_norm_inv !size_inv -frz !size_cat; apply/eqP; rewrite eqv eqsz.
+      rewrite !inv_cat.
+
       rewrite lt_sizelexiE; apply/orP; right; apply/andP; split; first by done.
       set c' := CmpOrder.half (inv c ++ inv (p:>FreeGroup Sigma)).
       set p' := inv (CmpOrder.upperhalf (inv c ++ inv (p:>FreeGroup Sigma)):>FreeGroup Sigma).
@@ -1128,7 +1140,7 @@ Proof.
         + by apply: lt_t1_t2.
 
       case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
-      - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last by assumption.
+      - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct; last rewrite /Order.le /=.
         rewrite CmpOrder.max_wordC CmpOrder.max_word_correct; last by assumption.
         case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
         - rewrite CmpOrder.min_wordC CmpOrder.min_word_correct -eq_firsthalfz; last by assumption.
@@ -1159,6 +1171,7 @@ Proof.
           apply/implyP => _; apply/andP; split; first by assumption.
           apply/implyP => habs.
           by rewrite /Order.le /= geqq'c' in habs.
+          by assumption.
       - move: (@sizelexi_total _ _ p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
         rewrite CmpOrder.min_word_correct; last by assumption.
         rewrite CmpOrder.max_word_correct; last by assumption.
@@ -1193,7 +1206,13 @@ Proof.
       have Ht: (q < p :> seqlexi _)%O.
         by move/eqP in Hdistinct; rewrite Order.POrderTheory.lt_def; apply/andP; split.
 
-      left.
+      left; apply/orP; right; apply/andP; split; first rewrite /CmpOrder.sz /=.
+      + have -> : FreeGroup_norm ((a ++ inv (lKprefix x y :> FreeGroup Sigma):>FreeGroup Sigma) @ y) =
+                    (a ++ (inv (q:>FreeGroup Sigma) :> FreeGroup Sigma) :> FreeGroup Sigma).
+        by rewrite -dect /t {2}eqx.
+      rewrite eqx in frx.
+      by rewrite -frx !size_cat; apply/eqP; rewrite !size_inv eqsz.
+
       rewrite lt_sizelexiE; apply/orP; right; apply/andP; split; first by done.
       set c' := CmpOrder.half (a ++ p).
       set p' := inv (CmpOrder.upperhalf (a ++ inv (lKprefix x y:>FreeGroup Sigma)):>FreeGroup Sigma).
@@ -1304,7 +1323,34 @@ Proof.
           by rewrite Order.PreorderTheory.ltxx in habs'.
 Qed.
 
-            
+Hypothesis frU: forall x, x \in U -> freely_reduced x.
+
+Lemma Placeholder (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
+  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
+  (sz(prod l) >= length l)%N.
+Proof.
+  case: l inU non_trvl => [//| a l inU non_trvl].
+  have ainU: a \in U.
+    move: (@inU 0) => finU.
+    rewrite /= in finU; apply: finU.
+    by apply: ltn0Sn.
+  move: (@lKprefix_all_split a ainU (N0 a ainU)) => [w Pw].
+  have: exists l', FreeGroup_norm (prod (a :: l)) = w ++ l' /\ (length l' >= length l + 1)%N.
+    move: a w inU non_trvl ainU Pw; elim: l => [// | b l IH] a w inU non_trvl ainU [wpref Pw].
+      move: (@lKprefix_allW a w wpref) => /mapP [x xinU prefx].
+      move: (@lKprefix_split x a (frU x xinU) (frU a ainU)) => [u [v]] [eqx [eqa frxa]].
+      move: (@triplet_lt x a x (frU x xinU) (frU a ainU) (frU x xinU) xinU ainU xinU) => Q.
+
+      rewrite /= addnC addn0.
+      have ->: FreeGroup_norm (a @ e) = a.
+        move: (frU a ainU) => H.
+        rewrite freely_reduced_correct in H; rewrite {2}H.
+        by apply /FreeGroup_norm_unique /neutral_right.
+Admitted.
+
+    
+    
+
 End WordSplitting.
 
 

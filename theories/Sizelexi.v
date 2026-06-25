@@ -186,6 +186,47 @@ Proof.
     by rewrite Hleq orbC.
 Qed.
 
+Fact sizelexi_total (Htotal: total (fun x y : T => (x <= y)%O)) : total (sizelexi).
+Proof.
+  rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
+  elim: u v cmpsz => [// | a l IH v].
+  case: v => [// | b l' cmpsz].
+  rewrite /= in cmpsz; case: cmpsz => cmpsz.
+  case: (boolP (a <= b)%O) => [Hle | Hf].
+  case: (boolP (l <= l' :> seqlexi _)%O) => [Hlel | Hfl].
+  + apply/orP; left.
+    rewrite lexi_cons; apply/andP; split; first by done.
+    by apply/implyP => Hle'.
+  + move/negPf in Hfl; move: (IH l' cmpsz) => IHl'; rewrite Hfl /= in IHl'.
+    case: (boolP (b <= a)%O) => [Hcomp | Hlt].
+    + apply/orP; right.
+      rewrite lexi_cons; apply/andP; split; first by done.
+      by apply/implyP => Hle'.
+    + apply/orP; left.
+      rewrite /Order.le /=; apply/andP; split; first by done.
+      apply/implyP => habs; move/negP in Hlt.
+      by move: (Hlt habs) => F.
+  case: (boolP (l <= l' :> seqlexi _)%O) => [Hlel | Hfl].
+  + move/negPf in Hf; move: (IH l' cmpsz) => IHl'; rewrite Hlel /= in IHl'.
+    case: (boolP (b <= a)%O) => [Hcomp | Hlt].
+    + apply/orP; right.
+      rewrite lexi_cons; apply/andP; split; first by done.
+      by rewrite Hf.
+    + rewrite /total in Htotal; move: (Htotal a b) => H'.
+      rewrite Hf /= in H'.
+      move/negP in Hlt.
+      by move: (Hlt H') => F.
+  + move/negPf in Hf; move/negPf in Hfl; move: (IH l' cmpsz) => IHl'; rewrite Hfl /= in IHl'.
+    case: (boolP (b <= a)%O) => [Hcomp | Hlt].
+    + apply/orP; right.
+      rewrite lexi_cons; apply/andP; split; first by done.
+      by rewrite Hf.
+    + rewrite /total in Htotal; move: (Htotal a b) => H'.
+      rewrite Hf /= in H'.
+      move/negP in Hlt.
+      by move: (Hlt H') => F.
+Qed.
+
 End SizeLexi.
 
 
@@ -295,13 +336,6 @@ move=> u v /andP[/orP[ltsz | /andP[/eqP eqsz leuv]]].
   by rewrite (gtn_eqF ltsz).
 move=> /orP[| /andP[_ levu]]; first by rewrite eqsz ltnn.
 by apply/eqP; rewrite (eq_le (u : seqlexi _)) leuv levu.
-Qed.
-
-
-Fact sizelexi_total : total (@sizelexi d T).
-Proof.
-rewrite /sizelexi => u v; case: (ltngtP (size u) (size v)) => cmpsz //=.
-by case: (leP (u : seqlexi _) v) => //= /ltW.
 Qed.
 
 End SizeLexiOrder.

@@ -204,9 +204,9 @@ Proof.
   + by [].
   case: ifP => [Ht' | Hf'].
   + by [].
-  + move: (@sizelexi_total disp T w w') => Ht.
+  + move: (@sizelexi_total disp T (Order.le_total) w w') => Ht.
     rewrite Hf /= in Ht.
-    move: (@sizelexi_total disp T w' w) => Ht'.
+    move: (@sizelexi_total disp T (Order.le_total) w' w) => Ht'.
     rewrite Hf' /= in Ht'.
     apply: sizelexi_anti; apply/andP; split; by done.
 Qed.  
@@ -230,9 +230,9 @@ Proof.
   + by [].
   case: ifP => [Ht' | Hf'].
   + by [].
-  + move: (@sizelexi_total disp T w w') => Ht.
+  + move: (@sizelexi_total disp T (Order.le_total) w w') => Ht.
     rewrite Hf /= in Ht.
-    move: (@sizelexi_total disp T w' w) => Ht'.
+    move: (@sizelexi_total disp T (Order.le_total) w' w) => Ht'.
     rewrite Hf' /= in Ht'.
     apply: sizelexi_anti; apply/andP; split; by done.
 Qed.  
@@ -341,6 +341,32 @@ Proof.
     rewrite /Order.lt /=.
     apply /sizelexi_wf /sizelexi_wf  /lt_wf.
 Qed.
+
+Section Total.
+
+#[local] HB.instance Definition _  := Order.Le_isPreorder.Build sizelexidisplay
+                               (seq T Normalisation inv) sizelexi_refl sizelexi_trans.
+
+Lemma szlexi_ofseq_total: total (fun a b: seq.seq (seq T Normalisation inv) => (a <= b)%O).
+Proof.
+  move => w w'.
+  rewrite /Order.le /=.
+  by move: (@sizelexi_total sizelexidisplay (seq T Normalisation inv) (@sizelexi_total disp T (Order.le_total))) => H.
+Qed.
+
+Lemma cmp_total: total cmp_le.
+Proof.
+  move => x y.
+  rewrite /cmp_le.
+  case: (boolP (sz x < sz y)%N) => [Hlt | Hle]; rewrite /= => //.
+  apply/orP; rewrite ltnNge negbK leq_eqVlt in Hle; move/orP: Hle => [/eqP Heq | Hlt].
+  + rewrite !Heq ltnn /= !eqxx /=.
+    rewrite /Order.le /=; apply/orP.
+    by move: (@szlexi_ofseq_total) => Q; rewrite /total in Q; move: (Q (transform x) (transform y)) => Qinst.
+  + by rewrite Hlt /=; right.
+Qed.
+
+End Total.
 
 #[export]
 HB.instance Definition _ := isPreorder.Build disp' (seq T Normalisation inv) cmp_lt_le_def cmp_refl cmp_trans.

@@ -176,7 +176,21 @@ Proof.
 
   rewrite -Heq_ij.
   by [].
-  by rewrite size_enumerate in H_bound.      
+  by rewrite size_enumerate in H_bound.
+Qed.
+
+Lemma enumerate_in (l: seq A) (j : nat) (jbnd: (j < size l)%N) (x: A):
+  nth ea l j = x -> (j, x) \in enumerate l.
+Proof.
+  move => H.
+  apply/(nthP (0, ea)).
+  exists (j); first by rewrite size_enumerate; apply: jbnd.
+  rewrite /enumerate.
+  rewrite nth_zip /=.
+  rewrite H nth_iota.
+  + by rewrite addnC addn0.
+  + by assumption.
+  + by rewrite size_iota.
 Qed.
 
 End Enumerate_eqType.
@@ -742,9 +756,7 @@ Lemma invol_unique (x: FreeGroup Sigma):
   (x == inv x) -> x == e.
 Proof.
   have: forall n (y: FreeGroup Sigma), (size y = n)%N -> y == inv y -> y == e.
-    (* 2. Apply well-founded induction on the natural number n *)
     elim/ltn_ind=> n IH y Hsize Hinv.
-    (* Case analysis on the size of the word *)
     case: n IH Hsize => [| [| n']] IH.
     - move=> /size0nil -> //.
       
@@ -766,9 +778,7 @@ Proof.
       rewrite /invl /= /FreeGroup_invl in habs'.
       by case: a approx fra frainv habs habs' => approx fra frainv habs habs' //=.
       
-    - (* Case n = n' + 2: x has at least 2 letters *)
-      move=> Hsize.
-      (* Deconstruct x into first letter, middle body, and last letter *)
+    - move=> Hsize.
       case: y Hinv Hsize => [//| a l approx szl].
       have lt0sz: (size l > 0)%N.
           rewrite /= in szl.
@@ -1244,7 +1254,7 @@ Proof.
               + by apply: habs.
               + by apply: slt_t1_t2.
             by rewrite Order.PreorderTheory.ltxx in habs'.
-        - move: (@sizelexi_total _ _ q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
+        - move: (@sizelexi_total _ _ le_total q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
 
           rewrite CmpOrder.min_word_correct -eq_firsthalfz; last by assumption.
           rewrite CmpOrder.max_word_correct; last by assumption.
@@ -1255,7 +1265,7 @@ Proof.
           apply/implyP => habs.
           by rewrite /Order.le /= geqq'c' in habs.
           by assumption.
-      - move: (@sizelexi_total _ _ p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
+      - move: (@sizelexi_total _ _ le_total p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
         rewrite CmpOrder.min_word_correct; last by assumption.
         rewrite CmpOrder.max_word_correct; last by assumption.
         case: (boolP (q' <= c')%O) => [leqq'c' | geqq'c'].
@@ -1269,7 +1279,7 @@ Proof.
             + by apply: leq'p'.
             + by apply: slt_t1_t2.
           by rewrite Order.PreorderTheory.ltxx in habs'.
-        + move: (@sizelexi_total _ _ q' c') => Hqtotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Hqtotal.
+        + move: (@sizelexi_total _ _ le_total q' c') => Hqtotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Hqtotal.
           rewrite -!eq_firsthalfz.
           rewrite CmpOrder.min_word_correct; last by assumption.
           rewrite CmpOrder.max_word_correct; last by assumption.
@@ -1367,7 +1377,7 @@ Proof.
               + by apply: slt_t1_t2.
               + by apply: habs.
             by rewrite Order.PreorderTheory.ltxx in habs'.
-        - move: (@sizelexi_total _ _ p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
+        - move: (@sizelexi_total _ _ le_total p' c') => Htotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Htotal.
 
           rewrite CmpOrder.min_word_correct; last by assumption.
           rewrite CmpOrder.max_word_correct; last by assumption.
@@ -1378,7 +1388,7 @@ Proof.
           apply/implyP => habs.
           by rewrite /Order.le /= geqp'c' in habs.
       - rewrite -eq_firsthalfx -eq_firsthalfpx.
-        move: (@sizelexi_total _ _ q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
+        move: (@sizelexi_total _ _ le_total q' c') => Htotal; move/negPf in geqq'c'; rewrite /Order.le /= in geqq'c'; rewrite geqq'c' /= in Htotal.
         rewrite CmpOrder.min_word_correct; last by assumption.
         rewrite CmpOrder.max_word_correct; last by assumption.
         case: (boolP (p' <= c')%O) => [leqp'c' | geqp'c'].
@@ -1392,7 +1402,7 @@ Proof.
             + by apply: slt_t1_t2.
             + by apply: leq'p'.
           by rewrite Order.PreorderTheory.ltxx in habs'.
-        + move: (@sizelexi_total _ _ p' c') => Hqtotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Hqtotal.
+        + move: (@sizelexi_total _ _ le_total p' c') => Hqtotal; move/negPf in geqp'c'; rewrite /Order.le /= in geqp'c'; rewrite geqp'c' /= in Hqtotal.
           rewrite CmpOrder.min_word_correct; last by assumption.
           rewrite CmpOrder.max_word_correct; last by assumption.
 
@@ -2244,6 +2254,12 @@ Proof.
     by [].
 Qed.
 
+Lemma t3_size (gens: vec):
+  (size (t3 gens) <= size gens)%N.
+Proof.
+  by rewrite /t3 size_filter count_size.
+Qed.
+
 Lemma t3_include_subgroup (gens: vec):
   forall x, in_generated_subgroup gens x -> in_generated_subgroup (t3 gens) x.
 Proof.
@@ -2836,13 +2852,30 @@ Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
 Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
   (sz(x @ y) >= sz(y))%N. *)
 
-Print second_reduce.
-
 Lemma second_reduce_fixpoint (v : vec) :
   second_reduce_step (second_reduce v) = [::].
 Proof.
-Admitted.
-  
+  have wf_cmp: well_founded vec_lexico_ltP.
+    rewrite /MR /vec_lexico_ltP /Order.lt /=.
+    apply: sizelexi_wf.
+    by apply /CmpOrder.cmp_wf /le_wf.
+
+  rewrite second_reduce_equation.
+  elim/(well_founded_ind wf_cmp): v.
+    move => v IH.
+    case eqE: (second_reduce_step v) => [//| [[[k ix] iy] xy] l].
+
+    move: (@second_reduce_tcc) => [H _].
+    move: (H v (k, ix, iy, xy) l (k, ix, iy) xy (k, ix) iy k ix (erefl) (erefl) (erefl) eqE) => H'.
+
+    set t:= if (k == 0)%B then t2 v ix iy else if (k == 1)%B then t1 (t2 (t1 v iy) ix iy) iy else if (k == 2)%B then t2 (t1 v ix) ix iy
+else if (k == 3)%B then t1 (t2 (t1 (t1 v iy) ix) ix iy) iy else v.
+
+    move: (@IH t H') => Q.
+
+    by rewrite second_reduce_equation.
+Qed.
+
 
 Definition NielsenReduction (gens: vec) :=
   map (FreeGroup_norm) (t3 (second_reduce gens)).
@@ -2866,6 +2899,193 @@ Proof.
     by rewrite habs in H.
 Qed.
 
+Lemma le_sz_xx (x: FreeGroup Sigma):
+  (sz x <= sz (x @ x))%N.
+Proof.
+  set x' := FreeGroup_norm x.
+  have frx': freely_reduced x'.
+    by rewrite freely_reduced_correct /x' FreeGroup_norm_involutive.
+  move: (@lKprefix_split Sigma x' x' frx' frx') => [w [w' [eqx'l [eqx'r frww']]]].
+
+  have eqsz: (size w = size w').
+    rewrite {1}eqx'l in eqx'r.
+    move/(f_equal size) in eqx'r; rewrite !size_cat addnC in eqx'r.
+    move/eqP in eqx'r; rewrite size_inv eqn_add2l in eqx'r.
+    by apply/eqP.
+
+  case: (boolP (size (w') > size (lKprefix x' x'))%N) => [Ht | Hf]; last first.
+  + have prefw: prefix w (lKprefix x' x').
+      rewrite prefixE.
+      move/(f_equal (take (size w))) in eqx'r; move/(f_equal (take (size w))) in eqx'l.
+      rewrite eqx'r in eqx'l.
+      rewrite take_cat in eqx'l.
+      rewrite ifF // in eqx'l; last first.
+      + by apply/negP; rewrite ltnn.
+      rewrite subnn take0 cats0 in eqx'l.
+      rewrite take_cat in eqx'l.
+      rewrite ltnNge negbK leq_eqVlt in Hf; case/orP: Hf => [/eqP Heq | Hlt].
+      + rewrite eqsz Heq ifF // in eqx'l.
+        rewrite subnn take0 cats0 in eqx'l.
+        by rewrite eqx'l take_size.
+        by apply/negP; rewrite ltnn.
+      + by rewrite eqsz Hlt -eqsz in eqx'l; apply/eqP.
+
+    have eqinv: w' = inv w.
+      move/prefixP: prefw => [s eqlK].
+
+      have eqsz': size (w ++ s) = size (w ++ inv (s:>FreeGroup Sigma)).
+        by rewrite !size_cat size_inv; apply/eqP; rewrite eqn_add2l.
+        
+      rewrite {1}eqx'r eqlK inv_cat catA in eqx'l; move/eqP in eqx'l.
+      move: (@eqseq_cat _ (w++s) (w ++ inv (s :> FreeGroup Sigma)) (w') (inv (w :> FreeGroup Sigma)) eqsz') => H.
+      by rewrite H in eqx'l; move/andP: eqx'l => [_ /eqP R].
+
+    move/prefixP: prefw => [s eqlK].
+    move/(f_equal inv) in eqx'l; rewrite inv_cat inv_eq_invol -eqinv -eqx'r in eqx'l.
+    have habs : x' == inv x'.
+      by rewrite eqx'l.
+
+    move: (invol_unique x' habs) => H.
+    have eqx'e: x' = e.
+      rewrite freely_reduced_correct in frx'.
+      rewrite -FreeGroup_norm_e frx'.
+      by apply: FreeGroup_norm_unique.
+    
+    rewrite /sz; rewrite /x' in eqx'e; rewrite eqx'e /=.
+    have ->: FreeGroup_norm (x @ x) = e.
+      rewrite -FreeGroup_norm_e FreeGroup_norm_law !eqx'e.
+      apply: FreeGroup_norm_unique.
+      by rewrite neutral_left.
+      by done.
+  + have preflK: prefix (lKprefix x' x') w.
+    move/(f_equal (take (size w))) in eqx'r; move/(f_equal (take (size w))) in eqx'l.
+    rewrite eqx'r in eqx'l.
+    rewrite take_cat in eqx'l.
+    rewrite ifF // in eqx'l; last first.
+    + by apply/negP; rewrite ltnn.
+    rewrite subnn take0 cats0 in eqx'l.
+    rewrite take_cat in eqx'l.
+    rewrite ifF in eqx'l; last first.
+      apply/negbTE; rewrite leqNgt negbK ltnW //.
+      by rewrite ltnS eqsz.
+    apply/prefixP.
+    exists (take (size w - size (lKprefix x' x')) w').
+    by symmetry.
+  
+  move/prefixP: preflK => [s eqw].
+  rewrite eqw in eqx'l.
+
+  have eqszs: (0 < size s)%N.
+    move/(f_equal size) in eqw.
+    rewrite size_cat in eqw.
+    by rewrite -(ltn_add2l (size (lKprefix x' x'))) addn0 -eqw eqsz.
+
+  have eqfrxx: FreeGroup_norm (x @ x) = (lKprefix x' x') ++ s ++ s ++ inv (lKprefix x' x':> FreeGroup Sigma).
+    rewrite FreeGroup_norm_law; change (FreeGroup_norm x) with (x'); rewrite {1}eqx'l {5}eqx'l -cat_law -!catA.  
+    rewrite [inv (lKprefix x' x' :> FreeGroup Sigma) ++ lKprefix x' x' ++ s ++ inv (lKprefix x' x' :> FreeGroup Sigma)]catA.
+    rewrite FreeGroup_norm_law [FreeGroup_norm
+    (s ++ (inv (lKprefix x' x' :> FreeGroup Sigma) ++ lKprefix x' x') ++
+    s ++ inv (lKprefix x' x' :> FreeGroup Sigma))]FreeGroup_norm_law.
+
+    rewrite [FreeGroup_norm
+    ((inv (lKprefix x' x' :> FreeGroup Sigma) ++ lKprefix x' x') ++
+    s ++ inv (lKprefix x' x' :> FreeGroup Sigma))]FreeGroup_norm_law.
+
+    have ->: FreeGroup_norm (inv (lKprefix x' x' :> FreeGroup Sigma) ++ lKprefix x' x') = e.
+      rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
+      by rewrite cat_law inverse_right.
+    rewrite -FreeGroup_norm_e.
+    rewrite -[FreeGroup_norm
+    (FreeGroup_norm e @ FreeGroup_norm (s ++ inv (lKprefix x' x' :> FreeGroup Sigma)))]FreeGroup_norm_law.
+    have -> : FreeGroup_norm (e @ (s ++ inv (lKprefix x' x' :> FreeGroup Sigma) :> FreeGroup Sigma)) = FreeGroup_norm (s ++ inv (lKprefix x' x' :> FreeGroup Sigma)).
+      apply: FreeGroup_norm_unique.
+      by rewrite neutral_left.
+    rewrite -[FreeGroup_norm
+    (FreeGroup_norm s @ FreeGroup_norm
+    (s ++ inv (lKprefix x' x' :> FreeGroup Sigma)))]FreeGroup_norm_law -FreeGroup_norm_law.
+    rewrite -!cat_law.
+    symmetry; rewrite -freely_reduced_correct.
+
+    have eqw': w' = s ++ inv (lKprefix x' x' :> FreeGroup Sigma).
+      rewrite {1}eqx'l -catA in eqx'r.
+      move: (@eqseq_cat _ (lKprefix x' x') (lKprefix x' x') (s ++ inv (lKprefix x' x' :> FreeGroup Sigma)) w' (erefl)) => H.
+      move/eqP in eqx'r; rewrite H in eqx'r.
+      move/andP: eqx'r => [_ /eqP R].
+      by symmetry.
+      
+    by rewrite eqw eqw' !catA in frww'; rewrite !catA.
+
+    rewrite /sz; change (FreeGroup_norm x) with x'; rewrite eqfrxx {1}eqx'l !size_cat.
+    rewrite addnA leq_add2l size_inv addnC -{1}[size (lKprefix x' x')]addn0 leq_add2l.
+    by apply: ltnW.
+Qed.
+
+Lemma NielsenR_minimal:
+  forall x y, (x \in gens) -> (y \in gens) -> (non_trivial x y) ->
+  (x @ y >= x)%O.
+Proof.
+  move => x y xing ying ntrv.
+  rewrite /gens /NielsenReduction in xing ying; move/mapP: ying => [y' yin yeq] ; move/mapP: xing => [x' xin xeq].
+  rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
+
+  have eqsrs: second_reduce_step (second_reduce v) = [::].
+    by apply: second_reduce_fixpoint.
+
+  (* WIP *)
+
+  rewrite leqNgt; apply/negP => habs.
+  move/nthP in y'ins; move/nthP in x'ins.
+  move: (y'ins e) => [iy iybound eqy']; move: (x'ins e) => [ix ixbound eqx'].
+
+  pose xy := FreeGroup_norm (x'@y').
+
+  have: (0, ix, iy, xy) \in second_reduce_step (second_reduce v).
+    rewrite /second_reduce_step; apply/flattenP.
+
+    set t := (fun '(((ix, x'), (iy, y')) : (nat * word) * (nat * word)) => pmap
+    (fun '(k, xy) =>
+      if ((xy < x')%O) then
+        Some(k, ix, iy, xy)
+      else
+        None: option (nat * nat * nat * word)
+    ) (enumerate [:: FreeGroup_norm (x' @ y'); FreeGroup_norm (x' @ inv y'); FreeGroup_norm (inv x' @ y'); FreeGroup_norm (inv x' @ inv y')])
+    ) ((ix, x'), (iy, y')).
+
+    exists (t).
+      apply/mapP.
+      exists ((ix, x'), (iy, y')); last by done.
+      rewrite mem_filter.
+
+      case: (ix =P iy) => [Ht | Hf].
+      + have eqx'y': x' = y'.
+          by rewrite -eqx' -eqy' Ht.
+        rewrite /sz xeq yeq eqx'y' -FreeGroup_norm_law FreeGroup_norm_involutive in habs.
+        have habs': (sz y' <= sz (y' @ y'))%N.
+          by apply: le_sz_xx.
+        rewrite /sz in habs'; rewrite leqNgt in habs'; move/negP in habs'.
+        by move: (habs' habs) => F.
+      + rewrite /=; apply/allpairsP.
+        exists ((ix, x'), (iy, y')); split.
+        - rewrite /=.
+          apply: enumerate_in.
+          by done.
+          by apply: eqx'.
+        - rewrite /=.
+          apply: enumerate_in.
+          by done.
+          by apply: eqy'.
+        - by done.
+      
+      rewrite /t mem_pmap; apply/mapP.
+      exists ((0, FreeGroup_norm (x' @ y'))).
+      + by apply: enumerate_in.
+      + case: ifP => [Hlt|_ //].
+        by rewrite /xy.
+Admitted.
+      
+
+  
+
 Lemma NielsenR_N1_left:
   forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
   (sz (x @ y) >= sz(x))%N.
@@ -2877,7 +3097,8 @@ Proof.
     rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
     rewrite leqNgt; apply/negP => habs.
     rewrite /second_reduce in x'ins y'ins.
-    Check second_reduce_equation.
+    
+
 Admitted.
 
 

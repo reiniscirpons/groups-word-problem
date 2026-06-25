@@ -593,8 +593,67 @@ Lemma freely_reduced_cat_overlap (q r s: FreeGroup Sigma) (frqr: freely_reduced 
 Proof.
   rewrite /freely_reduced /=.
   move => a b c habs.
-  case: (boolP (size a < size q)%N).
-Admitted.
+  case: (boolP (size a < size q)%N) => [Hlt | /negPf Hf]; last first.
+  + have sfx: suffix [:: invl (c :> sigma (FGP Sigma)),  c  & b] (r ++ s).
+      have eqsz: (size a - size q = (size (r ++ s) - size [:: invl (c: sigma (FGP Sigma)),  c  & b]))%N.
+        move/(f_equal size) in habs; rewrite !size_cat in habs.
+        move/(f_equal (fun n => subn n (size q))) in habs.
+        rewrite -addnCBA in habs.
+        rewrite subnn addn0 in habs.
+        move/(f_equal (fun n => subn n (size [:: invl (c:>sigma (FGP Sigma)),  c  & b]))) in habs.
+        have eqswap : (size a + size [:: invl (c:> sigma (FGP Sigma)), c & b] - size q - size [:: invl (c: sigma (FGP Sigma)), c & b] 
+          = size a - size q)%N.
+          rewrite subnAC -addnBA.
+          by rewrite subnn addn0.
+          by done.
+        rewrite eqswap in habs.
+        by rewrite size_cat; symmetry.
+        by done.
+
+      move/(f_equal (drop (size a))) in habs.
+      rewrite [drop (size a) (a ++ [:: invl (c: sigma (FGP Sigma)),  c  & b])]drop_size_cat in habs => //.
+      by rewrite drop_cat Hf eqsz in habs; move/eqP in habs; rewrite -suffixE in habs.
+
+    move/suffixP: sfx => [z eqrs].
+    rewrite /(freely_reduced) in frrs; move: (frrs z b c) => frrs'.
+    rewrite eqrs in frrs'.
+    contradiction.
+  + have prfx: prefix (a ++ [:: invl (c:> sigma (FGP Sigma));  c]) (q ++ r).
+      have lesz: (size (a ++ [:: invl (c:> sigma (FGP Sigma));  c]) <= size (q ++ r))%N.
+        rewrite !size_cat /=.
+        rewrite addn2 -addn1.
+        by apply: leq_add.
+      rewrite prefixE.
+      move/(f_equal (take (size (a ++ [:: invl (c:> sigma (FGP Sigma));  c])))) in habs.
+      rewrite catA take_cat in habs.
+      case: (boolP ((size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]) < size (q ++ r))%N)) => [Ht | Hf].
+      + rewrite ifT // in habs.
+        have eqtake: take (size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c])) (a ++ [:: invl (c :> sigma ((FGP Sigma))),  c  & b]) = (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]).
+          apply/eqP; rewrite -prefixE.
+          change (a ++ [:: invl (c :> sigma ((FGP Sigma))), c & b]) with (a ++ [:: invl (c :> sigma ((FGP Sigma))); c] ++ b).
+          by rewrite catA prefix_prefix.
+        apply/eqP.
+        by rewrite eqtake in habs.
+      + move/negPf in Hf.
+        rewrite ifF // in habs.
+        move/negP in Hf.
+        rewrite ltnNge in Hf.
+        move/negP in Hf. rewrite negbK in Hf.
+        have eq: (size (q ++ r) = size (a ++ [:: invl (c: sigma (FGP Sigma));  c]))%N.
+          by apply/eqP; rewrite eqn_leq Hf lesz.
+        rewrite eq subnn take0 cats0 in habs.
+        have eqtake: take (size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c])) (a ++ [:: invl (c :> sigma ((FGP Sigma))),  c  & b]) = (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]).
+          apply/eqP; rewrite -prefixE.
+          change (a ++ [:: invl (c :> sigma ((FGP Sigma))), c & b]) with (a ++ [:: invl (c :> sigma ((FGP Sigma))); c] ++ b).
+          by rewrite catA prefix_prefix.
+        rewrite eqtake in habs.
+        by rewrite habs take_size.
+    move/prefixP: prfx => [z eqz].
+    rewrite /freely_reduced in frqr.
+    move: (frqr a z c) => habs'.
+    by rewrite eqz catA in habs'.
+Qed.
+
 
 Lemma inv_cons (a : sigma (FGP Sigma)) (t : FreeGroup Sigma):
   inv (a :: t :> FreeGroup Sigma) = rcons (inv t) (invl a).
@@ -1366,7 +1425,7 @@ Proof.
     by rewrite eqxinvy inv_eq_invol mem_cat yingens /=.
 Qed.
     
-Lemma Placeholder (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
+Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
   (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
   (sz(prod l) >= length l)%N.
 Proof.
@@ -1376,33 +1435,36 @@ Proof.
     rewrite /= in finU; apply: finU.
     by apply: ltn0Sn.
   move: (@lKprefix_all_split a ainU (N0 a ainU)) => [w [win [hdistinct Pw]]].
-  have: exists l', FreeGroup_norm (prod (a :: l)) = w ++ l' /\ (size l' >= size l + 1)%N.
-    move: a w inU non_trvl ainU win hdistinct Pw; elim: l => [// | b l IH] a w inU non_trvl ainU wpref hdistinct Pw.
-    + move: (@lKprefix_allW a w wpref) => /mapP [x xinU prefx].
-      move: (@lKprefix_split x a (frU x xinU) (frU a ainU)) => [u [v]] [eqx [eqa frxa]].
+  move: (@lKprefix_allW a w win) => /mapP [x xinU prefx].
+  move: (@lKprefix_split x a (frU x xinU) (frU a ainU)) => [u [v]] [eqx [eqa frxa]].
 
-      have ntrvxa: non_trivial x a.
-        rewrite /non_trivial => habs.
-        move/(lKprefix_contra x a (frU x xinU) (frU a ainU)) in habs; rewrite -prefx in habs.
-        by rewrite habs in hdistinct; move/eqP in hdistinct.
+  have ntrvxa: non_trivial x a.
+    rewrite /non_trivial => habs.
+    move/(lKprefix_contra x a (frU x xinU) (frU a ainU)) in habs; rewrite -prefx in habs.
+    by rewrite habs in hdistinct; move/eqP in hdistinct.
 
-      move: (@triplet_lt x a x (frU x xinU) (frU a ainU) (frU x xinU) xinU ainU xinU ntrvxa ((non_trivialC x a ntrvxa))) => Q.
+  move: (@triplet_lt x a x (frU x xinU) (frU a ainU) (frU x xinU) xinU ainU xinU ntrvxa ((non_trivialC x a ntrvxa))) => Q.
+  case: Q => [Ha | [Hb | [q [qnempty eqaq]]]].
+  + exfalso.
+    by apply: (minU x a xinU ainU ntrvxa).
+  + exfalso.
+    by apply: (minU (inv x) (inv a) (inv_inU x xinU) (inv_inU a ainU) (non_trivial_inv x a ntrvxa)).
+  move: eqaq.
+  set t := lKprefix a x.
+  move => eqaq.
 
-      rewrite /= addnC addn0.
-      have ->: FreeGroup_norm (a @ e) = a.
+  have: exists l' q, FreeGroup_norm (prod (a :: l)) = w ++ q ++ l' /\ q <> [::] /\ prefix (w++q) a /\ (size l' >= size l)%N.
+    move: a w x u v q t inU xinU non_trvl ainU win prefx eqx eqa ntrvxa eqaq hdistinct Pw frxa qnempty; elim: l => [// | b l IH] a w x u v q t inU xinU non_trvl ainU win prefx eqx eqa ntrvxa eqaq hdistinct Pw frxa qnempty.
+    + have ->: FreeGroup_norm (a @ e) = a.
         move: (frU a ainU) => H.
         rewrite freely_reduced_correct in H; rewrite {2}H.
         by apply /FreeGroup_norm_unique /neutral_right.
-      case: Q => [Ha | [Hb | [q [qnempty eqaq]]]].
-      + exfalso.
-        by apply: (minU x a xinU ainU ntrvxa).
-      + exfalso.
-        by apply: (minU (inv x) (inv a) (inv_inU x xinU) (inv_inU a ainU) (non_trivial_inv x a ntrvxa)).
-      exists (q ++ inv (lKprefix a x :> FreeGroup Sigma)); split; first by rewrite prefx.
-      rewrite size_cat; case: ((size q =P 0)) => [Habs | Hlt].
-      + by move/size0nil in Habs.
-      + move/eqP in Hlt; rewrite -lt0n in Hlt.
-        by rewrite ltn_addr.
+      
+      exists (inv (t:>FreeGroup Sigma));
+      exists (q); split; first by rewrite prefx.
+      split; first by apply: qnempty.
+      split; first by rewrite prefx; apply/prefixP; exists (inv (t:>FreeGroup Sigma)); rewrite -catA. 
+      by rewrite /=.
     + have ibound': forall (i: nat) a l, (i < size l)%N -> (((i.+1) < size (a::l))%N).
         move => i ibound.
         rewrite /=.
@@ -1427,29 +1489,6 @@ Proof.
         move: (inU (0.+1) bnd) => L.
         by rewrite -nth_behead /= in L.
       move: (@lKprefix_all_split b binU (N0 b binU)) => [wb [wbin [wbdistinct Pwb]]].
-
-      move: (IH b wb inUW non_trvlW binU wbin wbdistinct Pwb) => [l' [eql' leszl']].
-      move: (@lKprefix_allW a w wpref) => /mapP [x xinU prefx].
-      move: (@lKprefix_split x a (frU x xinU) (frU a ainU)) => [u [v]] [eqx [eqa frxa]].
-
-      have ntrvxa: non_trivial x a.
-        rewrite /non_trivial => habs.
-        move/(lKprefix_contra x a (frU x xinU) (frU a ainU)) in habs; rewrite -prefx in habs.
-        by rewrite habs in hdistinct; move/eqP in hdistinct.
-      
-      have ntrvab: non_trivial a b.
-        have bnd: (0 < size [:: a,  b  & l] - 1)%N.
-          by rewrite /=; lia.
-        by move: (non_trvl 0 bnd) => L; rewrite -nth_behead /= in L.
-      
-      move: (@triplet_lt x a b (frU x xinU) (frU a ainU) (frU b binU) xinU ainU binU ntrvxa ntrvab) => Q.
-      case: Q => [Ha | [Hb | [q [qnempty eqaq]]]].
-      + exfalso.
-        by apply: (minU x a xinU ainU ntrvxa).
-      + exfalso.
-        by apply (minU (inv b) (inv a) (inv_inU b binU) (inv_inU a ainU) (non_trivialC (inv a) (inv b) (non_trivial_inv a b ntrvab))).
-      move: (lKprefix_split a b (frU a ainU) (frU b binU)) => [f [g]] [eqa' [eqb frab]].
-
       move: (@lKprefix_allW b wb wbin) => /mapP [z zinU prefz].
       move: (lKprefix_split z b(frU z zinU) (frU b binU)) => [f' [g']] [eqz [eqb' frzb]].
 
@@ -1458,12 +1497,37 @@ Proof.
         move/(lKprefix_contra z b (frU z zinU) (frU b binU)) in habs; rewrite -prefz in habs.
         by rewrite habs in wbdistinct; move/eqP in wbdistinct.
 
-      move: (@triplet_lt a b z (frU a ainU) (frU b binU) (frU z zinU) ainU binU zinU ntrvab (non_trivialC z b ntrvzb)) => Q.
-      case: Q => [Ha | [Hb | [p [pnempty eqbp]]]].
+      have ntrvab: non_trivial a b.
+        have bnd: (0 < size [:: a,  b  & l] - 1)%N.
+          by rewrite /= -addn2 -addnBA //= addnS ltn0Sn.
+        by move: (non_trvl 0 bnd) => L; rewrite -nth_behead /= in L.
+
+      move: (@triplet_lt x a b (frU x xinU) (frU a ainU) (frU b binU) xinU ainU binU ntrvxa ntrvab) => Q.
+      move: q eqaq qnempty => _ _ _.
+      case: Q => [Ha | [Hb | [q [qnempty eqaq]]]].
+      + exfalso.
+        by apply: (minU x a xinU ainU ntrvxa).
+      + exfalso.
+        by apply (minU (inv b) (inv a) (inv_inU b binU) (inv_inU a ainU) (non_trivialC (inv a) (inv b) (non_trivial_inv a b ntrvab))).
+      move: (lKprefix_split a b (frU a ainU) (frU b binU)) => [f [g]] [eqa' [eqb frab]].
+
+
+      move: (@triplet_lt z b z (frU z zinU) (frU b binU) (frU z zinU) zinU binU zinU ntrvzb (non_trivialC z b ntrvzb)) => Q.
+      case: Q => [Ha | [Hb | [m [mnempty eqbm]]]].
+      + exfalso.
+        by apply: (minU z b zinU binU ntrvzb).
+      + exfalso.
+        by apply (minU (inv z) (inv b) (inv_inU z zinU) (inv_inU b binU) (non_trivial_inv z b ntrvzb)).
+
+      move: (IH b wb z f' g' m (lKprefix b z) inUW zinU non_trvlW binU wbin prefz eqz eqb' ntrvzb eqbm wbdistinct Pwb frzb mnempty) => [l' [p' [eql' [p'nempty [p'infix leszl']]]]].
+
+      move: (@triplet_lt a b z (frU a ainU) (frU b binU) (frU z zinU) ainU binU zinU ntrvab (non_trivialC z b ntrvzb)) => Q'.
+      case: Q' => [Ha | [Hb | [p [pnempty eqbp]]]].
       + exfalso.
         by apply: (minU a b ainU binU ntrvab).
       + exfalso.
         by apply (minU (inv z) (inv b) (inv_inU z zinU) (inv_inU b binU) (non_trivial_inv z b ntrvzb)).
+
 
       have prefabwb: prefix (lKprefix a b) wb.
         apply: Pwb.
@@ -1475,7 +1539,8 @@ Proof.
       move/prefixP: prefabwb => [r eqwb].
       rewrite -prefz eqwb in eqb'.
 
-      exists (q ++ r ++ l'); split.
+      exists (r ++ p' ++ l');
+      exists (q); split.
       + rewrite /prod /= FreeGroup_norm_law.
         rewrite /prod /= in eql'.
         rewrite eql'.
@@ -1483,7 +1548,8 @@ Proof.
         rewrite -fra eqaq.
 
         rewrite eqwb -!cat_law !catA -[(((lKprefix x a ++ q) ++ inv (lKprefix a b :> FreeGroup Sigma)) ++ lKprefix a b)]catA.
-        rewrite !cat_law FreeGroup_norm_law [FreeGroup_norm ((((lKprefix x a :> FreeGroup Sigma) @ q) @ (inv (lKprefix a b :> FreeGroup Sigma) @ lKprefix a b)) @ r)]FreeGroup_norm_law.
+        rewrite !cat_law FreeGroup_norm_law [FreeGroup_norm (((((lKprefix x a :> FreeGroup Sigma) @ q) @ (inv (lKprefix a b :> FreeGroup Sigma) @ lKprefix a b)) @ r) @ p')]FreeGroup_norm_law.
+        rewrite [FreeGroup_norm ((((lKprefix x a :> FreeGroup Sigma) @ q) @ (inv (lKprefix a b :> FreeGroup Sigma) @ lKprefix a b)) @ r)]FreeGroup_norm_law.
         rewrite [FreeGroup_norm (((lKprefix x a :> FreeGroup Sigma) @ q) @ (inv (lKprefix a b :> FreeGroup Sigma) @ lKprefix a b))]FreeGroup_norm_law.
         have ->: FreeGroup_norm (inv (lKprefix a b :> FreeGroup Sigma) @ lKprefix a b) = e.
           rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
@@ -1492,7 +1558,8 @@ Proof.
         have ->: FreeGroup_norm (FreeGroup_norm ((lKprefix x a :> FreeGroup Sigma) @ q) @ FreeGroup_norm e) = FreeGroup_norm ((lKprefix x a :> FreeGroup Sigma) @ q).
           by rewrite -FreeGroup_norm_law; apply: FreeGroup_norm_unique; apply: neutral_right.
         rewrite -[FreeGroup_norm (FreeGroup_norm ((lKprefix x a:>FreeGroup Sigma) @ q) @ FreeGroup_norm r)]FreeGroup_norm_law.
-        rewrite -FreeGroup_norm_law.
+        rewrite -[FreeGroup_norm (FreeGroup_norm (((lKprefix x a :> FreeGroup Sigma) @ q) @ r) @ FreeGroup_norm p')]FreeGroup_norm_law.
+        rewrite -!FreeGroup_norm_law.
         symmetry.
         rewrite -!cat_law prefx -freely_reduced_correct.
 
@@ -1501,7 +1568,7 @@ Proof.
           by apply: fra.
           by rewrite {2}eqaq catA prefix_infix.
         
-        have frqr: freely_reduced (q ++ r).
+        have frqr: freely_reduced (q ++ (r ++ p')).
           have eqg: g = r ++ g'.
             rewrite {1}eqb -catA in eqb'; move/eqP in eqb'.
 
@@ -1516,27 +1583,65 @@ Proof.
             move/eqP in eqa'; rewrite (@eqseq_cat _ (lKprefix x a ++ q) f (inv (lKprefix a b :> FreeGroup Sigma)) (inv (lKprefix a b :> FreeGroup Sigma)) eqszf) in eqa';
             move/andP: eqa' => [/eqP R _].
             by symmetry.
+          
+          move/prefixP: p'infix => [s  eqg']. 
+          rewrite eqb' in eqg'.
+          rewrite -eqwb -catA in eqg'; move/eqP in eqg'.
+          rewrite (@eqseq_cat _ (wb) (wb) (g') (p' ++ s) (erefl)) in eqg';
+          move/andP: eqg' => [_ /eqP R].
+          rewrite R in eqg.
+
           rewrite eqf eqg in frab.
           apply: freely_reducedW.
           by apply: frab.
-          rewrite catA -[((lKprefix x a ++ q) ++ r)]catA.
+          rewrite !catA -[((lKprefix x a ++ q) ++ r)]catA -[((lKprefix x a ++ q ++ r) ++ p')]catA.
           apply/infixP.
           exists (lKprefix x a).
-          exists (g').
+          exists (s).
           by rewrite !catA.
       
-        have frrl: freely_reduced (r ++ l').
+        have frrl: freely_reduced (r ++ p' ++ l').
           rewrite eqwb in eql'.
-          have fr: (lKprefix a b ++ r) ++ l' = FreeGroup_norm ((lKprefix a b ++ r) ++ l').
+          have fr: (lKprefix a b ++ r) ++ p' ++ l' = FreeGroup_norm ((lKprefix a b ++ r) ++ p' ++ l').
             by rewrite -!eql' FreeGroup_norm_involutive.
           
           rewrite -freely_reduced_correct in fr.
           apply: freely_reducedW.
           by apply: fr.
-          by rewrite -catA; apply: suffix_infix. 
+          by rewrite -catA; apply: suffix_infix.
+          
+        have frxr: freely_reduced ((lKprefix x a ++ q) ++ (r ++ p')).
+          have leszq: (size q >= 1)%N.
+            rewrite ltnNge; apply/negP => habs.
+            by rewrite leqn0 in habs; move/eqP: habs => /size0nil habs; rewrite habs in qnempty.
+          rewrite -catA.
+          by apply: freely_reduced_cat_overlap.
 
+        rewrite -[(((lKprefix x a ++ q) ++ r) ++ p')]catA.
+        have leszrp': (size (r ++ p') >= 1)%N.
+          rewrite ltnNge; apply/negP => habs.
+          rewrite size_cat in habs.
+          by rewrite leqn0 addn_eq0 in habs; move/andP: habs => [_ /eqP /size0nil habs]; rewrite habs in p'nempty.
+        rewrite -[((lKprefix x a ++ q) ++ r ++ p') ++ l']catA.
+        rewrite catA in frrl.
+        by apply: freely_reduced_cat_overlap.
+      split; first by apply: qnempty.
+      split; first by rewrite prefx; apply/prefixP; exists (inv (lKprefix a b:>FreeGroup Sigma)); rewrite -catA {1}eqaq.
+      rewrite !size_cat /= ltn_addl //.
+      have leszrp': (size p' >= 1)%N.
+        rewrite ltnNge; apply/negP => habs.
+        by rewrite leqn0 in habs; move/eqP: habs => /size0nil habs; rewrite habs in p'nempty.
+      apply: (leq_ltn_trans leszl').
+      by rewrite addnC -{1}[size l']addn0 ltn_add2l.
 
-    
+  move => [l' [q' [eql' [q'nempty [_ lesz]]]]].
+  have leszq': (size q' >= 1)%N.
+    rewrite ltnNge; apply/negP => habs.
+    by rewrite leqn0 in habs; move/eqP: habs => /size0nil habs; rewrite habs in q'nempty.
+  rewrite /sz eql' !size_cat /= ltn_addl //.
+  apply: (leq_ltn_trans lesz).
+  by rewrite addnC -{1}[size l']addn0 ltn_add2l.
+Qed.
     
 
 End WordSplitting.

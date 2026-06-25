@@ -1643,65 +1643,7 @@ Proof.
   by rewrite addnC -{1}[size l']addn0 ltn_add2l.
 Qed.
     
-
 End WordSplitting.
-
-
-Section Nielsen_Axiom.
-
-Context {Sigma: finType}.
-Notation word := (FreeGroup Sigma).
-Notation vec := (seq word).
-
-Variable gens : vec.
-
-Let U := gens ++ [seq (inv w) | w <- gens].
-
-Let F := generatedSubgroup gens. 
-
-Local Notation nthgen := (nth e U).
-Notation bound := (@bound Sigma U).
-
-Hypothesis N0: forall k, (bound k) -> FreeGroup_norm (nth e gens k) <> e.
-Hypothesis N1_left: forall n m, (bound n) -> (bound m) -> (non_trivial (nthgen n) (nthgen m)) ->
-  (sz (nthgen n @ nthgen m) >= sz(nthgen n))%N.
-Hypothesis N1_right: forall n m, (bound n) -> (bound m) -> (non_trivial (nthgen n) (nthgen m)) ->
-  (sz(nthgen n @ nthgen m) >= sz(nthgen m))%N.
-
-Hypothesis N2 : forall k l m, (bound k) -> (bound l) -> (bound m) ->
-  (non_trivial (nthgen k) (nthgen l)) -> (non_trivial (nthgen l) (nthgen m)) ->
-  (sz(nthgen k @ nthgen l @ nthgen m) > sz(nthgen k) +sz(nthgen m) - sz(nthgen l))%N.
-
-Variable x y : FreeGroup Sigma.
-Hypothesis igsx: in_generated_subgroup gens x.
-Hypothesis igsy: in_generated_subgroup gens y.
-
-End Nielsen_Axiom.
-
-(* ############################################################################################
-
-Create a function f : x y -> a decomposition xa xb ya yb such that x @ y =reduc xa @ yb and
-x =reduc xa @ xb y =reduc ya @ yb with proof that it is indeed the case
-
-Lemma stating that size w @ w' = size w + size w' is freely reduced (check, may already exist)
-Lemmas stating that if t = x ++ y, x <= |t|/2, |x| < |y| and y > (|t|+1)/2 are equivalent.
-
-Combine that into a proof that if x and y satisfy N1, then |xa| > |t|/2 (and same for y).
-
-Create a function computing the maximum all xb for a given x (by taking the longest)
-Lemma to show that every xb is a suffix of this one.
-
-Same for prefixes.
-Lemma stating that if N1 and N2 are satisfied, then the max suffix and max prefix are both < |t|/2
-Lemma stating that if prefix and suffix are < |t|/2, then the word has a non trivial trichotomy
-
-Lemma stating that if N0 N1 N2 are satisfied, then the length of a reduced word is at least as large
-as the number of terms in the product (write that with a fold, proof by induction I think).
-
-Lemma stating that |x@x@y|>|y|.
-
-############################################################################################ *)
-
 
 
 
@@ -2596,17 +2538,25 @@ Lemma second_reduce_step_neq (gens: vec) (k ix iy: nat) (xy: word) (t: seq _) (H
 Proof.
   have Hin: (k, ix, iy, xy) \in second_reduce_step gens.
     by rewrite Heq mem_head.
-  Admitted.
+  rewrite /second_reduce_step in Hin.
+  move/flattenP: Hin => [s /mapP [[[ix' x] [iy' y]] xin eqs] tins].
+  rewrite mem_filter in xin.
+  rewrite eqs mem_pmap in tins.
+  move/mapP: tins => [[k' xy'] zin eqz].
+  move: eqz; case: ifP => [_ [eqkk' eqixix' eqiyiy' eqxyxy']|//].
+  rewrite -eqixix' -eqiyiy' in xin.
+  by move/andP: xin => [/eqP R _].
+Qed.
 
 
 Definition vec_lexico_ltP (gens gens': vec): Prop := (gens < gens')%O.
 
 (* Note(mathis): The weird function structure inside the match is here to provide a proof of ix <> iy *)
 Program Fixpoint second_reduce (gens: vec) {wf vec_lexico_ltP gens} :=
-  match second_reduce_step gens as l return (second_reduce_step gens = l -> _) with
-    | [::] => fun _ => gens
-    | (k, ix, iy, xy)::t => fun Heq =>
-      let h := second_reduce_step_neq gens k ix iy xy t Heq in
+  match second_reduce_step gens with
+    | [::] => gens
+    | (k, ix, iy, xy)::t =>
+      let h := second_reduce_step_neq gens k ix iy xy t (erefl) in
       let gens' :=
         if k==0 then t2 gens ix iy h
         else if k==1 then t1 (t2 (t1 gens iy) ix iy h) iy
@@ -2615,8 +2565,7 @@ Program Fixpoint second_reduce (gens: vec) {wf vec_lexico_ltP gens} :=
         else gens
       in
       second_reduce gens'
-  end erefl.
-
+  end.
 
 Lemma eq_size_t (gens : vec) (ix iy: nat) (hboundx: (ix < size gens)%N) (hboundy: (iy < size gens)%N) (h : ix <> iy):
   size (t1 (t2 (t1 (t1 gens iy) ix) ix iy h) iy) = size gens.
@@ -2638,7 +2587,7 @@ Next Obligation.
 Proof.
   rewrite /vec_lexico_ltP.
   have Hin: (k, ix, iy, xy) \in (second_reduce_step gens).
-    by rewrite Heq mem_head.
+    by rewrite -Heq_anonymous mem_head.
   rewrite /second_reduce_step in Hin.
   move/flatten_mapP: Hin => [[[pix px] [piy py]] pin pin'].
   rewrite mem_pmap in pin'; move/mapP: pin' => [[k' w] win weq].
@@ -2866,5 +2815,59 @@ Proof.
   apply: sizelexi_wf.
   by apply /CmpOrder.cmp_wf /le_wf.
 Qed.
+
+(* Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
+Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(x))%N.
+Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz(x @ y) >= sz(y))%N. *)
+
+Print second_reduce.
+
+Lemma second_reduce_fixpoint (v : vec) :
+  second_reduce_step (second_reduce v) = [::].
+Proof.
+  elim/(well_founded_ind second_reduce_obligation_3): v.
+  move => x y.
+Qed.
+  
+
+Definition NielsenReduction (gens: vec) :=
+  map (FreeGroup_norm) (t3 (second_reduce gens)).
+
+Context {v: vec}.
+Let gens := NielsenReduction v.
+Let U := gens ++ [seq (inv w) | w <- gens].
+
+Lemma NielsenR_N0:
+  forall x, (x \in U) -> FreeGroup_norm x <> e.
+Proof.
+  move => x xinU.
+  rewrite /U mem_cat /gens /NielsenReduction /t3 in xinU; case/orP: xinU => /mapP [y yin xeq].
+  + rewrite mem_filter in yin; move/andP: yin => [/eqP H _].
+    by rewrite FreeGroup_norm_e in H; rewrite xeq FreeGroup_norm_involutive.
+  + move/mapP: yin => [z zin yeq].
+    rewrite mem_filter in zin; move/andP: zin => [/eqP H _].
+    rewrite FreeGroup_norm_e in H; rewrite xeq yeq -FreeGroup_norm_inv FreeGroup_norm_involutive -FreeGroup_norm_e => habs.
+    move/(f_equal inv) in habs.
+    rewrite FreeGroup_norm_inv inv_eq_invol /= /inv/=/inv_word/= in habs.
+    by rewrite habs in H.
+Qed.
+
+Lemma NielsenR_N1_left:
+  forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(x))%N.
+Proof.
+  move => x y xinU yinU.
+  rewrite /U !mem_cat /gens /NielsenReduction in yinU xinU.
+  case/orP: yinU => [|] /mapP [y' yin yeq] non_trvxy.
+  + case/orP: xinU => [|] /mapP [x' xin xeq].
+    rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
+    rewrite leqNgt; apply/negP => habs.
+    rewrite /second_reduce in x'ins y'ins.
+    Check second_reduce_equation.
+
+
+
 
 End NielsenConstructionCorrection.

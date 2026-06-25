@@ -290,7 +290,7 @@ Notation vec := (seq word).
 Definition t3 (v: vec) := 
   filter (fun elm => negb (FreeGroup_dec_eq Sigma elm e)) v. (* need to change *)
 
-Definition t2 (v: vec) (i j : nat) (h: i <> j) :=
+Definition t2 (v: vec) (i j : nat) :=
   let u_j := nth e v j in
   let u_i := nth e v i in
   set_nth e v i (FreeGroup_norm (u_i @ u_j)).
@@ -1660,9 +1660,9 @@ Notation vec := (seq word).
 (* Note(mathis): I did implement t1 since I need it in the proof of t2, not for the algorithm *)
 
 Lemma H_all (gens: vec) (i j : nat) (h: i <> j) (g : 'I_(size gens) -> FreeGroup Sigma) (H_subgroup_f'n : forall n : 'I_(size gens),
-in_generated_subgroup (t2 gens i j h) (g n)) wx :
+in_generated_subgroup (t2 gens i j) (g n)) wx :
   forall y, (y \in [seq FreeGroup_alphabet_extension g t | t <- wx] ->
-  in_generated_subgroup (t2 gens i j h) y).
+  in_generated_subgroup (t2 gens i j) y).
 Proof.
   move => y.
   move/mapP => [n _ ->].
@@ -1848,10 +1848,10 @@ Proof.
   by [].
 Qed.
 
-Definition f' (gens: vec) (i j : nat) (h: i <> j) (n': 'I_(size gens)) :=
+Definition f' (gens: vec) (i j : nat) (n': 'I_(size gens)) :=
     let n := nat_of_ord n' in
-    if (n == i) then nth e (t2 gens i j h) i @ inv (nth e (t2 gens i j h) j)
-    else nth e (t2 gens i j h) n.
+    if (n == i) then nth (e:> FreeGroup Sigma) (t2 gens i j :> seq (FreeGroup Sigma)) i @ inv (nth (e:> FreeGroup Sigma) (t2 gens i j :> seq (FreeGroup Sigma)) j)
+    else nth (e:> FreeGroup Sigma) (t2 gens i j) n.
 
 Definition f (gens: vec) (n: 'I_(size gens)) := nth e gens n.
 
@@ -1859,11 +1859,6 @@ Lemma H_idiffj (i j : nat) (h: i <> j): (j == i)%B = false.
 Proof.
   apply/eqP.
   by apply: not_eq_sym h.
-Qed.
-
-Lemma H_jnoteqi (i j : nat) (h: i <> j): j <> i.
-Proof.
-  by apply: not_eq_sym.
 Qed.
 
 (* the structure of the proof need to be worked on *)
@@ -2029,7 +2024,7 @@ Proof.
 Qed.
 
 Lemma t2_change (gens : vec) (i j : nat) (h : i <> j):
-  (nth e gens i) @ (nth e gens j) == nth e (t2 gens i j h) i.
+  (nth e gens i) @ (nth e gens j) == nth e (t2 gens i j) i.
 Proof.
   rewrite /=.
   rewrite /t2.
@@ -2040,7 +2035,7 @@ Proof.
 Qed.
 
 Lemma t2_change_inv (gens : vec) (i j : nat) (h : i <> j):
-  (nth e (t2 gens i j h) i) @ (inv (nth e (t2 gens i j h) j)) == (nth e gens i).
+  (nth e (t2 gens i j) i) @ (inv (nth e (t2 gens i j) j)) == (nth (e:>presented (FGP Sigma)) gens i).
 Proof.
   rewrite /= /t2 nth_set_nth /= eqxx nth_set_nth /=.
   rewrite ifN.
@@ -2059,7 +2054,7 @@ Proof.
 Qed.
 
 Lemma t2_neutral (gens: vec) (i j k : nat) (h: i <> j) (Hk: i <> k):
-  nth e (t2 gens i j h) k = nth e gens k.
+  nth e (t2 gens i j) k = nth e gens k.
 Proof.
   rewrite /t2 nth_set_nth /=.
   rewrite ifN.
@@ -2069,7 +2064,7 @@ Proof.
 Qed.
 
 Lemma t2_preserve_size (gens: vec) (i j : nat) (Hibound: (i < size gens)%N) (h: i <> j):
-  size (t2 gens i j h) = size (gens).
+  size (t2 gens i j) = size (gens).
 Proof.
   rewrite /t2 size_set_nth.
   have: ((i.+1) <= size gens)%N.
@@ -2087,30 +2082,33 @@ Proof.
 Qed.
 
 Lemma t2_include_subgroup (gens: vec) (i j : nat) (Hibound: (i < size gens)%N) (Hjbound: (j < size gens)%N) (h: i <> j):
-  forall x, (in_generated_subgroup gens x -> in_generated_subgroup (t2 gens i j h) x).
+  forall x, (in_generated_subgroup gens x -> in_generated_subgroup (t2 gens i j) x).
 Proof.
   move => x.
   - move => [wx Hx].
     rewrite /nth_gen in Hx.
-    have: forall n , (f gens) n == (f' gens i j h) n.
+    have: forall n , (f gens) n == (f' gens i j) n.
     move => n.
       pose n' := nat_of_ord n.
       case: (n' =P i) => [Ht | Hf].
         - rewrite /f /f' /=.
           rewrite ifT.
           rewrite /n' in Ht.
-          by rewrite t2_change_inv Ht.
+          rewrite t2_change_inv -Ht /n'.
+          by done.
+          by rewrite -Ht in h.
           move/eqP in Ht.
           by [].
         - rewrite /f /f' /=.
           rewrite ifN.
           rewrite t2_neutral.
           by [].
+          by done.
           by apply: not_eq_sym.
           move/eqP in Hf.
           by [].
     - move => Heq.
-      have: \hat (f gens) wx == \hat (f' gens i j h) wx.
+      have: \hat (f gens) wx == \hat (f' gens i j) wx.
       apply: extension_universality.
       move => a.
       rewrite /=.
@@ -2119,40 +2117,43 @@ Proof.
       - by rewrite Heq neutral_right.
     - move => Heqf.
       rewrite Hx in Heqf.
-      have: forall n, in_generated_subgroup (t2 gens i j h) (f' gens i j h n).
+      have: forall n, in_generated_subgroup (t2 gens i j) (f' gens i j n).
       move => n;
       rewrite /f'.
 
       pose n' := nat_of_ord n.
       case: (n' =P i) => [Ht | Hf].
         - apply: igs_law.
-          have Heq_size : size (t2 gens i j h) = size gens.
+          have Heq_size : size (t2 gens i j) = size gens.
             apply: t2_preserve_size.
             by apply: Hibound.
           
-          change (nth e (t2 gens i j h) i) with (@nth_gen _ (t2 gens i j h) (cast_ord (esym Heq_size) (Ordinal Hibound))).
+          by apply: h.
+          change (nth e (t2 gens i j) i) with (@nth_gen _ (t2 gens i j) (cast_ord (esym Heq_size) (Ordinal Hibound))).
+
           apply: igs_gen.
           - apply: igs_inv.
-          have Heq_size : size (t2 gens i j h) = size gens.
+          have Heq_size : size (t2 gens i j) = size gens.
             by apply: t2_preserve_size.
-          change (nth e (t2 gens i j h) j) with (@nth_gen _ (t2 gens i j h) (cast_ord (esym Heq_size) (Ordinal Hjbound))).
+          change (nth e (t2 gens i j) j) with (@nth_gen _ (t2 gens i j) (cast_ord (esym Heq_size) (Ordinal Hjbound))).
           apply: igs_gen.
-        - have Heq_size : size (t2 gens i j h) = size gens.
+        - have Heq_size : size (t2 gens i j) = size gens.
             by apply: t2_preserve_size.
-          change (nth e (t2 gens i j h) n) with (@nth_gen _ (t2 gens i j h) (cast_ord (esym Heq_size) n)).
+          change (nth e (t2 gens i j) n) with (@nth_gen _ (t2 gens i j) (cast_ord (esym Heq_size) n)).
           apply: igs_gen.
       move => H_subgroup_f'n.
 
-      have: in_generated_subgroup (t2 gens i j h) (\hat (f' gens i j h) wx).
+      have: in_generated_subgroup (t2 gens i j) (\hat (f' gens i j) wx).
         rewrite /FreeGroup_universal_extension /extension.
         rewrite /FreeGroup_alphabet_extension.
         rewrite /prod.
 
-        apply: (igs_foldr_stable (t2 gens i j h) [seq match c with
-        | Base a => f' gens i j h a
-        | Inverse a => inv (f' gens i j h a)
+        apply: (igs_foldr_stable (t2 gens i j) [seq match c with
+        | Base a => f' gens i j a
+        | Inverse a => inv (f' gens i j a)
         end  | c <- wx]).
         apply: H_all.
+        by apply: h.
         apply: H_subgroup_f'n.
         apply: subseq_refl.
     move => H_in.
@@ -2162,34 +2163,36 @@ Proof.
 Qed.
 
 Lemma t2_equal_subgroup (gens: vec) (i j : nat) (Hibound : (i < size gens)%N) (Hjbound : (j < size gens)%N) (h: i <> j):
-  forall x, (in_generated_subgroup gens x <-> in_generated_subgroup (t2 gens i j h) x).
+  forall x, (in_generated_subgroup gens x <-> in_generated_subgroup (t2 gens i j) x).
 Proof.
   move => x.
   split.
-    - apply: t2_include_subgroup.
-      by [].
-      by [].
-    -have H1: in_generated_subgroup (t2 gens i j h) x <-> in_generated_subgroup (t1 (t2 gens i j h) j) x.
-      apply: t1_equal_subgroup.
-      rewrite t2_preserve_size.
-      by apply: Hjbound.
-      by apply: Hibound.
-     have H2: in_generated_subgroup (t1 (t2 gens i j h) j) x -> in_generated_subgroup (t2 (t1 (t2 gens i j h) j) i j h) x.
-      apply: t2_include_subgroup.
-      rewrite t1_preserve_size t2_preserve_size.
-      1-4: assumption.
-      rewrite t1_preserve_size t2_preserve_size.
-      1-4: assumption.
-      have H3: forall x, in_generated_subgroup (t2 (t1 (t2 gens i j h) j) i j h) x -> in_generated_subgroup (t1 (t2 (t1 (t2 gens i j h) j) i j h) j)x .
+    - by apply: t2_include_subgroup.
+    - have H1: in_generated_subgroup (t2 gens i j) x <-> in_generated_subgroup (t1 (t2 gens i j) j) x.
+        apply: t1_equal_subgroup => //.
+        by rewrite t2_preserve_size //.
+        
+      have H2: in_generated_subgroup (t1 (t2 gens i j) j) x -> in_generated_subgroup (t2 (t1 (t2 gens i j) j) i j) x.
+        apply: t2_include_subgroup.
+        rewrite t1_preserve_size t2_preserve_size.
+        1-6: assumption.
+        by rewrite t1_preserve_size t2_preserve_size.
+        by assumption.
+      
+      have H3: forall x, in_generated_subgroup (t2 (t1 (t2 gens i j) j) i j) x -> in_generated_subgroup (t1 (t2 (t1 (t2 gens i j) j) i j) j)x .
         apply: t1_include_subgroup.
-        by rewrite t2_preserve_size t1_preserve_size t2_preserve_size.
+        rewrite t2_preserve_size //.
+        1-2: by rewrite t1_preserve_size t2_preserve_size //.
+        
+      have H4: forall x, in_generated_subgroup (t1 (t2 (t1 (t2 gens i j) j) i j) j) x -> in_generated_subgroup gens x.
 
-      have H4: forall x, in_generated_subgroup (t1 (t2 (t1 (t2 gens i j h) j) i j h) j) x -> in_generated_subgroup gens x.
+      have Heq_size: size (t1 (t2 (t1 (t2 gens i j) j) i j) j) = size gens.
+        rewrite t1_preserve_size t2_preserve_size //.
+        1-4: by rewrite t1_preserve_size t2_preserve_size //.
+      have H_jnoteqi: j <> i.
+        by apply/not_eq_sym.
 
-      have Heq_size: size (t1 (t2 (t1 (t2 gens i j h) j) i j h) j) = size gens.
-        by rewrite t1_preserve_size t2_preserve_size t1_preserve_size t2_preserve_size.
-
-      pose perm_id (n : 'I_(size (t1 (t2 (t1 (t2 gens i j h) j) i j h) j))) := cast_ord (Heq_size) n.
+      pose perm_id (n : 'I_(size (t1 (t2 (t1 (t2 gens i j) j) i j) j))) := cast_ord (Heq_size) n.
       have Hbij: bijective perm_id.
         exists (cast_ord (esym Heq_size)).
         move => s.
@@ -2209,20 +2212,18 @@ Proof.
           apply /congruent_left /FreeGroup_norm_correct.
           rewrite -t2_change.
           rewrite t2_neutral.
-          by rewrite -associativity inverse_left neutral_right.
-          by [].
-          1-2: by apply: H_jnoteqi.
-        - case: (n =P j)%B => [Htj | Hfj].
-          - rewrite Htj t1_inv t2_neutral.
+          by rewrite -associativity inverse_left neutral_right. 
+          1-6: by assumption.
+        - case: (n =P j)%B => [Htj | Hfj] //.
+          - rewrite Htj t1_inv t2_neutral //.
             rewrite t1_inv !FreeGroup_norm_inv inv_involutive FreeGroup_norm_involutive t2_neutral.
             by rewrite FreeGroup_norm_correct.
             by rewrite Htj in Hfn.
             by rewrite Htj in Hfn.
-          - rewrite t1_neutral.
-            rewrite t2_neutral.
-            rewrite t1_neutral.
-            rewrite t2_neutral.
-            by [].
+          - rewrite t1_neutral //.
+            rewrite t2_neutral //.
+            rewrite t1_neutral //.
+            rewrite t2_neutral //.
             1-4: by apply: not_eq_sym.
       move => H0.
       apply: H4; apply: H3; apply: H2.
@@ -2552,42 +2553,49 @@ Qed.
 Definition vec_lexico_ltP (gens gens': vec): Prop := (gens < gens')%O.
 
 (* Note(mathis): The weird function structure inside the match is here to provide a proof of ix <> iy *)
-Program Fixpoint second_reduce (gens: vec) {wf vec_lexico_ltP gens} :=
+Function second_reduce (gens: vec) {wf vec_lexico_ltP gens} :=
   match second_reduce_step gens with
     | [::] => gens
     | (k, ix, iy, xy)::t =>
-      let h := second_reduce_step_neq gens k ix iy xy t (erefl) in
       let gens' :=
-        if k==0 then t2 gens ix iy h
-        else if k==1 then t1 (t2 (t1 gens iy) ix iy h) iy
-        else if k==2 then t2 (t1 gens ix) ix iy h
-        else if k==3 then t1 (t2 (t1 (t1 gens iy) ix) ix iy h) iy
+        if k==0 then t2 gens ix iy
+        else if k==1 then t1 (t2 (t1 gens iy) ix iy) iy
+        else if k==2 then t2 (t1 gens ix) ix iy
+        else if k==3 then t1 (t2 (t1 (t1 gens iy) ix) ix iy) iy
         else gens
       in
       second_reduce gens'
   end.
-
-Lemma eq_size_t (gens : vec) (ix iy: nat) (hboundx: (ix < size gens)%N) (hboundy: (iy < size gens)%N) (h : ix <> iy):
-  size (t1 (t2 (t1 (t1 gens iy) ix) ix iy h) iy) = size gens.
 Proof.
-  by rewrite t1_preserve_size t2_preserve_size t1_preserve_size t1_preserve_size.
-Qed.
+  move => gens p t [[k ix] iy] xy [k'''' ix''''] iy'' k'' ix'' [eqk'k'' eqix'ix''] [eqkk'' eqixix'' eqiyiy''] eqp.
+  have ->: k'' = k.
+    by symmetry.
+  have ->: ix'' = ix.
+    by symmetry.
+  have ->: iy'' = iy.
+    by symmetry.
+  move => Heq.
 
-Lemma eq_size_setnth (gens : vec) (ix: nat) (x: word) (hboundx: (ix < size gens)%N) :
- size (set_nth e gens ix x) = size gens.
-Proof.
+  have eq_size_set_nth (v : vec) (idx: nat) (x: word) (hboundx: (idx < size v)%N) :
+    size (set_nth e v idx x) = size v.
   rewrite size_set_nth /maxn.
-  case (boolP (ix.+1 < size gens)%N) => [Ht | Hf].
-    - by rewrite Ht.
-    move/negbTE in Hf; rewrite Hf; rewrite ltnNge in Hf; move/negbFE in Hf.
-    by apply/eqP; rewrite eqn_leq Hf hboundx.
-Qed.
+  case (boolP (idx.+1 < size v)%N) => [Ht' | Hf'].
+    - by rewrite Ht'.
+    move/negbTE in Hf'; rewrite Hf'; rewrite ltnNge in Hf'; move/negbFE in Hf'.
+    by apply/eqP; rewrite eqn_leq Hf' hboundx.
 
-Next Obligation.
-Proof.
+  have eq_size_t (v : vec) (idx idy: nat) (hboundx: (idx < size v)%N) (hboundy: (idy < size v)%N) (idh: idx <> idy):
+    size (t1 (t2 (t1 (t1 v idy) idx) idx idy) idy) = size v.
+    rewrite t1_preserve_size t2_preserve_size //.
+    rewrite t1_preserve_size //.
+    1-2: rewrite t1_preserve_size //.
+    rewrite t1_preserve_size // t1_preserve_size.
+    1-4: by assumption.
+    1-2: rewrite t1_preserve_size // t1_preserve_size //.
+
   rewrite /vec_lexico_ltP.
   have Hin: (k, ix, iy, xy) \in (second_reduce_step gens).
-    by rewrite -Heq_anonymous mem_head.
+    by rewrite Heq mem_head.
   rewrite /second_reduce_step in Hin.
   move/flatten_mapP: Hin => [[[pix px] [piy py]] pin pin'].
   rewrite mem_pmap in pin'; move/mapP: pin' => [[k' w] win weq].
@@ -2617,26 +2625,30 @@ Proof.
   case: eqP => [Hkt | Hdiff1] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
 
-    have Hleq : (t1 (t2 (t1 gens iy) ix iy diffixiy) iy <=
+    have Hleq : (t1 (t2 (t1 gens iy) ix iy) iy <=
       set_nth e gens ix (FreeGroup_norm (nth e gens ix @ inv (nth e gens iy))) :> vec)%O.
+
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
-        rewrite t1_preserve_size t2_preserve_size t1_preserve_size.
-        rewrite eq_size_setnth //=.
-        1-7: by [].
+        rewrite t1_preserve_size t2_preserve_size //.
+        rewrite t1_preserve_size //.
+        rewrite eq_size_set_nth //=.
+        1-3: by rewrite t1_preserve_size //.
       move => i ibound.
       case: (i =P ix) => [Hixt | Hixf].
       - rewrite Hixt.
         apply /CmpOrder.cmp_congr_left.
         apply /(@FreeGroup_norm_unique _ _ (nth e (set_nth e gens ix (FreeGroup_norm (nth e gens ix @ inv(nth e gens iy)))) ix)).
         + rewrite t1_neutral.
-          rewrite -t2_change t1_inv t1_neutral.
+          rewrite -t2_change.
+          rewrite t1_inv t1_neutral.
           rewrite nth_set_nth /=.
           rewrite ifT.
           apply /trans. apply /congruent_left; apply /FreeGroup_norm_correct.
           apply /symm /FreeGroup_norm_correct.
           + by apply/eqP.
         + by apply /not_eq_sym /diffixiy.
-        + by apply /not_eq_sym /diffixiy.
+        + by apply /diffixiy.
+          by apply /not_eq_sym /diffixiy.
         by apply: CmpOrder.cmp_refl.
       - apply /CmpOrder.cmp_congr_left.
         apply /(@FreeGroup_norm_unique _ _ (nth e (set_nth e gens ix (FreeGroup_norm (nth e gens ix @ inv (nth e gens iy)))) i)).
@@ -2647,11 +2659,13 @@ Proof.
             rewrite ifF.
             by apply /FreeGroup_norm_correct.
             + by rewrite -Hyt; apply/eqP.
-            + by  rewrite -Hyt; apply/not_eq_sym.
+            + by rewrite -Hyt; apply/not_eq_sym.
+            + by rewrite -Hyt; apply/not_eq_sym.
           - rewrite t1_neutral; last first.
             + by apply/not_eq_sym.
             rewrite t2_neutral; last first.
             + by apply/not_eq_sym.
+            + by assumption.
             rewrite t1_neutral; last first.
             + by apply/not_eq_sym.
             rewrite nth_set_nth /=.
@@ -2672,18 +2686,20 @@ Proof.
   case: eqP => [Hkt | Hdiff2] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
 
-    have Hleq : (t2 (t1 gens ix) ix iy diffixiy <=
+    have Hleq : (t2 (t1 gens ix) ix iy <=
       set_nth e gens ix (FreeGroup_norm (inv(nth e gens ix) @ nth e gens iy)) :> vec)%O.
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
-        rewrite t2_preserve_size t1_preserve_size.
-        rewrite eq_size_setnth //=.
-        1-3: by [].
+        rewrite t2_preserve_size //.
+        rewrite t1_preserve_size //.
+        rewrite eq_size_set_nth //=.
+        rewrite t1_preserve_size //.
       move => i ibound.
       case: (i =P ix) => [Hixt | Hixf].
       - rewrite Hixt.
         apply /CmpOrder.cmp_congr_left.
         apply /(@FreeGroup_norm_unique _ _ (nth e (set_nth e gens ix (FreeGroup_norm (inv(nth e gens ix) @ nth e gens iy))) ix)).
-        + rewrite -t2_change t1_inv t1_neutral.
+        + rewrite -t2_change //.
+          rewrite t1_inv t1_neutral.
           rewrite nth_set_nth /=.
           rewrite ifT.
           apply /trans.
@@ -2702,9 +2718,10 @@ Proof.
             by [].
             + by rewrite -Hyt; apply/eqP.
             + by  rewrite -Hyt; apply/not_eq_sym.
-            + by apply /diffixiy.
+            1-2: by apply /diffixiy.
           - rewrite t2_neutral; last first.
             + by apply/not_eq_sym.
+            + by assumption.
             rewrite t1_neutral; last first.
             + by apply/not_eq_sym.
             rewrite nth_set_nth /=.
@@ -2725,21 +2742,20 @@ Proof.
   case: eqP => [Hkt | Hdiff3] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
 
-    have Hleq : (t1 (t2 (t1 (t1 gens iy) ix) ix iy
-      diffixiy) iy <=
+    have Hleq : (t1 (t2 (t1 (t1 gens iy) ix) ix iy) iy <=
       set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy))) :> vec)%O.
       rewrite (@pointwise_le_seq _ _ (e:>word) _ _) //=.
-      rewrite [size (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy))))] eq_size_setnth.
+      rewrite [size (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy))))] eq_size_set_nth.
       by rewrite eq_size_t.
       + by [].
       move => i ibound.
-      have happrox: (nth e (t1 (t2 (t1 (t1 gens iy) ix) ix iy
-                    diffixiy) iy) i) ==
+      have happrox: (nth e (t1 (t2 (t1 (t1 gens iy) ix) ix iy) iy) i) ==
                     nth e (set_nth e gens ix (FreeGroup_norm (inv (nth e gens ix) @ inv (nth e gens iy)))) i.
         case: (i =P ix) => [Hxt | Hxf].
-        - rewrite Hxt t1_neutral.
-          rewrite -t2_change t1_inv t1_neutral.
-          rewrite t1_neutral.
+        - rewrite Hxt t1_neutral //.
+          rewrite -t2_change //.
+          rewrite t1_inv t1_neutral //.
+          rewrite t1_neutral //.
           rewrite t1_inv.
           apply: trans.
           + by apply /symm /FreeGroup_norm_correct.
@@ -2747,7 +2763,6 @@ Proof.
             rewrite ifT.
             + by [].
             + by [].
-            + by apply /diffixiy.
             + by apply /not_eq_sym /diffixiy.
             + by apply /not_eq_sym /diffixiy.
         - case: (i =P iy) => [Hyt | Hyf].
@@ -2759,13 +2774,14 @@ Proof.
             by apply /FreeGroup_norm_correct.
             + by rewrite Hyt in Hxf; apply/eqP.
             +1-2 : by apply /diffixiy.
+            + by assumption.
           - rewrite t1_neutral; last first.
             + by apply /not_eq_sym.
-            rewrite t2_neutral; last first.
+            rewrite t2_neutral //; last first.
             + by apply /not_eq_sym.
-            rewrite t1_neutral; last first.
+            rewrite t1_neutral //; last first.
             + by apply /not_eq_sym.
-            rewrite t1_neutral; last first.
+            rewrite t1_neutral //; last first.
             + by apply /not_eq_sym.
             rewrite nth_set_nth /=.
             rewrite ifF //=; last first.
@@ -2806,11 +2822,9 @@ Proof.
         by rewrite (@bound_enumerate _ _ 0 _ _ w).
       by rewrite /= in kinb'.
     by move: (leq_ltn_trans kofb kinb).
-Qed.
 
+  (* the well founded proof *)
 
-Next Obligation.
-Proof.
   rewrite /MR /vec_lexico_ltP /Order.lt /=.
   apply: sizelexi_wf.
   by apply /CmpOrder.cmp_wf /le_wf.
@@ -2827,9 +2841,7 @@ Print second_reduce.
 Lemma second_reduce_fixpoint (v : vec) :
   second_reduce_step (second_reduce v) = [::].
 Proof.
-  elim/(well_founded_ind second_reduce_obligation_3): v.
-  move => x y.
-Qed.
+Admitted.
   
 
 Definition NielsenReduction (gens: vec) :=
@@ -2866,6 +2878,7 @@ Proof.
     rewrite leqNgt; apply/negP => habs.
     rewrite /second_reduce in x'ins y'ins.
     Check second_reduce_equation.
+Admitted.
 
 
 

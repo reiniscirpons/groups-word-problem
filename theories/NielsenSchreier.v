@@ -2847,12 +2847,6 @@ Proof.
   by apply /CmpOrder.cmp_wf /le_wf.
 Qed.
 
-(* Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
-Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz (x @ y) >= sz(x))%N.
-Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz(x @ y) >= sz(y))%N. *)
-
 Lemma second_reduce_fixpoint (v : vec) :
   second_reduce_step (second_reduce v) = [::].
 Proof.
@@ -3179,6 +3173,39 @@ Proof.
         by rewrite yeq y2eq -!FreeGroup_norm_inv -!FreeGroup_norm_law.
       by apply: (@enumerate_in _ e).
 Qed.
+
+
+(* Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
+Hypothesis N1_left: 
+Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz(x @ y) >= sz(y))%N. *)
+
+Lemma NielsenR_N1_left:
+  forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(x))%N.
+Proof.
+  move => x y xinU yinU ntrvxy.
+  move: (NielsenR_minimal x y xinU yinU ntrvxy) => Hlt.
+  move/negP in Hlt; rewrite /Order.lt /= /CmpOrder.cmp_lt /= negb_or in Hlt; move/andP: Hlt => [Hsize _].
+  rewrite ltnNge negbK in Hsize.
+  by rewrite /sz; rewrite /CmpOrder.sz in Hsize.
+Qed.
+
+Lemma NielsenR_N1_right:
+  forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(y))%N.
+Proof.
+  move => x y xinU yinU ntrvxy.
+  move: (NielsenR_minimal (inv y) (inv x) (inv_inU _ y yinU) (inv_inU _ x xinU) (non_trivial_inv y x (non_trivialC x y ntrvxy))) => Hlt.
+  move/negP in Hlt; rewrite /Order.lt /= /CmpOrder.cmp_lt /= negb_or in Hlt; move/andP: Hlt => [Hsize _].
+  rewrite ltnNge negbK in Hsize.
+  rewrite /sz; rewrite /CmpOrder.sz in Hsize.
+  rewrite -size_inv -size_inv -FreeGroup_norm_inv -FreeGroup_norm_inv.
+  have ->: FreeGroup_norm (inv (x @ y)) = FreeGroup_norm (inv y @ inv x).
+    by apply: FreeGroup_norm_unique; rewrite inverse_law.
+  by assumption.
+Qed.
+
 
 
 End NielsenConstructionCorrection.

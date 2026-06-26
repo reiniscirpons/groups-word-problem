@@ -115,8 +115,12 @@ Definition half {T: eqType} (w: seq T) :=
   let len := size w in
   take (divn (len + 1) 2) w.
 
+Definition upperhalf {T: eqType} (w: seq T) :=
+  let len := size w in
+  drop (divn len 2) w.
+
 Lemma half_oversized {T: eqType} (a u v : seq T) (leua: (size u <= size a)%N) (luva: (size v <= size a)%N) (eqsz: size u = size v):
-  half (a ++ u) = half (a ++ v).
+  CmpOrder.half (a ++ u) = CmpOrder.half (a ++ v).
 Proof.
   have eqsz_simpl: forall m w: seq T, ((size (m ++ w) + 1) %/ 2 < size m)%N = false -> (size w <= size m)%N -> ((size (m ++ w) + 1) %/2 = size m)%N.
     move => m w Heq2 Hleq.
@@ -135,7 +139,7 @@ Proof.
     move => m w Heq2 Hleq.
     rewrite eqsz_simpl; by lia.
   
-  rewrite /half !take_cat.
+  rewrite /CmpOrder.half !take_cat.
 
   case: ifP => [_ | Heq1].
   case: ifP => [_ | Heq2].
@@ -235,7 +239,7 @@ Qed.
 
 Definition transform (w: seq T Normalisation inv) :=
   let l1 := (half (Normalisation w)) in
-  let l2 := (half (inv (Normalisation w))) in
+  let l2 := (inv (upperhalf (Normalisation w))) in
   [:: min_word l1 l2; max_word l1 l2].
 
 Definition sz w := size (Normalisation w).
@@ -299,7 +303,7 @@ Proof.
   move => equw leww'.
   have eqszuw: sz u = sz w.
     by rewrite /sz equw.
-  rewrite /cmp_le /transform !equw !eqszuw; apply: leww'.
+  by rewrite /cmp_le /transform !equw !eqszuw; apply: leww'.
 Qed.
 
 Lemma wf_prodlexi {T1 T2 : eqType} (le1: T1 -> T1 -> bool)

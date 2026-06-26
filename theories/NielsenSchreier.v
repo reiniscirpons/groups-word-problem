@@ -1154,7 +1154,7 @@ Proof.
     move: (@CmpOrder.half_oversized _ a p (inv (p:>FreeGroup Sigma)) leqszprefa leqszp_inv eqszp) => eq_firsthalfpx.
     rewrite -frx eqx dect.
 
-    have rsize: forall n, (n - (n - 1) %/ 2 >= (n + 1) %/ 2)%N.
+    have rsize: forall n, (n - n %/ 2 >= (n + 1) %/ 2)%N.
       by lia.
 
     have divn_leq_succ: forall n, (n <= ((n + 1)%/2)*2)%N.
@@ -1190,15 +1190,15 @@ Proof.
       set p' := inv (CmpOrder.upperhalf (inv c ++ inv (p:>FreeGroup Sigma)):>FreeGroup Sigma).
       set q' := inv (CmpOrder.upperhalf (inv c ++ inv (lKprefix y z:> FreeGroup Sigma)):>FreeGroup Sigma).
 
-      set t1 := (take (size (inv c ++ inv (p:>FreeGroup Sigma)) - (size (inv c ++ inv (p:>FreeGroup Sigma)) - 1) %/ 2) (inv (inv c ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
-      set t2 := (take (size (inv c ++ inv (q:>FreeGroup Sigma)) - (size (inv c ++ inv (q:>FreeGroup Sigma)) - 1) %/ 2) (inv (inv c ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t1 := (take (size (inv c ++ inv (p:>FreeGroup Sigma)) - (size (inv c ++ inv (p:>FreeGroup Sigma))) %/ 2) (inv (inv c ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t2 := (take (size (inv c ++ inv (q:>FreeGroup Sigma)) - (size (inv c ++ inv (q:>FreeGroup Sigma))) %/ 2) (inv (inv c ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
 
       have eqt1p': t1 = p'.
         by rewrite /t1 /p' /CmpOrder.upperhalf inv_drop.
       have eqt2q': t2 = q'.
         by rewrite /t2 /q' /CmpOrder.upperhalf inv_drop.
 
-      have sz_simpl : forall k, (k = size q) -> (k <= (size c + size q - ((size c + size q) - 1)%/2))%N.
+      have sz_simpl : forall k, (k = size q) -> (k <= (size c + size q - (size c + size q)%/2))%N.
         move => k eqk.
         apply: leq_trans; last first.
         + apply: rsize.
@@ -1312,15 +1312,15 @@ Proof.
       set p' := inv (CmpOrder.upperhalf (a ++ inv (lKprefix x y:>FreeGroup Sigma)):>FreeGroup Sigma).
       set q' := inv (CmpOrder.upperhalf (a ++ inv (q:> FreeGroup Sigma)):>FreeGroup Sigma).
 
-      set t1 := (take (size (a ++ inv (p:>FreeGroup Sigma)) - (size (a ++ inv (p:>FreeGroup Sigma)) - 1) %/ 2) (inv (a ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
-      set t2 := (take (size (a ++ inv (q:>FreeGroup Sigma)) - (size (a ++ inv (q:>FreeGroup Sigma)) - 1) %/ 2) (inv (a ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t1 := (take (size (a ++ inv (p:>FreeGroup Sigma)) - (size (a ++ inv (p:>FreeGroup Sigma))) %/ 2) (inv (a ++ inv (p:>FreeGroup Sigma) :> FreeGroup Sigma))).
+      set t2 := (take (size (a ++ inv (q:>FreeGroup Sigma)) - (size (a ++ inv (q:>FreeGroup Sigma))) %/ 2) (inv (a ++ inv (q:>FreeGroup Sigma) :> FreeGroup Sigma))).
 
       have eqt1p': t1 = p'.
         by rewrite /t1 /p' /CmpOrder.upperhalf inv_drop.
       have eqt2q': t2 = q'.
         by rewrite /t2 /q' /CmpOrder.upperhalf inv_drop.
 
-      have sz_simpl : forall k, (k = size q) -> (k <= (size a + size q - ((size a + size q) - 1)%/2))%N.
+      have sz_simpl : forall k, (k = size q) -> (k <= (size a + size q - (size a + size q)%/2))%N.
         move => k eqk.
         apply: leq_trans; last first.
         + apply: rsize.
@@ -3034,107 +3034,151 @@ Proof.
 Qed.
 
 Lemma NielsenR_minimal_aux (k: nat) (wx wy x' y': FreeGroup Sigma) (x'ins: x' \in (second_reduce v)) (y'ins: y' \in (second_reduce v)) (lewxx': (wx <= x')%O)
-  (Hinj: (x' = y') -> (wx = wy)) (valid: (k, (FreeGroup_norm (wx @ wy)))  \in enumerate [:: FreeGroup_norm (x' @ y');  FreeGroup_norm (x' @ inv y');  FreeGroup_norm (inv x' @ y');  FreeGroup_norm (inv x' @ inv y')]):
-  (wx @ wy >= wx)%O.
+  (non_trvl: non_trivial wx wy) (Hinj: (x' = y') -> (wx = wy \/ (wx = inv wy))) (valid: (k, (FreeGroup_norm (wx @ wy)))  \in enumerate [:: FreeGroup_norm (x' @ y');  FreeGroup_norm (x' @ inv y');  FreeGroup_norm (inv x' @ y');  FreeGroup_norm (inv x' @ inv y')]):
+  ~ (wx @ wy < wx :> word)%O.
 Proof.
-  (* rewrite /gens /NielsenReduction in xing ying; move/mapP: ying => [y' yin yeq] ; move/mapP: xing => [x' xin xeq].
-    rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins]. *)
-
   have eqsrs: second_reduce_step (second_reduce v) = [::].
     by apply: second_reduce_fixpoint.
 
-  case: (boolP (wx @ wy < wx :> word)%O) => [Habs | Hcomp].
-  + move/nthP in y'ins; move/nthP in x'ins.
-    move: (y'ins e) => [iy iybound eqy']; move: (x'ins e) => [ix ixbound eqx'].
+  move => Habs.
 
-    pose xy := FreeGroup_norm (wx @ wy).
+  move/nthP in y'ins; move/nthP in x'ins.
+  move: (y'ins e) => [iy iybound eqy']; move: (x'ins e) => [ix ixbound eqx'].
 
-    have: (k, ix, iy, xy) \in second_reduce_step (second_reduce v).
-      rewrite /second_reduce_step; apply/flattenP.
+  pose xy := FreeGroup_norm (wx @ wy).
 
-      set t := (fun '(((ix, x'), (iy, y')) : (nat * word) * (nat * word)) => pmap
-      (fun '(k, xy) =>
-        if ((xy < x')%O) then
-          Some(k, ix, iy, xy)
-        else
-          None: option (nat * nat * nat * word)
-      ) (enumerate [:: FreeGroup_norm (x' @ y'); FreeGroup_norm (x' @ inv y'); FreeGroup_norm (inv x' @ y'); FreeGroup_norm (inv x' @ inv y')])
-      ) ((ix, x'), (iy, y')).
+  have: (k, ix, iy, xy) \in second_reduce_step (second_reduce v).
+    rewrite /second_reduce_step; apply/flattenP.
 
-      exists (t).
-        apply/mapP.
-        exists ((ix, x'), (iy, y')); last by done.
-        rewrite mem_filter.
+    set t := (fun '(((ix, x'), (iy, y')) : (nat * word) * (nat * word)) => pmap
+    (fun '(k, xy) =>
+      if ((xy < x')%O) then
+        Some(k, ix, iy, xy)
+      else
+        None: option (nat * nat * nat * word)
+    ) (enumerate [:: FreeGroup_norm (x' @ y'); FreeGroup_norm (x' @ inv y'); FreeGroup_norm (inv x' @ y'); FreeGroup_norm (inv x' @ inv y')])
+    ) ((ix, x'), (iy, y')).
 
-        case: (ix =P iy) => [Ht | Hf].
-        + have eqx'y': x' = y'.
-            by rewrite -eqx' -eqy' Ht.
-          have habs': (wx <= (wx @ wy))%O.
-            move: (Hinj eqx'y') => weq.
-            rewrite weq.
+    exists (t).
+      apply/mapP.
+      exists ((ix, x'), (iy, y')); last by done.
+      rewrite mem_filter.
+
+      case: (ix =P iy) => [Ht | Hf].
+      + have eqx'y': x' = y'.
+          by rewrite -eqx' -eqy' Ht.
+        have habs': (wx <= (wx @ wy))%O.
+          move: (Hinj eqx'y') => [weq | winv].
+          + rewrite weq.
             by move: (le_cmp_xx wy) => Q.
-          
-          by move: (@Order.PreorderTheory.lt_le_trans _ _ wx (wx @ wy) (wx @ wy) Habs habs') => Q; rewrite Order.PreorderTheory.ltxx in Q.
-
-        + rewrite /=; apply/allpairsP.
-          exists ((ix, x'), (iy, y')); split.
-          - rewrite /=.
-            by apply: (@enumerate_in _ e) => //.
-          - rewrite /=.
-            apply: (@enumerate_in _ e) => //.
-            by done.
+          + rewrite /non_trivial in non_trvl.
+            have eqabs: FreeGroup_norm (wx @ wy) = e.
+              rewrite -FreeGroup_norm_e.
+              apply: FreeGroup_norm_unique.
+              by rewrite winv inverse_right.
+            by rewrite eqabs in non_trvl.
         
-        rewrite /t mem_pmap; apply/mapP.
-        exists ((k, xy)).
-        + by rewrite /xy.
-        + rewrite ifT //.
-          apply: (@Order.PreorderTheory.lt_le_trans _ _ wx xy x').
-          + by rewrite /xy /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform FreeGroup_norm_involutive.
-          + by apply: lewxx'.
+        by move: (@Order.PreorderTheory.lt_le_trans _ _ wx (wx @ wy) (wx @ wy) Habs habs') => Q; rewrite Order.PreorderTheory.ltxx in Q.
 
-    by rewrite eqsrs.
-  + by apply: comp_or_leq.
+      + rewrite /=; apply/allpairsP.
+        exists ((ix, x'), (iy, y')); split.
+        - rewrite /=.
+          by apply: (@enumerate_in _ e) => //.
+        - rewrite /=.
+          apply: (@enumerate_in _ e) => //.
+          by done.
+      
+      rewrite /t mem_pmap; apply/mapP.
+      exists ((k, xy)).
+      + by rewrite /xy.
+      + rewrite ifT //.
+        apply: (@Order.PreorderTheory.lt_le_trans _ _ wx xy x').
+        + by rewrite /xy /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform FreeGroup_norm_involutive.
+        + by apply: lewxx'.
+
+  by rewrite eqsrs.
 Qed.
 
 Lemma rev_half (x': word):
   CmpOrder.half (inv (FreeGroup_norm x')) = inv (CmpOrder.upperhalf (FreeGroup_norm x') :> FreeGroup Sigma).
 Proof.
   rewrite /CmpOrder.half /CmpOrder.upperhalf.
+  rewrite /inv/=/inv_word/= map_rev size_rev size_map take_rev map_rev size_map; apply: f_equal.
+  rewrite map_drop.
+  have ->: (size (FreeGroup_norm x') - (size (FreeGroup_norm x') + 1) %/ 2 = size (FreeGroup_norm x') %/ 2)%N.
+    by lia.
+  by done.
+Qed.
 
-Lemma NielsenR_N1_left:
+Lemma rev_upperhalf (x': word):
+  CmpOrder.upperhalf (inv (FreeGroup_norm x')) = inv (CmpOrder.half (FreeGroup_norm x') :> FreeGroup Sigma).
+Proof.
+  rewrite -{2}[FreeGroup_norm x']inv_eq_invol.
+  by rewrite -FreeGroup_norm_inv rev_half inv_eq_invol.
+Qed.
+
+Lemma NielsenR_minimal:
   forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (x @ y >= x :> word)%O.
+  ~ (x @ y < x :> word)%O.
 Proof.
   move => x y xinU yinU.
   rewrite /U !mem_cat /gens /NielsenReduction in yinU xinU.
-  case/orP: yinU => [|] /mapP [y' yin yeq] non_trvxy.
+  case/orP: yinU => [/mapP [y' yin yeq] | /mapP [y2 /mapP [y' yin y2eq] yeq]] non_trvxy.
   + case/orP: xinU => [/mapP [x' xin xeq]| /mapP [x2 /mapP [x' xin x2eq] xeq]].
     rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
-    case: (boolP (x @ y < x :> word)%O) => [Habs | Hcomp].
-    + apply: (NielsenR_minimal_aux 0).
+    move => Habs.
+    apply: (NielsenR_minimal_aux 0); last by apply: Habs.
+    - by apply: x'ins.
+    - by apply: y'ins.
+    - by rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform xeq !FreeGroup_norm_involutive; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
+    - by done.
+    - move => Heq; left.
+      by rewrite Heq in xeq; rewrite -yeq in xeq.
+    - have ->: FreeGroup_norm (x @ y) = FreeGroup_norm (x' @ y').
+        by rewrite xeq yeq -FreeGroup_norm_law.
+      by apply: (@enumerate_in _ e).
+    + rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
+      move => Habs.
+      rewrite xeq x2eq in Habs.
+      apply: (NielsenR_minimal_aux 2); last by apply: Habs.
       - by apply: x'ins.
       - by apply: y'ins.
-      - by rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform xeq !FreeGroup_norm_involutive; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
-      - move => Heq.
-        by rewrite Heq in xeq; rewrite -yeq in xeq.
-      - have ->: FreeGroup_norm (x @ y) = FreeGroup_norm (x' @ y').
-          by rewrite xeq yeq -FreeGroup_norm_law.
+      - rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform FreeGroup_norm_inv size_inv FreeGroup_norm_involutive !rev_half !rev_upperhalf inv_eq_invol.
+        by rewrite CmpOrder.min_wordC CmpOrder.max_wordC; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
+      - by rewrite -x2eq -xeq.
+      - move => Heq; right.
+        by rewrite yeq Heq.
+      - have ->: FreeGroup_norm (inv (FreeGroup_norm x') @ y) = FreeGroup_norm (inv x' @ y').
+          by rewrite yeq -FreeGroup_norm_inv -FreeGroup_norm_law.
         by apply: (@enumerate_in _ e).
-    + by apply: comp_or_leq.
+  + case/orP: xinU => [/mapP [x' xin xeq]| /mapP [x2 /mapP [x' xin x2eq] xeq]].
+    rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
+    move => Habs.
+    apply: (NielsenR_minimal_aux 1); last by apply: Habs.
+    - by apply: x'ins.
+    - by apply: y'ins.
+    - by rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform xeq !FreeGroup_norm_involutive; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
+    - by done.
+    - move => Heq; right.
+      by rewrite yeq y2eq xeq inv_eq_invol Heq.
+    - have ->: FreeGroup_norm (x @ y) = FreeGroup_norm (x' @ inv y').
+        by rewrite xeq yeq y2eq -FreeGroup_norm_inv -FreeGroup_norm_law.
+      by apply: (@enumerate_in _ e).
   + rewrite /t3 !mem_filter in xin yin; move/andP: xin => [ntrvx x'ins]; move/andP: yin => [ntrvy y'ins].
-    case: (boolP (x @ y < x :> word)%O) => [Habs | Hcomp]; last first.
-    + by apply: comp_or_leq.
-    + rewrite xeq x2eq in Habs.
-      apply: (NielsenR_minimal_aux 2).
-      - by apply: x'ins.
-      - by apply: y'ins.
-      - rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform xeq x2eq FreeGroup_norm_inv size_inv FreeGroup_norm_involutive.
-      ; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
-    
-
-Admitted.
-
-
+    move => Habs.
+    rewrite xeq x2eq in Habs.
+    apply: (NielsenR_minimal_aux 3); last by apply: Habs.
+    - by apply: x'ins.
+    - by apply: y'ins.
+    - rewrite /Order.le /= /CmpOrder.cmp_le /= /CmpOrder.sz /CmpOrder.transform FreeGroup_norm_inv size_inv FreeGroup_norm_involutive !rev_half !rev_upperhalf inv_eq_invol.
+      by rewrite CmpOrder.min_wordC CmpOrder.max_wordC; apply/orP; right; rewrite eqxx /Order.le /= sizelexi_refl.
+    - by rewrite -x2eq -xeq.
+    - move => Heq; left.
+      by rewrite yeq y2eq Heq.
+    - have ->: FreeGroup_norm (inv (FreeGroup_norm x') @ y) = FreeGroup_norm (inv x' @ inv y').
+        by rewrite yeq y2eq -!FreeGroup_norm_inv -!FreeGroup_norm_law.
+      by apply: (@enumerate_in _ e).
+Qed.
 
 
 End NielsenConstructionCorrection.

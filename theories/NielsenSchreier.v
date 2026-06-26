@@ -1836,7 +1836,75 @@ Proof.
       + by  assumption.
 Qed.
 
+Lemma igs_map_norm (v: vec) (x: FreeGroup Sigma) :
+  in_generated_subgroup v x <-> in_generated_subgroup (map FreeGroup_norm v) x.
+Proof.
+  case: (boolP ((size v == 0)%B)) => [Heq | Hlt]; last first.
+  rewrite -lt0n in Hlt.
+  split.
+  + move => igs_vx.
+    rewrite /in_generated_subgroup; rewrite /in_generated_subgroup in igs_vx; case: igs_vx => [w approxw].
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen.
+    rewrite size_map.
+    exists (w).
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen in approxw.
+    rewrite -approxw.
+    apply: prod_congr.
+    + by rewrite !size_map.
+    move => i ibnd; rewrite size_map in ibnd.
     
+    set lhs := fun c: InverseAlphabet 'I_(size v) => match c with
+    | Base a => nth e [seq FreeGroup_norm i  | i <- v] a
+    | Inverse a => inv (nth e [seq FreeGroup_norm i  | i <- v] a)
+    end.
+    set rhs := fun c: InverseAlphabet 'I_(size v) => match c with
+    | Base a => nth e v a
+    | Inverse a => inv (nth e v a)
+    end.
+    rewrite (@nth_map _ (Base (Ordinal Hlt)) (FreeGroup Sigma) e lhs i w ibnd).
+    rewrite (@nth_map _ (Base (Ordinal Hlt)) (FreeGroup Sigma) e rhs i w ibnd).
+    case: (nth (Base (Ordinal (n:=size v) (m:=0) Hlt)) w i).
+    + move => s.
+      rewrite /lhs /rhs (nth_map e).
+      by rewrite FreeGroup_norm_correct.
+      by done.
+    + move => s.
+      rewrite /lhs /rhs (nth_map e).
+      by rewrite FreeGroup_norm_correct.
+      by done.
+  + move => igs_vnx.
+    rewrite /in_generated_subgroup; rewrite /in_generated_subgroup in igs_vnx; case: igs_vnx => [w approxw].
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen in approxw; move: w approxw.
+    rewrite size_map; move => w approxw.
+    exists (w).
+    rewrite /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /nth_gen.
+    rewrite -approxw.
+    apply: prod_congr.
+    + by rewrite !size_map.
+    move => i ibnd; rewrite size_map in ibnd.
+    
+    set lhs := fun c: InverseAlphabet 'I_(size v) => match c with
+    | Base a => nth e [seq FreeGroup_norm i  | i <- v] a
+    | Inverse a => inv (nth e [seq FreeGroup_norm i  | i <- v] a)
+    end.
+    set rhs := fun c: InverseAlphabet 'I_(size v) => match c with
+    | Base a => nth e v a
+    | Inverse a => inv (nth e v a)
+    end.
+    rewrite (@nth_map _ (Base (Ordinal Hlt)) (FreeGroup Sigma) e lhs i w ibnd).
+    rewrite (@nth_map _ (Base (Ordinal Hlt)) (FreeGroup Sigma) e rhs i w ibnd).
+    case: (nth (Base (Ordinal (n:=size v) (m:=0) Hlt)) w i).
+    + move => s.
+      rewrite /lhs /rhs (nth_map e).
+      by rewrite FreeGroup_norm_correct.
+      by done.
+    + move => s.
+      rewrite /lhs /rhs (nth_map e).
+      by rewrite FreeGroup_norm_correct.
+      by done.
+  + move/eqP: Heq => /size0nil vempty.
+    by rewrite vempty /=.
+Qed.
 
 
 Lemma norm_igs (v : vec) (x : FreeGroup Sigma) (H: in_generated_subgroup v (FreeGroup_norm x)):
@@ -3206,6 +3274,86 @@ Proof.
   by assumption.
 Qed.
 
+Lemma NielsenR_subgroup_eq:
+  forall x, in_generated_subgroup v x <-> in_generated_subgroup gens x.
+Proof. 
+  have wf_cmp: well_founded vec_lexico_ltP.
+    rewrite /MR /vec_lexico_ltP /Order.lt /=.
+    apply: sizelexi_wf.
+    by apply /CmpOrder.cmp_wf /le_wf.
+  
+  move => x.
+  rewrite /gens /NielsenReduction.
+  rewrite -igs_map_norm.
+  rewrite -t3_equality_subgroup.
 
+  suff: forall v', second_reduce v' = second_reduce v -> 
+    (in_generated_subgroup v' x <-> in_generated_subgroup (second_reduce v) x).
+  + move => H; by move: (H v (erefl)) => R.
+
+  move => w.
+
+  elim/(well_founded_ind wf_cmp): w.
+    move => l IH eql.
+    rewrite {1}second_reduce_equation in eql.
+
+    case eqE: (second_reduce_step l) => [| [[[k ix] iy] xy] l'].
+    + by rewrite eqE in eql; rewrite eql.
+
+    move: (@second_reduce_tcc) => [H _].
+    move: (H l (k, ix, iy, xy) l' (k, ix, iy) xy (k, ix) iy k ix (erefl) (erefl) (erefl) eqE) => H'.
+
+    have tin: (k, ix, iy, xy) \in second_reduce_step l.
+      by rewrite eqE mem_head.
+    rewrite /second_reduce_step in tin; move/flatten_mapP: tin => [[[ix' x'] [iy' y']] cin tin].
+    rewrite mem_pmap in tin; move/mapP: tin => [[k' xy'] k'xyin eqopt].
+    move: eqopt; case: ifP => [eqcmp [_ eqixix' eqiyiy' _]|//].
+    rewrite mem_filter in cin; move/andP: cin => [ix'diffiy' cin].
+    move/allpairsP: cin => [[[n nx] [m mx]] [nin min [eqix'n _ eqiy'm _]]].
+    rewrite /= in nin min.
+    have ixbnd: (ix < size l)%N.
+      rewrite eqixix' eqix'n.
+      apply: bound_enumerate => //.
+      by apply: nin.
+    have iybnd: (iy < size l)%N.
+      rewrite eqiyiy' eqiy'm.
+      apply: bound_enumerate => //.
+      by apply: min.
+    rewrite -eqixix' -eqiyiy' in ix'diffiy'.
+    move/eqP in ix'diffiy'.
+
+    set t:= if (k == 0)%B then t2 l ix iy else if (k == 1)%B then t1 (t2 (t1 l iy) ix iy) iy else if (k == 2)%B then t2 (t1 l ix) ix iy
+      else if (k == 3)%B then t1 (t2 (t1 (t1 l iy) ix) ix iy) iy else l.
+
+    rewrite eqE in eql.
+    move: (@IH t H' eql) => Q.
+
+    rewrite -Q /t.
+    case: k eqE H' t Q eql => [| [| [| [| j]]]] eqE H' t Q eql; rewrite /=.
+    + by rewrite -t2_equal_subgroup.
+    + rewrite -t1_equal_subgroup //.
+      rewrite -t2_equal_subgroup //.
+      by rewrite -t1_equal_subgroup //.
+      1-2: by rewrite t1_preserve_size.
+      rewrite t2_preserve_size //.
+      1-2: by rewrite t1_preserve_size //.
+    + rewrite -t2_equal_subgroup //.
+      by rewrite -t1_equal_subgroup //.
+      1-2: by rewrite t1_preserve_size.
+    + rewrite -t1_equal_subgroup //.
+      rewrite -t2_equal_subgroup //.
+      rewrite -t1_equal_subgroup //.
+      by rewrite -t1_equal_subgroup //.
+      by rewrite t1_preserve_size.
+      rewrite t1_preserve_size //.
+      1-2: by rewrite t1_preserve_size.
+      rewrite t1_preserve_size //.
+      1-2: by rewrite t1_preserve_size.
+      rewrite t2_preserve_size //.
+      rewrite t1_preserve_size //.
+      3: rewrite t1_preserve_size //.
+      1-4: by rewrite t1_preserve_size //.
+    + by done.
+Qed.
 
 End NielsenConstructionCorrection.

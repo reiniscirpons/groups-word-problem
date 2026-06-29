@@ -941,6 +941,140 @@ Proof.
   by apply/mapP; exists (x).
 Qed.
 
+Lemma half_upperhalf_equal (x y: FreeGroup Sigma) (eqsz: size x = size y)
+  (eqfh: CmpOrder.half x = CmpOrder.half y)
+  (eqsh: CmpOrder.upperhalf x = CmpOrder.upperhalf y):
+  x = y.
+Proof.
+  rewrite /CmpOrder.half in eqfh.
+  rewrite /CmpOrder.upperhalf in eqsh.
+  case: (boolP (odd (size x))) => [Ht | Hf].
+  + have eqszodd: forall n, odd n -> ((n + 1) %/ 2 = (n %/ 2 + 1))%N.
+      by lia.
+    rewrite !eqszodd // in eqfh; last by rewrite -eqsz.
+
+    move/(f_equal (drop 1)) in eqsh; rewrite !drop_drop addnC in eqsh.
+    rewrite -[x](cat_take_drop (size x %/ 2 + 1)); rewrite -[y](cat_take_drop (size y %/ 2 + 1)).
+    by rewrite eqfh eqsh addnC.
+  + rewrite -oddS in Hf.
+    have eqszeven: forall n, odd (n.+1) -> ((n + 1) %/ 2 = (n %/ 2))%N.
+      by lia.
+    rewrite !eqszeven // in eqfh; last by rewrite -eqsz.
+    rewrite -[x](cat_take_drop (size x %/ 2)); rewrite -[y](cat_take_drop (size y %/ 2)).
+    by rewrite eqfh eqsh.
+Qed.
+
+
+Lemma rev_half (x': word):
+  CmpOrder.half (inv (FreeGroup_norm x')) = inv (CmpOrder.upperhalf (FreeGroup_norm x') :> FreeGroup Sigma).
+Proof.
+  rewrite /CmpOrder.half /CmpOrder.upperhalf.
+  rewrite /inv/=/inv_word/= map_rev size_rev size_map take_rev map_rev size_map; apply: f_equal.
+  rewrite map_drop.
+  have ->: (size (FreeGroup_norm x') - (size (FreeGroup_norm x') + 1) %/ 2 = size (FreeGroup_norm x') %/ 2)%N.
+    by lia.
+  by done.
+Qed.
+
+Lemma rev_upperhalf (x': word):
+  CmpOrder.upperhalf (inv (FreeGroup_norm x')) = inv (CmpOrder.half (FreeGroup_norm x') :> FreeGroup Sigma).
+Proof.
+  rewrite -{2}[FreeGroup_norm x']inv_eq_invol.
+  by rewrite -FreeGroup_norm_inv rev_half inv_eq_invol.
+Qed.
+
+Lemma cmp_comp (x y : FreeGroup Sigma):
+  (x <= y)%O && (y <= x)%O -> (x == y) \/ (x == inv y).
+Proof.
+  move => /andP [lexy leyx].
+  rewrite /Order.le /= /CmpOrder.cmp_le in lexy leyx.
+  rewrite /CmpOrder.sz /= in lexy leyx.
+  have eqsz: (size (FreeGroup_norm x) = size (FreeGroup_norm y)).
+    case: (boolP (size (FreeGroup_norm x) < size (FreeGroup_norm y))%N) => [Hlt | Hleq].
+    + move/ltnW in Hlt.
+      rewrite leqNgt in Hlt; move/negPf in Hlt.
+      by rewrite Hlt /= in leyx; move/andP: leyx => [/eqP R _].
+    + move/negPf in Hleq.
+      by rewrite Hleq /= in lexy; move/andP: lexy => [/eqP R _].
+  + rewrite eqsz ltnn /= in lexy leyx.
+    move/andP: lexy => [_ letxty]; move/andP: leyx => [_ letytx].
+    rewrite /CmpOrder.transform /= in letytx letxty.
+    
+    case: (boolP ((CmpOrder.half (FreeGroup_norm x)) <= (inv (CmpOrder.upperhalf (FreeGroup_norm x) :> FreeGroup Sigma)))%O) => [Hleq | Hnleq].
+    + rewrite CmpOrder.min_word_correct // in letxty letytx.
+      rewrite CmpOrder.max_word_correct // in letxty letytx.
+      case: (boolP ((CmpOrder.half (FreeGroup_norm y)) <= (inv (CmpOrder.upperhalf (FreeGroup_norm y) :> FreeGroup Sigma)))%O) => [Hleqy | Hnleqy].
+      + rewrite CmpOrder.min_word_correct // in letxty letytx.
+        rewrite CmpOrder.max_word_correct // in letxty letytx.
+        set p := [:: CmpOrder.half (FreeGroup_norm x);  inv (CmpOrder.upperhalf (FreeGroup_norm x):>FreeGroup Sigma)].
+        set q := [:: CmpOrder.half (FreeGroup_norm y);  inv (CmpOrder.upperhalf (FreeGroup_norm y):>FreeGroup Sigma)].
+        have eqpq: p = q.
+          have clexy: (sizelexi p q && sizelexi q p).
+            apply/andP; split.
+            - rewrite /Order.le /= in letxty.
+              by rewrite /p /q.
+            - rewrite /Order.le /= in letytx.
+              by rewrite /p /q.
+          by apply: (sizelexi_anti clexy).
+        case: eqpq => [eqfh eqsh].
+        have eqshc: inv (inv (CmpOrder.upperhalf (FreeGroup_norm x):>FreeGroup Sigma)) = inv (inv (CmpOrder.upperhalf (FreeGroup_norm y):>FreeGroup Sigma)).
+          by apply: f_equal.
+        rewrite !inv_eq_invol in eqshc.
+        left.
+        move: (half_upperhalf_equal (FreeGroup_norm x) (FreeGroup_norm y) eqsz eqfh eqshc) => eqfr.
+        by rewrite -[x]FreeGroup_norm_correct -[y]FreeGroup_norm_correct eqfr.
+      + move: (@sizelexi_total _ _ le_total (CmpOrder.half (FreeGroup_norm y)) (inv (CmpOrder.upperhalf (FreeGroup_norm y) :> FreeGroup Sigma))) => Htotal; move/negPf in Hnleqy; rewrite /Order.le /= in Hnleqy; rewrite Hnleqy /= in Htotal.
+        rewrite CmpOrder.min_wordC CmpOrder.min_word_correct // in letxty letytx.
+        rewrite CmpOrder.max_wordC CmpOrder.max_word_correct // in letxty letytx.
+        rewrite /Order.le /= in letxty; rewrite /Order.le /= in letytx.
+        move: (conj letxty letytx) => /andP clexy.
+        move: (sizelexi_anti clexy) => [eqfh eqsh].
+        rewrite -rev_half in eqfh.
+        have eqadhoc : inv (inv (CmpOrder.upperhalf (FreeGroup_norm x) :> FreeGroup Sigma)) = inv  (CmpOrder.half (FreeGroup_norm y):> FreeGroup Sigma).
+          by apply: f_equal.
+        rewrite inv_eq_invol in eqadhoc.
+        rewrite -rev_upperhalf in eqadhoc.
+        have eqsz' : size (FreeGroup_norm x) = size (inv (FreeGroup_norm y)).
+          by rewrite size_inv eqsz.
+        move: (half_upperhalf_equal (FreeGroup_norm x) (inv (FreeGroup_norm y)) eqsz' eqfh eqadhoc) => eqfr.
+        right.
+        by rewrite -[x]FreeGroup_norm_correct -[inv y]FreeGroup_norm_correct FreeGroup_norm_inv eqfr.
+    + move: (@sizelexi_total _ _ le_total (CmpOrder.half (FreeGroup_norm x)) (inv (CmpOrder.upperhalf (FreeGroup_norm x) :> FreeGroup Sigma))) => Htotal; move/negPf in Hnleq; rewrite /Order.le /= in Hnleq; rewrite Hnleq /= in Htotal.
+      rewrite CmpOrder.min_wordC CmpOrder.min_word_correct // in letxty letytx.
+      rewrite CmpOrder.max_wordC CmpOrder.max_word_correct // in letxty letytx.
+
+      case: (boolP ((CmpOrder.half (FreeGroup_norm y)) <= (inv (CmpOrder.upperhalf (FreeGroup_norm y) :> FreeGroup Sigma)))%O) => [Hleqy | Hnleqy].
+      + rewrite CmpOrder.min_word_correct // in letxty letytx.
+        rewrite CmpOrder.max_word_correct // in letxty letytx.
+        rewrite /Order.le /= in letxty; rewrite /Order.le /= in letytx.
+        move: (conj letxty letytx) => /andP clexy.
+        move: (sizelexi_anti clexy) => [eqfh eqsh].
+        have eqadhoc : inv (inv (CmpOrder.upperhalf (FreeGroup_norm x) :> FreeGroup Sigma)) = inv (CmpOrder.half (FreeGroup_norm y):> FreeGroup Sigma).
+          by apply: f_equal.
+        rewrite inv_eq_invol in eqadhoc.
+        rewrite -rev_upperhalf in eqadhoc.
+        rewrite -rev_half in eqsh.
+        have eqsz' : size (FreeGroup_norm x) = size (inv (FreeGroup_norm y)).
+          by rewrite size_inv eqsz.
+        move: (half_upperhalf_equal (FreeGroup_norm x) (inv (FreeGroup_norm y)) eqsz' eqsh eqadhoc) => eqfr.
+        right.
+        by rewrite -[x]FreeGroup_norm_correct -[inv y]FreeGroup_norm_correct FreeGroup_norm_inv eqfr.
+      + move: (@sizelexi_total _ _ le_total (CmpOrder.half (FreeGroup_norm y)) (inv (CmpOrder.upperhalf (FreeGroup_norm y) :> FreeGroup Sigma))) => Htotaly; move/negPf in Hnleqy; rewrite /Order.le /= in Hnleqy; rewrite Hnleqy /= in Htotaly.
+        rewrite CmpOrder.min_wordC CmpOrder.min_word_correct // in letxty letytx.
+        rewrite CmpOrder.max_wordC CmpOrder.max_word_correct // in letxty letytx.
+        rewrite /Order.le /= in letxty; rewrite /Order.le /= in letytx.
+        move: (conj letxty letytx) => /andP clexy.
+        move: (sizelexi_anti clexy) => [eqfh eqsh].
+
+        have eqshc: inv (inv (CmpOrder.upperhalf (FreeGroup_norm x):>FreeGroup Sigma)) = inv (inv (CmpOrder.upperhalf (FreeGroup_norm y):>FreeGroup Sigma)).
+          by apply: f_equal.
+        rewrite !inv_eq_invol in eqshc.
+        left.
+        move: (half_upperhalf_equal (FreeGroup_norm x) (FreeGroup_norm y) eqsz eqsh eqshc) => eqfr.
+        by rewrite -[x]FreeGroup_norm_correct -[y]FreeGroup_norm_correct eqfr.
+Qed.
+
+
 Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
 Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
   (sz (x @ y) >= sz(x))%N.
@@ -3159,24 +3293,6 @@ Proof.
         + by apply: lewxx'.
 
   by rewrite eqsrs.
-Qed.
-
-Lemma rev_half (x': word):
-  CmpOrder.half (inv (FreeGroup_norm x')) = inv (CmpOrder.upperhalf (FreeGroup_norm x') :> FreeGroup Sigma).
-Proof.
-  rewrite /CmpOrder.half /CmpOrder.upperhalf.
-  rewrite /inv/=/inv_word/= map_rev size_rev size_map take_rev map_rev size_map; apply: f_equal.
-  rewrite map_drop.
-  have ->: (size (FreeGroup_norm x') - (size (FreeGroup_norm x') + 1) %/ 2 = size (FreeGroup_norm x') %/ 2)%N.
-    by lia.
-  by done.
-Qed.
-
-Lemma rev_upperhalf (x': word):
-  CmpOrder.upperhalf (inv (FreeGroup_norm x')) = inv (CmpOrder.half (FreeGroup_norm x') :> FreeGroup Sigma).
-Proof.
-  rewrite -{2}[FreeGroup_norm x']inv_eq_invol.
-  by rewrite -FreeGroup_norm_inv rev_half inv_eq_invol.
 Qed.
 
 Lemma NielsenR_minimal:

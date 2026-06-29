@@ -338,4 +338,10 @@ move=> /orP[| /andP[_ levu]]; first by rewrite eqsz ltnn.
 by apply/eqP; rewrite (eq_le (u : seqlexi _)) leuv levu.
 Qed.
 
+HB.instance Definition _ := Order.Le_isPOrder.Build sizelexidisplay
+  (seq T) sizelexi_refl sizelexi_anti sizelexi_trans.
+
+HB.instance Definition _ := Order.POrder_isTotal.Build sizelexidisplay
+  (seq T) (sizelexi_total (Order.le_total)).
+
 End SizeLexiOrder.

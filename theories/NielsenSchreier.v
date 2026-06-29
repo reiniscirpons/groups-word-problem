@@ -302,7 +302,7 @@ Notation word := (FreeGroup Sigma).
 Notation vec := (seq word).
 
 Definition t3 (v: vec) := 
-  filter (fun elm => negb (FreeGroup_dec_eq Sigma elm e)) v. (* need to change *)
+  filter (fun elm => negb (FreeGroup_dec_eq Sigma elm e)) v.
 
 Definition t2 (v: vec) (i j : nat) :=
   let u_j := nth e v j in
@@ -340,6 +340,8 @@ Section WordSplitting.
 Section lprefix.
 
 Context {T: eqType}.
+
+(* prefix's lemmas *)
 
 Lemma prefix_size (z x y: seq T) (prefxz: prefix x z) (prefyz: prefix y z) (sz: (size x <= size y)%N):
   prefix x y.
@@ -441,6 +443,8 @@ Proof.
         by apply: (IH l' s s').
 Qed.
 
+(* *)
+
 Lemma size_take_simpl (s t: seq T) (k: nat) (eqsz: size s = size t):
   size (take k s) = size (take k t).
 Proof.
@@ -534,11 +538,19 @@ Let U := gens ++ [seq (inv w) | w <- gens].
 Definition lKprefix (x y : FreeGroup Sigma) :=
   lprefix (inv x) y.
 
+(* Lemmas for inv *)
+
 Lemma size_inv (x: FreeGroup Sigma):
   size (inv x) = size x.
 Proof.
   by rewrite /inv/=/inv_word/= size_map size_rev.
 Qed.
+
+Lemma inv_cons (a : sigma (FGP Sigma)) (t : FreeGroup Sigma):
+  inv (a :: t :> FreeGroup Sigma) = rcons (inv t) (invl a).
+Proof.
+  by rewrite /inv /= /inv_word map_rev map_cons rev_cons map_rev.
+Qed. 
 
 Lemma inv_cat (x y: FreeGroup Sigma):
   inv (x ++ y :> FreeGroup Sigma) = inv y ++ inv x.
@@ -559,6 +571,10 @@ Proof.
   elim: x => [// | a l IH].
   by rewrite map_cons invlK IH.
 Qed.
+
+(* *)
+
+(* freely reduced lemmas *)
 
 Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
   freely_reduced x.
@@ -668,13 +684,9 @@ Proof.
     by rewrite eqz catA in habs'.
 Qed.
 
+(* *)
 
-Lemma inv_cons (a : sigma (FGP Sigma)) (t : FreeGroup Sigma):
-  inv (a :: t :> FreeGroup Sigma) = rcons (inv t) (invl a).
-Proof.
-  by rewrite /inv /= /inv_word map_rev map_cons rev_cons map_rev.
-Qed. 
-
+(* lKprefix lemmas *)
 
 Lemma lKprefix_split (x y: FreeGroup Sigma) (frx: freely_reduced x) (fry: freely_reduced y):
   exists (w w': FreeGroup Sigma), (
@@ -737,8 +749,7 @@ Proof.
         exists (lKprefix x y).
         exists ([::]).
         by rewrite cats0.
-      + (* the only part about the function *)
-        move => Habs.
+      + move => Habs.
         have eqaa': invl (invl a) = invl (invl a').
           by rewrite (@f_equal _ _ invl _ (invl a')).
         rewrite !invlK  in eqaa'.
@@ -864,6 +875,9 @@ Proof.
   by apply: invol_unique.
 Qed.
 
+(* *)
+
+(* lKprefix_all lemmas *)
 
 Definition lKprefix_all (y: FreeGroup Sigma) :=
   sort (fun a b => (size b <= size a)%N) (
@@ -940,6 +954,8 @@ Proof.
   rewrite -eqt mem_sort mem_filter; apply/andP; split; first by [].
   by apply/mapP; exists (x).
 Qed.
+
+(* lemmas about cmp_le *)
 
 Lemma half_upperhalf_equal (x y: FreeGroup Sigma) (eqsz: size x = size y)
   (eqfh: CmpOrder.half x = CmpOrder.half y)
@@ -1074,6 +1090,19 @@ Proof.
         by rewrite -[x]FreeGroup_norm_correct -[y]FreeGroup_norm_correct eqfr.
 Qed.
 
+
+Lemma cmp_total (x y: word) (Hcomp: ~~ (x @ y < x :> word)%O):
+  (x <= x @ y)%O.
+Proof.
+  rewrite Order.PreorderTheory.lt_leAnge in Hcomp.
+  have htotal: (total (fun x y:word => (x <= y)%O)).
+    by apply: CmpOrder.cmp_total.
+  rewrite /total in htotal; move: (htotal (x @ y) x) => H; rewrite negb_and negbK in Hcomp.
+  case/orP: Hcomp => [/negPf Hcomp | //].
+  by rewrite Hcomp /= in H.
+Qed.
+
+(* *)
 
 Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
 Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
@@ -1267,7 +1296,6 @@ Proof.
     rewrite freely_reduced_correct in frz.
     rewrite FreeGroup_norm_inv -frz eqz.
 
-    (* *)
     have eqsz_inv: size p = size (inv (q:> FreeGroup Sigma)).
       by rewrite size_inv -eqsz.
     have leqsz_inv: (size (inv (q:> FreeGroup Sigma)) <= size a)%N.
@@ -2074,7 +2102,6 @@ Proof.
   by apply: not_eq_sym h.
 Qed.
 
-(* the structure of the proof need to be worked on *)
 
 Lemma t1_preserve_size (gens: vec) (i: nat) (Hibound: (i < size gens)%N):
 size (t1 gens i) = size (gens).
@@ -2412,7 +2439,7 @@ Proof.
         by rewrite cast_ordK.
         move => s.
         by rewrite /perm_id cast_ordKV.
-      apply: in_generated_subgroup_perm_morphism; last first. (* swap to force the Goal0? to be perm_id *)
+      apply: in_generated_subgroup_perm_morphism; last first.
       by apply: Hbij.
       move => n; case: n => [n Hn].
       rewrite /nth_gen /=.
@@ -2554,7 +2581,7 @@ Proof.
   by [].
 Qed.
 
-(* Note(mathis): Once again, there is some code duplication, It would be cool to factor it *)
+(* Note(mathis): Once again, there is some code duplication, It would be niice to factor it *)
 
 Lemma t3_equality_subgroup (gens: vec):
   forall x, in_generated_subgroup gens x <-> in_generated_subgroup (t3 gens) x.
@@ -2607,6 +2634,7 @@ Proof.
             by apply: H_in_subgroup_hat.
 Qed.
 
+(* All of this is kind of useless now *)
 
 Definition sort_uniq {T: eqType} (h: T -> T -> bool) (u: seq T) :=
     sort h (undup u).
@@ -2717,6 +2745,8 @@ Proof.
     by apply: Heq_nthmap.
 Qed.
 
+(* *)
+
 
 (* Note(mathis): the type annotations are necessary *)
 Definition second_reduce_step (gens: vec) :=
@@ -2753,6 +2783,7 @@ Proof.
   by rewrite (@in_enumerate _ _ 0 _ qix qx).
 Qed.
 
+(* useless too *)
 Lemma second_reduce_step_neq (gens: vec) (k ix iy: nat) (xy: word) (t: seq _) (Heq: second_reduce_step gens = (k, ix, iy, xy)::t):
   ix <> iy.
 Proof.
@@ -2767,7 +2798,7 @@ Proof.
   rewrite -eqixix' -eqiyiy' in xin.
   by move/andP: xin => [/eqP R _].
 Qed.
-
+(* *)
 
 Definition vec_lexico_ltP (gens gens': vec): Prop := (gens < gens')%O.
 
@@ -3049,6 +3080,7 @@ Proof.
   by apply /CmpOrder.cmp_wf /le_wf.
 Qed.
 
+(* auxiliary lemma for the minimality proof *)
 Lemma second_reduce_fixpoint (v : vec) :
   second_reduce_step (second_reduce v) = [::].
 Proof.
@@ -3072,6 +3104,7 @@ else if (k == 3)%B then t1 (t2 (t1 (t1 v iy) ix) ix iy) iy else v.
 
     by rewrite second_reduce_equation.
 Qed.
+(* *)
 
 
 Definition NielsenReduction (gens: vec) :=
@@ -3216,17 +3249,6 @@ Proof.
 
     change (FreeGroup_norm x) with x'; rewrite eqfrxx {1}eqx'l !size_cat.
     by rewrite addnA ltn_add2l size_inv addnC -{1}[size (lKprefix x' x')]addn0 ltn_add2l.
-Qed.
-
-Lemma comp_or_leq (x y: word) (Hcomp: ~~ (x @ y < x :> word)%O):
-  (x <= x @ y)%O.
-Proof.
-  rewrite Order.PreorderTheory.lt_leAnge in Hcomp.
-  have htotal: (total (fun x y:word => (x <= y)%O)).
-    by apply: CmpOrder.cmp_total.
-  rewrite /total in htotal; move: (htotal (x @ y) x) => H; rewrite negb_and negbK in Hcomp.
-  case/orP: Hcomp => [/negPf Hcomp | //].
-  by rewrite Hcomp /= in H.
 Qed.
 
 Lemma NielsenR_minimal_aux (k: nat) (wx wy x' y': FreeGroup Sigma) (x'ins: x' \in (second_reduce v)) (y'ins: y' \in (second_reduce v)) (lewxx': (wx <= x')%O)

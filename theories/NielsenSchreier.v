@@ -113,6 +113,326 @@ Proof.
   by rewrite /sumn /= leq_addr.
 Qed.
 
+(* extension of mask and subseq *)
+
+
+Context {T: eqType}.
+Context {et: T}.
+
+(*
+
+Lemma subseq_injection_inj {T: eqType} {et: T} (s t: seq T) (Hsub: subseq s t) (i: nat) (ibnd: (i < size s)%N): injective (subseq_injection s t Hsub).
+ *)
+
+Fixpoint compute_mask (s t: seq T) {struct t}: bitseq :=
+  if s is a :: l then
+    if t is a' :: l' then
+      if (a == a') then (true)::(compute_mask l l') else (false)::(compute_mask (a::l) l')
+    else [::]
+  else nseq (size t) (false).
+
+Lemma compute_mask0 (t: seq T): compute_mask [::] t = nseq (size t) (false).
+Proof.
+  rewrite /compute_mask.
+  case: t => //.
+Qed.
+
+Lemma compute_0mask (s: seq T): compute_mask s [::] = [::].
+Proof. rewrite /compute_mask /=; case s => //.
+Qed.
+       
+Lemma compute_mask_cons (l l': seq T) (a a': T) :
+  compute_mask (a::l) (a'::l') = (a == a')%B::(compute_mask (if (a == a') then l else a::l) l').
+Proof.
+  rewrite /compute_mask; case: (a == a')%B => //.
+Qed.
+
+Lemma size_compute_mask (s t : seq T):
+ size (compute_mask s t) = size t.
+Proof.
+  move: s.
+  elim: t => [| a l IH] s.
+  + by rewrite compute_0mask /=.
+  case: s => [| a' l'].
+  + by rewrite compute_mask0 size_nseq.
+  rewrite compute_mask_cons /=; apply/eqP; rewrite eqSS.
+  by rewrite (IH (if a' == a then l' else a' :: l')).
+Qed.
+  
+Lemma compute_mask_correct (s t : seq T) (Hsub: subseq s t):
+  mask (compute_mask s t) t = s.
+Proof.
+  move: s Hsub.
+  elim: t => [| a' l' IH] s Hsub.
+  + by rewrite compute_0mask; rewrite subseq0 in Hsub; symmetry; apply/eqP.
+  case: s Hsub => [|a l] Hsub.
+  + by rewrite compute_mask0 mask_false.
+  rewrite compute_mask_cons.
+  case eqaa': (a == a')%B; move/eqP in eqaa'.
+  rewrite  !eqaa'; rewrite eqaa' in Hsub.
+  rewrite mask_cons /=.
+  change (a'::l) with ([:: a'] ++ l) in Hsub.
+  change (a'::l') with ([:: a'] ++ l') in Hsub.
+  rewrite subseq_cat2l in Hsub.
+  by move: (IH l Hsub) => ->.
+  rewrite mask_cons /=.
+  move/eqP: eqaa' => /negbTE diffaa'.
+  rewrite /= diffaa' in Hsub.
+  by move: (IH (a::l) Hsub) => ->.
+Qed.
+
+Definition mask_index (m : bitseq) (i : nat) : nat :=
+  nth (size m) [seq j <- iota 0 (size m) | nth false m j] i.
+
+Lemma mask_eq {A B: eqType} (m1 m2: bitseq) (t : seq A) (l: seq B) (huniq: uniq t) (eqmask : mask m1 t = mask m2 t) (eqsz: size l = size t):
+  mask m1 l = mask m2 l.
+Proof.
+  move: l m2 t huniq eqmask eqsz.
+  elim: m1 => [l m2 t huniq eqmask eqsz |b s1 IH1].
+  + rewrite mask0s in eqmask; rewrite mask0s.
+    elim: m2 t l eqsz eqmask huniq  => [//| b' s2 IH2] t l eqsz.
+    case: b'.
+    - case: l eqsz IH2 => [|a l'] eqsz IH2.
+      + rewrite /= in eqsz; symmetry in eqsz; move/size0nil in eqsz.
+        by rewrite !eqsz.
+      + case: t eqsz => [//|a' t'] eqsz.
+        rewrite /= in eqsz; case: eqsz => eqsz.
+        by rewrite mask_cons /=.
+    - case: l eqsz IH2 => [|a l'] eqsz IH2.
+      + by done.
+      + case: t eqsz => [//|a' t'] eqsz.
+        rewrite /= in eqsz; case: eqsz => eqsz.
+        rewrite mask_cons /= => masknil /andP [_ huniq].
+        by rewrite (IH2 t' l' eqsz).
+  + move => l m2; elim: m2 l => [|b' s2 IH2] l t eqmask eqsz.
+    - case: t eqmask eqsz => [|a' t'] huniq eqmask.
+      + by rewrite /=; move/size0nil => ->.
+      rewrite mask_cons mask0s in eqmask.
+      case: b eqmask.
+      + by done.
+      rewrite /=; case: l => [//|a l'].
+      move => eqmask eqsz.
+      rewrite mask_cons /=; rewrite /= in eqsz; case: eqsz => eqsz.
+      rewrite /= in huniq; move/andP: huniq => [_ huniq'].
+      by rewrite (IH1 l' [::] t' _ eqmask eqsz).
+    - case: t eqmask eqsz => [|a' t'].
+      + by rewrite /= => _ _; move/size0nil => ->.
+      case: b IH2.
+      case: b' => IH2 huniq.
+      + rewrite !mask_cons /= => eqmask; case: eqmask => eqmask.
+        case: l => [| a l'].
+        - by done.
+        - rewrite /= => eqsz; case: eqsz => eqsz.
+          rewrite /= in huniq; move/andP: huniq => [_ huniq'].
+          by rewrite (IH1 l' s2 t' _ eqmask eqsz).
+      + rewrite !mask_cons /=.
+        rewrite /= in huniq; move/andP: huniq => [Hnotin Huniq'].
+        move => eqmask; have ain: a' \in t'.
+          apply: mem_mask.
+          Unshelve.
+          4: exact: s2.
+          by rewrite -eqmask mem_head.
+          by rewrite ain /= in Hnotin.
+      + case b' => IH2 huniq.
+        rewrite !mask_cons /=.
+        rewrite /= in huniq; move/andP: huniq => [Hnotin Huniq'].
+        move => eqmask; have ain: a' \in t'.
+          apply: mem_mask.
+          Unshelve.
+          4: exact: s1.
+          by rewrite eqmask mem_head.
+          by rewrite ain /= in Hnotin.
+      + rewrite !mask_cons /= => eqmask.
+        case: l => [//|a l'] eqsz.
+        rewrite /= in eqsz; case: eqsz => eqsz.
+        rewrite !mask_cons /=; rewrite /= in huniq; move/andP: huniq => [_ huniq'].
+        by rewrite (IH1 l' s2 t' _ eqmask eqsz).
+Qed.
+        
+        
+Lemma nth_mask (t: seq T) (m: bitseq) (j: nat): nth et t (nth (size t) (mask m (iota 0 (size t))) j) = nth et (mask m t) j.
+Proof.
+  move: (@resize_mask nat m (iota 0 (size t))) => [m' eqszm' eqmask].
+
+  have ->: mask m t = mask m' t.
+    rewrite (mask_eq m m' (iota 0 (size t)) t) //.
+    + by apply: iota_uniq.
+    + by rewrite size_iota.
+
+  rewrite {}eqmask.
+  rewrite size_iota in eqszm'.
+  move: t j eqszm'.
+  elim: m' => [| b l IH] t j eqszm.
+  + by rewrite !mask0s nth_nil nth_default // nth_nil.
+  case: t eqszm => [| a' l'] eqszm.
+  + by rewrite /= !nth_nil.
+  rewrite /=.
+  case: j => [|i].
+  + case: b eqszm.
+  - by rewrite /=.
+  - move => eqszm; rewrite /= in eqszm; case: eqszm => eqszm;  case: (posnP (size (mask l (iota 1 (size l'))))) => [Heq | Hlt].
+    + rewrite size_mask in Heq.
+      have nhas : ~~ (has id l).
+      by rewrite has_count ltnNge negbK Heq.
+      move/hasPn in nhas.
+      have eql : l = nseq (size l) false.
+        apply: (eq_from_nth).
+        Unshelve.
+        7: exact: false.
+        + by rewrite size_nseq.
+        + move => k kbnd.
+          rewrite nth_nseq ifT //.
+          have kinl: (nth false l k) \in l.
+           apply/nthP.
+           by exists(k) => //.
+          apply/negP.
+          apply/negP.
+          by rewrite nhas.
+        rewrite eql !mask_false !nth_nil nth_default //.
+        by rewrite size_iota eqszm.
+          
+        
+     + change (iota 1 (size l')) with (iota (1 + 0) (size l')).
+
+       rewrite iotaDl -map_mask (nth_map (size l')).
+       rewrite addnC addn1 -nth_behead /=.
+       by apply: (IH l' 0).
+       rewrite size_mask; rewrite size_mask // in Hlt.
+       1-3: by rewrite size_iota.
+  + case: b eqszm; rewrite /=; case => eqszm.
+    + change (iota 1 (size l')) with (iota (1 + 0) (size l')).
+
+      case: (ltnP i (size (mask l l'))) => [Hlt | Hleq].
+      + rewrite iotaDl -map_mask (nth_map (size l')).
+        rewrite addnC addn1 -nth_behead /=.
+        by apply: (IH l' i).
+        rewrite size_mask in Hlt.
+        rewrite size_mask //.
+        by rewrite size_iota eqszm.
+        by done.
+      + rewrite size_mask in Hleq.
+        rewrite !nth_default //.
+        by rewrite size_mask.
+        + rewrite size_mask //.
+          by rewrite size_iota eqszm.
+        by done.
+    + change (iota 1 (size l')) with (iota (1 + 0) (size l')).
+
+      case: (ltnP (i.+1) (size (mask l l'))) => [Hlt | Hleq].
+      + rewrite iotaDl -map_mask (nth_map (size l')).
+        rewrite addnC addn1 -nth_behead /=.
+        by apply: (IH l' (i.+1)).
+        rewrite size_mask in Hlt.
+        rewrite size_mask //.
+        by rewrite size_iota eqszm.
+        by done.
+      + rewrite size_mask in Hleq.
+        rewrite !nth_default //.
+        by rewrite size_mask.
+        + rewrite size_mask //.
+          by rewrite size_iota eqszm.
+        by done.
+Qed.
+
+    
+Lemma eq_size_count m:
+  count id m = size [seq j <- iota 0 (size m) | nth false m j].
+Proof.
+  by rewrite -{1}[m](mkseq_nth false) count_map size_filter /=.
+Qed.  
+
+Lemma mask_index_inj m i j : (i < count id m)%N -> (j < count id m)%N -> mask_index m i = mask_index m j -> i = j.
+Proof.
+  move => ibnd jbnd; rewrite /mask_index=> eqf.
+  pose positions := [seq j <- iota 0 (size m) | nth false m j].
+
+  have Hsorted : sorted (fun x y => (x < y)%N) positions.
+    apply: sorted_filter => //; first by apply: ltn_trans.
+    by apply: iota_ltn_sorted.
+
+  have eqsz : count id m = size positions.
+    by rewrite /positions; apply eq_size_count.
+
+  rewrite eqsz in ibnd jbnd.
+
+  apply: anti_leq; apply/andP; split.
+  - rewrite leqNgt; apply/negP => H.
+    by move: (sorted_ltn_nth ltn_trans (size m) Hsorted j i jbnd ibnd H); rewrite eqf ltnn.
+  - rewrite leqNgt; apply/negP => H.
+    by move: (sorted_ltn_nth ltn_trans (size m) Hsorted i j ibnd jbnd H); rewrite eqf ltnn.
+Qed.
+
+
+Definition subseq_injection (s t: seq T) (Hsub: subseq s t):=
+  mask_index (compute_mask s t).
+
+Variable s t : seq T.
+Hypothesis Hsub: subseq s t.
+Let subs_injection := subseq_injection s t Hsub.
+  
+Lemma injection_bnd (i: nat) (ibnd: (i < size s)%N): (subs_injection i < size t)%N.
+Proof.
+  pose m := (compute_mask s t).
+  have eqm : s = mask m t.
+  by rewrite /m; symmetry; apply: (compute_mask_correct s t Hsub).
+  have eqsz : size t = size m by rewrite /m size_compute_mask.
+  have eqszs: size s = count id m by rewrite eqm size_mask.
+
+  rewrite /mask_index.
+  pose l := [seq j <- iota 0 (size m) | nth false m j].
+  pose z := nth (size m) l i.
+  have ziniota: z \in iota 0 (size m).
+   have: z \in l. 
+     apply/nthP; exists(i).
+     by rewrite /l -eq_size_count -eqszs.
+     by rewrite /z.
+   by rewrite /l mem_filter => /andP [zcond zin].
+
+  move: ziniota.
+  rewrite mem_iota add0n {1}eqsz => /andP [_ hlt].
+  by rewrite /z /l in hlt.
+Qed.
+
+Lemma injection_correct (i: nat) (ibnd: (i < size s)%N): nth et s i = nth et t (subs_injection i).
+Proof.
+  pose m := (compute_mask s t).
+  have eqm : s = mask m t.
+  by rewrite /m; symmetry; apply: (compute_mask_correct s t Hsub).
+  have eqsz : size t = size m by rewrite /m size_compute_mask.
+  have eqszs: size s = count id m by rewrite eqm size_mask.
+
+  rewrite /subs_injection /subseq_injection.
+
+  rewrite /mask_index.
+  pose l := [seq j <- iota 0 (size m) | nth false m j].
+  pose z := nth (size m) l i.
+  have ziniota: z \in iota 0 (size m).
+   have: z \in l. 
+     apply/nthP; exists(i).
+     by rewrite /l -eq_size_count -eqszs.
+     by rewrite /z.
+   by rewrite /l mem_filter => /andP [zcond zin].
+
+  rewrite /mask_index.
+  rewrite {1}eqm /m filter_mask.
+  by rewrite -nth_mask [[seq nth false (compute_mask s t) j | j <- iota 0 (size (compute_mask s t))]](mkseq_nth false) eqsz /=.
+Qed.
+                           
+Lemma subseq_injection_inj:
+  {in [pred i | (i < size s)%N] &, injective subs_injection}.
+Proof.
+  move => i j ibnd jbnd.
+
+  have eqsz: count id (compute_mask s t) = size s.
+    rewrite -{2}[s](compute_mask_correct s t Hsub) size_mask //.
+    by apply: size_compute_mask.
+    
+  rewrite /subs_injection /subseq_injection.
+  apply: mask_index_inj.
+  by rewrite eqsz.
+  by rewrite eqsz.
+Qed.
+
 End SeqExtension.
 
 Section Enumerate_Type.
@@ -1859,76 +2179,6 @@ Proof.
 Qed.
 
 
-Definition rank := size gens.
-Definition friso := @subgroup_projection (FreeGroup Sigma) gens.
-
-
-HB.instance Definition _ :=
-isSetoidMorphism.Build _ _ friso (subgroup_projection_preserve_equiv gens).
-
-HB.instance Definition _ :=
-  isMonoidMorphism.Build _ _ friso (subgroup_projection_preserve_e gens) (subgroup_projection_preserve_law gens).
-
-(* no new instance *)
-HB.instance Definition _ := isSurjective.Build 
-  _ _ friso (subgroup_projection_surjective gens).
-
-Fact friso_injectivity_property: forall x y, friso x == friso y -> x == y.
-Proof.
-  have: (size gens > 0)%N -> forall x y, friso x == friso y -> x == y.
-  move => Hltsz x y fapprox.
-
-  have finv_approx: friso (FreeGroup_norm (x @ inv y)) == e.
-    by rewrite FreeGroup_norm_correct morphism_preserve_law /= fapprox -morphism_preserve_inv /= inverse_left.
-  have finv_approx_frg: (@subgroupby_inj (FreeGroup Sigma) _ (friso (FreeGroup_norm (x @ inv y))) == e:> word).
-    by rewrite /friso; rewrite /friso in finv_approx; rewrite finv_approx.
-  rewrite /subgroup_inj /friso /= in finv_approx_frg.
-
-  set t := (\hat (nth_gen gens) (FreeGroup_norm (x @ inv y))).
-  have eqsz0: sz t = 0.
-    rewrite /t /sz.
-    have eqnorm: FreeGroup_norm (t) = e.
-      by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
-    by rewrite eqnorm.
-  rewrite /t /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /= in eqsz0.
-  set l := [seq match c with
-    | Base a => nth_gen gens a
-    | Inverse a => inv (nth_gen gens a)
-    end  | c <- FreeGroup_norm (x @ inv y)]. 
-
-  have inU: forall i, (i < size l)%N -> (nth e l i) \in U.
-    move => i ibnd; rewrite /l (nth_map (Base (Ordinal Hltsz))).
-    set z := nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.
-    case: z => s.
-    + by rewrite /U mem_cat; apply/orP; left; apply/nthP; exists s.
-    + rewrite /U mem_cat; apply/orP; right; apply/(nthP e); exists s; first by rewrite size_map.
-      by rewrite (nth_map e e) /nth_gen.
-    by rewrite /l size_map in ibnd.
-  
-  have non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1)).
-    move => i ibnd.
-    rewrite /non_trivial => Habs.
-    rewrite /l !(nth_map (Base (Ordinal (n:=size gens) (m:=0) Hltsz))) in Habs.
-    move: Habs.
-
-    case eqa: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i) => [sa|sa].
-    + case eqb: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.+1) => [sb|sb].
-  - move => habs'.
-Admitted.
-
-(* Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz (x @ y) >= sz(x))%N.
-Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz(x @ y) >= sz(y))%N. *)
-
-(* Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
-  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
-  (sz(prod l) >= size l)%N. *)
-
-
-HB.instance Definition _ :=
-  isInjective.Build (FreeGroup 'I_rank) (generatedSubgroup gens) friso friso_injectivity_property.
-
 End WordSplitting.
 
 
@@ -2694,7 +2944,13 @@ Proof.
   by [].
 Qed.
 
-(* Note(mathis): Once again, there is some code duplication, It would be niice to factor it *)
+Lemma t3_subseq (gens : vec):
+  subseq (t3 gens) gens.
+Proof.
+  by rewrite /t3 filter_subseq.
+Qed.
+
+(* Note(mathis): Once again, there is some code duplication, It would be nice to factor it *)
 
 Lemma t3_equality_subgroup (gens: vec):
   forall x, in_generated_subgroup gens x <-> in_generated_subgroup (t3 gens) x.
@@ -3488,19 +3744,28 @@ Proof.
   + by rewrite leqNgt in ilowbnd; move/negPf in ilowbnd.
 Qed.
 
-
-
 Lemma NielsenR_minimal:
   forall (i j: nat), (i < size U)%N -> (j < size U)%N -> (i != invnat j) ->
   ~ ((nth e U i) @ (nth e U j) < (nth e U i) :> word)%O.
 Proof.
-  move => i j ibnd jbnd.
+  move => i j ibnd jbnd diffij.
 
   set x := (nth e U i).
   set y := (nth e U j).
 
   have xinU : x \in U.
+    by apply/nthP; exists (i) => //.
   have yinU : y \in U.
+    by apply/nthP; exists (j) => //.
+
+  case: (ltnP i (size gens)) ibnd => [Hlt | Hle] ibnd.
+  + move: (index_in_gens i ibnd Hlt) => eqnthi.
+    case: (ltnP j (size gens)) jbnd => [Hltj | Hlej] jbnd.
+    + move: (index_in_gens j jbnd Hltj) => eqnthj.
+      move => Habs. (* proof by contradiction to avoid crashing Rocq *)
+      apply: (NielsenR_minimal_aux 0); last by apply: Habs.
+
+  (*
 
   rewrite /U !mem_cat /gens /NielsenReduction in yinU xinU.
   case/orP: yinU => [/mapP [y' yin yeq] | /mapP [y2 /mapP [y' yin y2eq] yeq]] non_trvxy.
@@ -3556,7 +3821,7 @@ Proof.
     - have ->: FreeGroup_norm (inv (FreeGroup_norm x') @ y) = FreeGroup_norm (inv x' @ inv y').
         by rewrite yeq y2eq -!FreeGroup_norm_inv -!FreeGroup_norm_law.
       by apply: (@enumerate_in _ e).
-Qed.
+Qed.*)
 
 (*
 Lemma NielsenR_undup_aux (x' y' wx wy: FreeGroup Sigma) (k ix iy: nat) (xinU: FreeGroup_norm (x') \in U)
@@ -3759,6 +4024,77 @@ Proof.
       1-4: by rewrite t1_preserve_size //.
     + by done.
 Qed.
+
+
+Definition rank := size gens.
+Definition friso := @subgroup_projection (FreeGroup Sigma) gens.
+
+
+HB.instance Definition _ :=
+isSetoidMorphism.Build _ _ friso (subgroup_projection_preserve_equiv gens).
+
+HB.instance Definition _ :=
+  isMonoidMorphism.Build _ _ friso (subgroup_projection_preserve_e gens) (subgroup_projection_preserve_law gens).
+
+(* no new instance *)
+HB.instance Definition _ := isSurjective.Build 
+  _ _ friso (subgroup_projection_surjective gens).
+
+Fact friso_injectivity_property: forall x y, friso x == friso y -> x == y.
+Proof.
+  have: (size gens > 0)%N -> forall x y, friso x == friso y -> x == y.
+  move => Hltsz x y fapprox.
+
+  have finv_approx: friso (FreeGroup_norm (x @ inv y)) == e.
+    by rewrite FreeGroup_norm_correct morphism_preserve_law /= fapprox -morphism_preserve_inv /= inverse_left.
+  have finv_approx_frg: (@subgroupby_inj (FreeGroup Sigma) _ (friso (FreeGroup_norm (x @ inv y))) == e:> word).
+    by rewrite /friso; rewrite /friso in finv_approx; rewrite finv_approx.
+  rewrite /subgroup_inj /friso /= in finv_approx_frg.
+
+  set t := (\hat (nth_gen gens) (FreeGroup_norm (x @ inv y))).
+  have eqsz0: sz t = 0.
+    rewrite /t /sz.
+    have eqnorm: FreeGroup_norm (t) = e.
+      by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
+    by rewrite eqnorm.
+  rewrite /t /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /= in eqsz0.
+  set l := [seq match c with
+    | Base a => nth_gen gens a
+    | Inverse a => inv (nth_gen gens a)
+    end  | c <- FreeGroup_norm (x @ inv y)]. 
+
+  have inU: forall i, (i < size l)%N -> (nth e l i) \in U.
+    move => i ibnd; rewrite /l (nth_map (Base (Ordinal Hltsz))).
+    set z := nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.
+    case: z => s.
+    + by rewrite /U mem_cat; apply/orP; left; apply/nthP; exists s.
+    + rewrite /U mem_cat; apply/orP; right; apply/(nthP e); exists s; first by rewrite size_map.
+      by rewrite (nth_map e e) /nth_gen.
+    by rewrite /l size_map in ibnd.
+  
+  have non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1)).
+    move => i ibnd.
+    rewrite /non_trivial => Habs.
+    rewrite /l !(nth_map (Base (Ordinal (n:=size gens) (m:=0) Hltsz))) in Habs.
+    move: Habs.
+
+    case eqa: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i) => [sa|sa].
+    + case eqb: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.+1) => [sb|sb].
+  - move => habs'.
+Admitted.
+
+(* Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz (x @ y) >= sz(x))%N.
+Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
+  (sz(x @ y) >= sz(y))%N. *)
+
+(* Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
+  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
+  (sz(prod l) >= size l)%N. *)
+
+
+HB.instance Definition _ :=
+  isInjective.Build (FreeGroup 'I_rank) (generatedSubgroup gens) friso friso_injectivity_property.
 
 
 End NielsenConstructionCorrection.

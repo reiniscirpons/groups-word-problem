@@ -1968,15 +1968,14 @@ Proof.
     by rewrite eqxinvy inv_eq_invol mem_cat yingens /=.
 Qed.
     
-Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
+Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: {subset l <= U})
   (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
   (sz(prod l) >= size l)%N.
 Proof.
   case: l inU non_trvl => [//| a l inU non_trvl].
   have ainU: a \in U.
-    move: (@inU 0) => finU.
-    rewrite /= in finU; apply: finU.
-    by apply: ltn0Sn.
+    by apply: inU; rewrite mem_head.
+
   move: (@lKprefix_all_split a ainU (N0 a ainU)) => [w [win [hdistinct Pw]]].
   move: (@lKprefix_allW a w win) => /mapP [x xinU prefx].
   move: (@lKprefix_split x a (frU x xinU) (frU a ainU)) => [u [v]] [eqx [eqa frxa]].
@@ -2012,11 +2011,26 @@ Proof.
         move => i ibound.
         rewrite /=.
         by lia.
-    
-      have inUW: (forall i : nat, (i < size (b :: l))%N -> nth e (b :: l) i  \in U).
-        move => i ibound.
-        move: (inU (i.+1) (ibound' _ i a (b::l) ibound)) => nthinU.
-        by rewrite -nth_behead /= in nthinU.
+
+      have binU: b \in U.
+        apply: inU.
+        apply: mem_drop.
+        Unshelve.
+        4: exact: 1.
+        by rewrite /= mem_head.
+      
+      have inUW: {subset b::l <= U}.
+        move => z zin.
+        change (b::l) with ([:: b] ++ l) in zin.
+        rewrite mem_cat in zin.
+        case/orP: zin.
+         + by rewrite mem_seq1 => /eqP ->.
+         + move => zin.
+           apply: inU.
+           apply: mem_drop.
+           Unshelve.
+           4: exact: 2.
+           by rewrite /= drop0.
 
       have non_trvlW: (forall i : nat, (i < size (b :: l) - 1)%N -> non_trivial (nth e (b :: l) i) (nth e (b :: l) i.+1)).
         move => i ibound.
@@ -2026,11 +2040,6 @@ Proof.
         move: (non_trvl (i.+1) i'bound) => ntrvnth.
         by rewrite -nth_behead /= in ntrvnth.
 
-      have binU: b \in U.
-        have bnd: (1 < size [:: a,  b  & l])%N.
-          by rewrite /=; lia.
-        move: (inU (0.+1) bnd) => L.
-        by rewrite -nth_behead /= in L.
       move: (@lKprefix_all_split b binU (N0 b binU)) => [wb [wbin [wbdistinct Pwb]]].
       move: (@lKprefix_allW b wb wbin) => /mapP [z zinU prefz].
       move: (lKprefix_split z b(frU z zinU) (frU b binU)) => [f' [g']] [eqz [eqb' frzb]].

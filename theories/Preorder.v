@@ -177,6 +177,7 @@ Section Preorder.
 
 Context (T : orderType disp) (Normalisation: seq.seq T -> seq.seq T) (inv: seq.seq T -> seq.seq T).
 
+
 Hypothesis lt_wf : well_founded (@Order.lt _ T).
 
 Definition min_word (w w': seq T Normalisation inv) :=
@@ -305,7 +306,7 @@ Proof.
     by rewrite /sz equw.
   by rewrite /cmp_le /transform !equw !eqszuw; apply: leww'.
 Qed.
-
+  
 Lemma wf_prodlexi {T1 T2 : eqType} (le1: T1 -> T1 -> bool)
     (lt1 : T1 -> T1 -> bool) (Hanti: forall x y, le1 x y = (x == y) || (lt1 x y)) (Hrefl: reflexive le1) (lt2 : T2 -> T2 -> bool)
     (wf1 : well_founded lt1) (wf2 : well_founded lt2) :

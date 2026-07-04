@@ -1422,12 +1422,12 @@ Qed.
 
 
 Lemma cmp_total (x y: word):
-  ~~ (x @ y < x :> word)%O = (x <= x @ y)%O.
+  ~~ (y < x :> word)%O = (x <= y)%O.
 Proof.
   rewrite Order.PreorderTheory.lt_leAnge.
   have htotal: (total (fun x y:word => (x <= y)%O)).
     by apply: CmpOrder.cmp_total.
-  rewrite /total in htotal; move: (htotal (x @ y) x) => H; rewrite negb_and negbK.
+  rewrite /total in htotal; move: (htotal y x) => H; rewrite negb_and negbK.
   case/orP: H => [Hcomp | Hcomp].
   + by rewrite Hcomp /=.
   + by rewrite Hcomp orbC /=.
@@ -1452,6 +1452,15 @@ Proof.
   + by rewrite inv_e in L.
 Qed.
 
+Lemma cmp_bot_uniq_contra (x: word):
+  FreeGroup_norm x != e -> (e < x:>word)%O.
+Proof.
+  apply: contraLR; rewrite cmp_total => eqe.
+  move: (cmp_bot_uniq x eqe) => approxe.
+  rewrite negbK; apply/eqP.
+  by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
+Qed.
+
 Global Instance cmp_le_proper : Proper (eq ==> eq ==> iff) (<=%O:> word -> word -> Prop).
 Proof.
   move=> a b eq_ab u v eq_uv.
@@ -1463,6 +1472,16 @@ Proof.
   by rewrite !eqnab !eqnuv.
 Qed.
 
+Global Instance cmp_lt_proper : Proper (eq ==> eq ==> iff) (<%O:> word -> word -> Prop).
+Proof.
+  move=> a b eq_ab u v eq_uv.
+
+  have eqnab : FreeGroup_norm a = FreeGroup_norm b by apply: FreeGroup_norm_unique.
+  have eqnuv : FreeGroup_norm u = FreeGroup_norm v by apply: FreeGroup_norm_unique.
+ 
+  rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /=.
+  by rewrite !eqnab !eqnuv.
+Qed.
 
 Lemma cmp_invK_left (w w': word):
   ((inv w) <= w' :> word)%O <-> (w <= w')%O.
@@ -4063,8 +4082,208 @@ HB.instance Definition _ :=
 
 (* no new instance *)
 HB.instance Definition _ := isSurjective.Build 
-  _ _ friso (subgroup_projection_surjective gens).
+                              _ _ friso (subgroup_projection_surjective gens).
 
+Definition g c := match c with
+    | Base a => nth_gen gens a
+    | Inverse a => inv (nth_gen gens a)
+  end.
+
+Lemma g_inj : injective g.
+Proof.
+  pose t := second_reduce v.
+  pose s := t3 t.
+  
+  have Hsub: subseq s t.
+    by rewrite /t3 filter_subseq.
+  
+  have eqsz : size s = size gens.
+    by rewrite /s /gens /NielsenReduction size_map /t.
+  
+  move => x; case: x => m.
+  move => y; case: y => n.
+  + rewrite /g /= .
+    apply: contra_eq.
+    move => Hdiff.
+    have Hdiffs: m != n by done.
+
+    have szm: (m < size s)%N by rewrite eqsz.
+    have szn: (n < size s)%N by rewrite eqsz.
+    apply/eqP => Habs.
+    pose x := nth_gen gens m.
+    pose y := nth_gen gens n.
+
+    pose ix := subseq_injection s t Hsub m.
+    pose iy := subseq_injection s t Hsub n.
+
+    have: ~ (x @ (inv y) < x:> word)%O.
+      move => H'.
+      apply: (NielsenR_minimal_aux 1 ix iy (nth e s m) (inv (nth e s n))).
+      + by apply: (injection_correct s t Hsub m).
+      + by apply: (injection_correct s t Hsub n).
+      + by apply: (injection_bnd).
+      + by apply: (injection_bnd).
+      + by done.
+      + move: Hdiffs; apply: contra_neq.
+        move => eqixiy.
+        move: (@subseq_injection_inj _ s t Hsub m n szm szn eqixiy) => Q.
+        by apply: val_inj.
+      + by apply: (@enumerate_in _ e).
+      + rewrite /gens /NielsenReduction /nth_gen /= !(nth_map e) in Habs.
+        have approxe: (nth e s m @ inv (nth e s n)) == e.
+        by rewrite -[nth e s m @ inv (nth e s n)]FreeGroup_norm_correct FreeGroup_norm_law Habs -FreeGroup_norm_law FreeGroup_norm_correct /s inverse_left.
+
+        rewrite (cmp_lt_proper _ e _ _(nth e s m)) => //.
+        apply: cmp_bot_uniq_contra; apply/eqP => //.
+        have xinU: x \in U.
+          by rewrite /x /U mem_cat; apply/orP; left; rewrite mem_nth.
+        move: (NielsenR_N0 x xinU) => L.
+        rewrite /x /gens / NielsenReduction /nth_gen (nth_map e) in L.
+        by rewrite FreeGroup_norm_involutive in L; rewrite /s /t.
+        by rewrite /s /t in szm.
+
+      + by rewrite /s /t in szn.
+      + by rewrite /s /t in szm.
+    have approxe: (x @ inv y) == e.
+    by rewrite -[x @ inv y]FreeGroup_norm_correct /x /y FreeGroup_norm_law Habs -FreeGroup_norm_law FreeGroup_norm_correct inverse_left.
+
+    rewrite (cmp_lt_proper _ e _ x) => //.
+    move/negP => eqe.
+    rewrite cmp_total in eqe.
+    move: (cmp_bot_uniq x eqe) => approxxe.
+    have eqe': FreeGroup_norm x = e by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
+    have xinU: x \in U.
+      by rewrite /x /U mem_cat; apply/orP; left; rewrite mem_nth.
+    move: (NielsenR_N0 x xinU) => L.
+    by rewrite eqe' in L.
+
+  + rewrite /g /= .
+    move => Hdiff.
+    have Hdiffs: m != n.
+      apply/eqP => Habs.
+      rewrite Habs in Hdiff.
+      have eqinv : (nth_gen gens n == inv (nth_gen gens n)) by rewrite {1}Hdiff.
+      move: (invol_unique (nth_gen gens n) eqinv).
+      have inU: (nth e gens n) \in U by rewrite /U mem_cat; apply/orP; left; rewrite mem_nth.
+      move: (NielsenR_N0 (nth e gens n) inU) => Q.
+      move => habs'.
+      by move/(FreeGroup_norm_unique) in habs'; rewrite FreeGroup_norm_e in habs'; rewrite habs' in Q.
+      
+    have szm: (m < size s)%N by rewrite eqsz.
+    have szn: (n < size s)%N by rewrite eqsz.
+    exfalso.
+    pose x := nth_gen gens m.
+    pose y := nth_gen gens n.
+
+    pose ix := subseq_injection s t Hsub m.
+    pose iy := subseq_injection s t Hsub n.
+
+    apply: (NielsenR_minimal_aux 0 ix iy (nth e s m) (nth e s n)).
+    + by apply: (injection_correct s t Hsub m) => //.
+    + by apply: (injection_correct s t Hsub n) => //.
+    + by apply: injection_bnd => //.
+    + by apply: injection_bnd => //.
+    + by done.
+    + move: Hdiffs; apply: contra_neq.
+      move => eqixiy.
+      move: (@subseq_injection_inj _ s t Hsub m n szm szn eqixiy) => Q.
+      by apply: val_inj.
+    + by apply: (@enumerate_in _ e).
+    + rewrite (cmp_lt_proper _ e _ _(nth e s m)) => //.
+      apply: cmp_bot_uniq_contra.
+      move: (NielsenR_N0 (nth_gen gens m)) => Q; rewrite /gens /NielsenReduction /nth_gen (nth_map e) in Q.
+      rewrite FreeGroup_norm_involutive in Q; rewrite /s /t.
+      apply/eqP; apply: Q.
+      by rewrite -/s /U mem_cat; apply/orP; left; rewrite /gens /NielsenReduction map_f //; rewrite -/s mem_nth.
+    + by rewrite -/s.
+    + rewrite /gens /NielsenReduction /nth_gen !(nth_map e) -/s in Hdiff.
+      by rewrite -[nth e s m]FreeGroup_norm_correct; rewrite -[nth e s n]FreeGroup_norm_correct Hdiff inverse_right => //.
+    + by done.
+    + by done.
+  + move => y; case: y => n.
+    rewrite /g /= .
+    move => Hdiff.
+    have Hdiffs: m != n.
+      apply/eqP => Habs.
+      rewrite Habs in Hdiff.
+      have eqinv : (nth_gen gens n == inv (nth_gen gens n)) by rewrite {1}Hdiff.
+      move: (invol_unique (nth_gen gens n) eqinv).
+      have inU: (nth e gens n) \in U by rewrite /U mem_cat; apply/orP; left; rewrite mem_nth.
+      move: (NielsenR_N0 (nth e gens n) inU) => Q.
+      move => habs'.
+      by move/(FreeGroup_norm_unique) in habs'; rewrite FreeGroup_norm_e in habs'; rewrite habs' in Q.
+      
+    have szm: (m < size s)%N by rewrite eqsz.
+    have szn: (n < size s)%N by rewrite eqsz.
+    exfalso.
+    pose x := nth_gen gens m.
+    pose y := nth_gen gens n.
+
+    pose ix := subseq_injection s t Hsub m.
+    pose iy := subseq_injection s t Hsub n.
+
+    apply: (NielsenR_minimal_aux 0 ix iy (nth e s m) (nth e s n)).
+    + by apply: (injection_correct s t Hsub m) => //.
+    + by apply: (injection_correct s t Hsub n) => //.
+    + by apply: injection_bnd => //.
+    + by apply: injection_bnd => //.
+    + by done.
+    + move: Hdiffs; apply: contra_neq.
+      move => eqixiy.
+      move: (@subseq_injection_inj _ s t Hsub m n szm szn eqixiy) => Q.
+      by apply: val_inj.
+    + by apply: (@enumerate_in _ e).
+    + rewrite (cmp_lt_proper _ e _ _(nth e s m)) => //.
+      apply: cmp_bot_uniq_contra.
+      move: (NielsenR_N0 (nth_gen gens m)) => Q; rewrite /gens /NielsenReduction /nth_gen (nth_map e) in Q.
+      rewrite FreeGroup_norm_involutive in Q; rewrite /s /t.
+      apply/eqP; apply: Q.
+      by rewrite -/s /U mem_cat; apply/orP; left; rewrite /gens /NielsenReduction map_f //; rewrite -/s mem_nth.
+    + by rewrite -/s.
+    + rewrite /gens /NielsenReduction /nth_gen !(nth_map e) -/s in Hdiff.
+      by rewrite -[nth e s m]FreeGroup_norm_correct; rewrite -[nth e s n]FreeGroup_norm_correct -Hdiff inverse_left => //.
+    + by done.
+    + by done.
+
+  + rewrite /g /= .
+    apply: contra_eq.
+    move => Hdiff.
+    have Hdiffs: m != n by done.
+
+    have szm: (m < size s)%N by rewrite eqsz.
+    have szn: (n < size s)%N by rewrite eqsz.
+    apply/eqP => Habs.
+    pose x := nth_gen gens m.
+    pose y := nth_gen gens n.
+
+    pose ix := subseq_injection s t Hsub m.
+    pose iy := subseq_injection s t Hsub n.
+
+    apply: (NielsenR_minimal_aux 1 ix iy (nth e s m) (inv (nth e s n))).
+    + by apply: (injection_correct s t Hsub m).
+    + by apply: (injection_correct s t Hsub n).
+    + by apply: (injection_bnd).
+    + by apply: (injection_bnd).
+    + by done.
+    + move: Hdiffs; apply: contra_neq.
+      move => eqixiy.
+      move: (@subseq_injection_inj _ s t Hsub m n szm szn eqixiy) => Q.
+      by apply: val_inj.
+    + by apply: (@enumerate_in _ e).
+    + rewrite (cmp_lt_proper _ e _ _(nth e s m)) => //.
+      apply: cmp_bot_uniq_contra.
+      move: (NielsenR_N0 (nth_gen gens m)) => Q; rewrite /gens /NielsenReduction /nth_gen (nth_map e) in Q.
+      rewrite FreeGroup_norm_involutive in Q; rewrite /s /t.
+      apply/eqP; apply: Q.
+      by rewrite -/s /U mem_cat; apply/orP; left; rewrite /gens /NielsenReduction map_f //; rewrite -/s mem_nth.
+    + by done.
+    + rewrite /gens /NielsenReduction /nth_gen !(nth_map e) -/s in Habs.
+      rewrite -[nth e s m]FreeGroup_norm_correct; rewrite -[nth e s n]FreeGroup_norm_correct -Habs inverse_left => //.
+    + by done.
+    + by done.
+Qed.
+
+      
 Fact friso_injectivity_property: forall x y, friso x == friso y -> x == y.
 Proof.
   have: (size gens > 0)%N -> forall x y, friso x == friso y -> x == y.
@@ -4076,26 +4295,23 @@ Proof.
     by rewrite /friso; rewrite /friso in finv_approx; rewrite finv_approx.
   rewrite /subgroup_inj /friso /= in finv_approx_frg.
 
-  set t := (\hat (nth_gen gens) (FreeGroup_norm (x @ inv y))).
+  pose norm_xyV := FreeGroup_norm (x @ inv y).
+  pose t := (\hat (nth_gen gens) norm_xyV).
   have eqsz0: sz t = 0.
     rewrite /t /sz.
     have eqnorm: FreeGroup_norm (t) = e.
       by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
     by rewrite eqnorm.
   rewrite /t /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /= in eqsz0.
-  set l := [seq match c with
-    | Base a => nth_gen gens a
-    | Inverse a => inv (nth_gen gens a)
-    end  | c <- FreeGroup_norm (x @ inv y)]. 
+    
+  pose l := [seq g c | c <- FreeGroup_norm (x @ inv y)]. 
 
-  have inU: forall i, (i < size l)%N -> (nth e l i) \in U.
-    move => i ibnd; rewrite /l (nth_map (Base (Ordinal Hltsz))).
-    set z := nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.
-    case: z => s.
-    + by rewrite /U mem_cat; apply/orP; left; apply/nthP; exists s.
-    + rewrite /U mem_cat; apply/orP; right; apply/(nthP e); exists s; first by rewrite size_map.
-      by rewrite (nth_map e e) /nth_gen.
-    by rewrite /l size_map in ibnd.
+  have inU: {subset l <= U}.
+    move => z zin.
+    rewrite /l in zin; move/mapP: zin => [z' z'in ->].
+    case: z' z'in => [s|s] z'in.
+    + by rewrite /g /= /U mem_cat; apply/orP; left; rewrite mem_nth.
+    + by rewrite /g /= /U mem_cat; apply/orP; right; rewrite map_f // mem_nth.
   
   have non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1)).
     move => i ibnd.

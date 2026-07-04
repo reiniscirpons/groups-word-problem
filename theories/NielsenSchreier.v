@@ -4283,7 +4283,18 @@ Proof.
     + by done.
 Qed.
 
-      
+Lemma g_normK x: FreeGroup_norm (g x) = g x.
+Proof.
+  rewrite /g; case: x => y.
+  + rewrite /nth_gen /gens /NielsenReduction (nth_map e).
+    by rewrite FreeGroup_norm_involutive.
+    by rewrite -[size (t3 (second_reduce v))](size_map FreeGroup_norm).
+  + rewrite FreeGroup_norm_inv; apply: (f_equal inv).
+    rewrite /nth_gen /gens /NielsenReduction (nth_map e).
+    by rewrite FreeGroup_norm_involutive.
+    by rewrite -[size (t3 (second_reduce v))](size_map FreeGroup_norm).
+Qed.
+    
 Fact friso_injectivity_property: forall x y, friso x == friso y -> x == y.
 Proof.
   have: (size gens > 0)%N -> forall x y, friso x == friso y -> x == y.

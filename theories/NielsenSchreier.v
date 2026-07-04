@@ -362,6 +362,7 @@ Proof.
     by move: (sorted_ltn_nth ltn_trans (size m) Hsorted i j ibnd jbnd H); rewrite eqf ltnn.
 Qed.
 
+Section SubSeqInjection.
 
 Definition subseq_injection (s t: seq T) (Hsub: subseq s t):=
   mask_index (compute_mask s t).
@@ -431,6 +432,42 @@ Proof.
   apply: mask_index_inj.
   by rewrite eqsz.
   by rewrite eqsz.
+Qed.
+
+End SubSeqInjection.
+
+Lemma subseq_mapP {T1 T2: eqType} (f: T1 -> T2) (t: seq T1) (s: seq T2):
+  (subseq s (map f t)) <-> exists s', (subseq s' t) /\ s = map f s'.
+Proof.
+  split => [Hsubseq | Hexists].
+  + move/subseqP: Hsubseq => [m eqsz eqs].
+    exists (mask m t); split.
+    - by rewrite size_map in eqsz; apply/subseqP; exists m.
+    - by rewrite map_mask.
+  + case: Hexists => s' [Hsub eqs].
+    by  move/subseqP: Hsub => [m eqsz eqs']; rewrite eqs' map_mask in eqs; apply/subseqP; exists m; first by rewrite size_map.
+Qed.
+
+Lemma infix_mapP {T1 T2: eqType} (f: T1 -> T2) (t: seq T1) (s: seq T2):
+  (infix s (map f t)) <-> exists s', (infix s' t) /\ s = map f s'.
+Proof.
+  split => [Hinfix | Hexists].
+  + move/infixP: Hinfix => [p [q Q]].
+    pose p' := take (size p) t.
+    pose s' := take (size s) (drop (size p) t).
+    pose q' := drop (size s) (drop (size p) t).
+
+    exists s'; split.
+    + apply/infixP; exists p'; exists q'.
+      + rewrite /p' /q' /s'.
+        by rewrite cat_take_drop cat_take_drop.
+      + rewrite /s' map_take map_drop Q drop_cat ifF; last by apply:ltnn.
+        rewrite subnn drop0 take_cat ifF; last by apply: ltnn.
+        by rewrite subnn take0 cats0.
+  + case: Hexists => s' [Hinfix eqs].
+    apply/infixP; move/infixP: Hinfix => [p' [q' Q]].
+    exists (map f p'); exists (map f q').
+    by rewrite eqs -!map_cat -Q.
 Qed.
 
 End SeqExtension.
@@ -1988,7 +2025,7 @@ Proof.
 Qed.
     
 Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: {subset l <= U})
-  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
+  (non_trvl: forall p q x y, (l = p ++ [:: x; y] ++ q) -> non_trivial x y):
   (sz(prod l) >= size l)%N.
 Proof.
   case: l inU non_trvl => [//| a l inU non_trvl].
@@ -2051,13 +2088,10 @@ Proof.
            4: exact: 2.
            by rewrite /= drop0.
 
-      have non_trvlW: (forall i : nat, (i < size (b :: l) - 1)%N -> non_trivial (nth e (b :: l) i) (nth e (b :: l) i.+1)).
-        move => i ibound.
-        rewrite ltn_subRL in ibound.
-        move: (ibound' _ (1+i)%N a (b::l) ibound) => i'bound.
-        rewrite -addnS -ltn_subRL in i'bound.
-        move: (non_trvl (i.+1) i'bound) => ntrvnth.
-        by rewrite -nth_behead /= in ntrvnth.
+      have non_trvlW: (forall p q x y, (b :: l = p ++ [:: x; y] ++ q) -> non_trivial x y).
+        move => p' q' x' y' eql.
+        apply: (non_trvl ([:: a] ++ p') q').
+        by rewrite -catA -eql.        
 
       move: (@lKprefix_all_split b binU (N0 b binU)) => [wb [wbin [wbdistinct Pwb]]].
       move: (@lKprefix_allW b wb wbin) => /mapP [z zinU prefz].
@@ -2069,9 +2103,7 @@ Proof.
         by rewrite habs in wbdistinct; move/eqP in wbdistinct.
 
       have ntrvab: non_trivial a b.
-        have bnd: (0 < size [:: a,  b  & l] - 1)%N.
-          by rewrite /= -addn2 -addnBA //= addnS ltn0Sn.
-        by move: (non_trvl 0 bnd) => L; rewrite -nth_behead /= in L.
+        by apply: (non_trvl [::] l).
 
       move: (@triplet_lt x a b (frU x xinU) (frU a ainU) (frU b binU) xinU ainU binU ntrvxa ntrvab) => Q.
       move: q eqaq qnempty => _ _ _.
@@ -4294,11 +4326,19 @@ Proof.
     by rewrite FreeGroup_norm_involutive.
     by rewrite -[size (t3 (second_reduce v))](size_map FreeGroup_norm).
 Qed.
-    
+
+Lemma g_inv x: inv (g x) = g (FreeGroup_invl _ x).
+Proof.
+  rewrite /g.
+  case: x => s.
+  + by rewrite /=.
+  + by rewrite /= inv_eq_invol.
+Qed.
+  
 Fact friso_injectivity_property: forall x y, friso x == friso y -> x == y.
 Proof.
-  have: (size gens > 0)%N -> forall x y, friso x == friso y -> x == y.
-  move => Hltsz x y fapprox.
+  case: (posnP (size gens)) => [Heq0 | Hltsz]; last first.
+  move => x y fapprox.
 
   have finv_approx: friso (FreeGroup_norm (x @ inv y)) == e.
     by rewrite FreeGroup_norm_correct morphism_preserve_law /= fapprox -morphism_preserve_inv /= inverse_left.
@@ -4324,29 +4364,77 @@ Proof.
     + by rewrite /g /= /U mem_cat; apply/orP; left; rewrite mem_nth.
     + by rewrite /g /= /U mem_cat; apply/orP; right; rewrite map_f // mem_nth.
   
-  have non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1)).
-    move => i ibnd.
+  have non_trvl: forall p q x y, (l = p ++ [:: x; y] ++ q) -> non_trivial x y.
+    move => p q x' y' heql.
+    have subxy: infix [:: x'; y'] l by rewrite heql; apply/infixP; exists p; exists q.
+    move/infix_mapP: subxy => [w [Hinfixw eqw]].
+
+    have Hsize : size w = 2 by rewrite -[size w](size_map g) -eqw.
+  
+    case: w Hsize Hinfixw eqw => [| cx [| cy [| ?]]] // _ Hinfixw eqgmap.
+
+    rewrite /= in eqgmap; case: eqgmap => [-> ->].
+    
     rewrite /non_trivial => Habs.
-    rewrite /l !(nth_map (Base (Ordinal (n:=size gens) (m:=0) Hltsz))) in Habs.
-    move: Habs.
+    have eqg: g cx = inv (g cy).
+      rewrite -[g cx]g_normK -[g cy]g_normK -FreeGroup_norm_inv.
+      apply: FreeGroup_norm_unique.
+      rewrite -[g cx]neutral_right.
+      rewrite -{1}[e](inverse_left (g cy)) associativity.
+      rewrite -[(g cx @ g cy) @ inv (g cy)]FreeGroup_norm_correct FreeGroup_norm_law Habs.
+      by rewrite FreeGroup_norm_correct neutral_left FreeGroup_norm_inv g_normK.
+    rewrite g_inv in eqg.
+    move/g_inj in eqg.
+    pose l' := FreeGroup_norm (x @ (inv y)).
+    have frl': freely_reduced l'.
+      by rewrite /l' freely_reduced_correct FreeGroup_norm_involutive.
+    rewrite /l' /freely_reduced in frl'.
+    move/infixP: Hinfixw => [p' [q' infixl']].
+    rewrite eqg in infixl'.
 
-    case eqa: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i) => [sa|sa].
-    + case eqb: (nth (Base (Ordinal (n:=size gens) (m:=0) Hltsz)) (FreeGroup_norm (x @ inv y)) i.+1) => [sb|sb].
-  - move => habs'.
-Admitted.
+   by  move: (frl' p' q' cy) => Q; rewrite infixl' in Q.
 
-(* Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz (x @ y) >= sz(x))%N.
-Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz(x @ y) >= sz(y))%N. *)
+  have : (size l <= sz (prod l))%N.
+    apply: prod_leq_size.
+    Unshelve.
+    10: exact: gens.
+    + by apply: NielsenR_N0.
+    + by apply: NielsenR_N1_left.
+    + by apply: NielsenR_N1_right.
+    + move => u; rewrite mem_cat => /orP [uingens | uininv].
+      + rewrite /gens/ NielsenReduction in uingens; move/mapP: uingens => [u' u'in equ].
+        by rewrite freely_reduced_correct equ FreeGroup_norm_involutive.
+      + rewrite /gens/ NielsenReduction in uininv; move/mapP: uininv => [u' /mapP [u'2 u'in2 equ'2] equ].
+        by rewrite freely_reduced_correct equ equ'2 !FreeGroup_norm_inv FreeGroup_norm_involutive.
+    + by apply: NielsenR_minimal_simpl.
+    + move => u.
+      rewrite /l; move => /mapP [u' u'in ->].
+      rewrite /g; case u' => v'.
+      + by rewrite mem_cat; apply/orP; left; rewrite mem_nth.
+      + by rewrite mem_cat; apply/orP; right; rewrite map_f // mem_nth.
+    + by apply: non_trvl.
 
-(* Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
-  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
-  (sz(prod l) >= size l)%N. *)
+  rewrite eqsz0 leqn0 => /eqP eql0.
+  have: ((size (FreeGroup_norm (x @ inv y))) = 0)%N.
+    by rewrite -[size (FreeGroup_norm (x @ inv y))](size_map g) eql0.
+  move => /size0nil eqtrivial.
+  by rewrite -[x]neutral_right -[e](inverse_right y) associativity -[x @ inv y]FreeGroup_norm_correct eqtrivial neutral_left.
 
 
+    (* 0 case *) (* I know there is a shorter way, I just couldn't find it *)
+  
+  + move: friso; rewrite Heq0 => f x y feq.
+    clear.
+    have -> : x = y.
+      case: x; case y => //.
+      + by rewrite /=; move => s; case: s => [[s' Hs']|[s' Hs']].
+      + by rewrite /=; move => s; case: s => [[s' Hs']|[s' Hs']].
+      + by rewrite /=; move => s; case: s => [[s' Hs']|[s' Hs']].
+    + by done.
+Qed.
+
+        
 HB.instance Definition _ :=
   isInjective.Build (FreeGroup 'I_rank) (generatedSubgroup gens) friso friso_injectivity_property.
-
 
 End NielsenConstructionCorrection.

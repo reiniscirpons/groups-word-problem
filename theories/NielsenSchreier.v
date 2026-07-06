@@ -4437,4 +4437,63 @@ Qed.
 HB.instance Definition _ :=
   isInjective.Build (FreeGroup 'I_rank) (generatedSubgroup gens) friso friso_injectivity_property.
 
+
+(* id isomorphism between the two generated subgroup *)
+
+Definition id_gen_morphism (x: generatedSubgroup gens) := {|sb_point := x.(sb_point); sb_point_characterization := (NielsenR_subgroup_eq (x.(sb_point))).2 (x.(sb_point_characterization)) |}: generatedSubgroup v.
+
+Lemma id_preserve_eq (x y: generatedSubgroup gens):
+  x == y -> id_gen_morphism x == id_gen_morphism y.
+Proof.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+Qed.
+
+Lemma id_preserve_law (x y : generatedSubgroup gens):
+  id_gen_morphism (x @ y) == id_gen_morphism x @ id_gen_morphism y.
+Proof.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+Qed.
+
+Lemma id_preserve_e:
+  id_gen_morphism e == e.
+Proof.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+Qed.
+
+HB.instance Definition _ :=
+isSetoidMorphism.Build _ _ id_gen_morphism id_preserve_eq.
+
+HB.instance Definition _ :=
+  isMonoidMorphism.Build _ _ id_gen_morphism id_preserve_e id_preserve_law.
+
+Lemma id_injective (x y : generatedSubgroup gens):
+  id_gen_morphism x == id_gen_morphism y -> x == y.
+Proof.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+Qed.
+
+Lemma id_surjective (x : generatedSubgroup v):
+  exists (y: generatedSubgroup gens), (id_gen_morphism y) == x.
+Proof.
+  exists {|sb_point := x.(sb_point); sb_point_characterization := (NielsenR_subgroup_eq (x.(sb_point))).1 (x.(sb_point_characterization)) |}.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+Qed.
+  
+(* no new instance *)
+HB.instance Definition _ := isSurjective.Build 
+                              _ _ id_gen_morphism id_surjective.
+
+HB.instance Definition _ :=
+  isInjective.Build _ _ id_gen_morphism id_injective.
+
+
+(* composition of the two isomorphisms *)
+
+Definition subfree_group_iso := id_gen_morphism \o friso.
+
+Check subfree_group_iso.
+
+
+
+
 End NielsenConstructionCorrection.

@@ -2246,74 +2246,6 @@ Proof.
   by rewrite addnC -{1}[size l']addn0 ltn_add2l.
 Qed.
 
-Definition rank := size gens.
-Definition friso := @subgroup_projection (FreeGroup Sigma) gens.
-
-
-HB.instance Definition _ :=
-isSetoidMorphism.Build _ _ friso (subgroup_projection_preserve_equiv gens).
-
-HB.instance Definition _ :=
-  isMonoidMorphism.Build _ _ friso (subgroup_projection_preserve_e gens) (subgroup_projection_preserve_law gens).
-
-(* no new instance *)
-HB.instance Definition _ := isSurjective.Build 
-  _ _ friso (subgroup_projection_surjective gens).
-
-Fact friso_injectivity_property x y : friso x == friso y -> x == y.
-Proof.
-case: (posnP (size gens)) => [| Hltsz fapprox].
-- clear;  move=> e _; move: x y; rewrite e => x y. 
-  suff -> : x = y by [].  
-  admit.
-- pose norm_xyV := FreeGroup_norm (x @ inv y).
-  have finv_approx: friso norm_xyV == e.
-    rewrite /norm_xyV FreeGroup_norm_correct morphism_preserve_law /= fapprox.
-    by rewrite -morphism_preserve_inv /= inverse_left.
-  have finv_approx_frg:
-    (@subgroupby_inj (FreeGroup Sigma) _ (friso norm_xyV) == e :> word).
-    by rewrite finv_approx.
-  pose t := \hat (nth_gen gens) norm_xyV.
-  have eqsz0: sz t = 0.
-    have eqnorm: FreeGroup_norm (t) = e.
-      by rewrite -FreeGroup_norm_e; apply: FreeGroup_norm_unique.
-    by rewrite /t /sz eqnorm.
-  (* rewrite /t /FreeGroup_universal_extension /extension /FreeGroup_alphabet_extension /= in eqsz0. *)
-    pose f x := match x with
-     | Base a => nth_gen gens a
-     | Inverse a => inv (nth_gen gens a)
-    end.
-    pose l := [seq f c | c <- norm_xyV]. 
-  have inU : {subset l <= U}. 
-    move=> w; rewrite /l /U; case/mapP=> /= z hz ->; rewrite /f mem_cat.
-    case: z hz => a ha //; first by rewrite  mem_nth. 
-    by rewrite map_f ?orbT // mem_nth.
-  have size_l : size l = size norm_xyV by rewrite size_map.
-  have non_trvl i : (i.+1 < size l)%N -> non_trivial (nth e l i) (nth e l (i.+1)).
-    rewrite size_l => ibnd.
-    rewrite /non_trivial.
-    rewrite /l !(nth_map (Base (Ordinal (n:=size gens) (m:=0) Hltsz))) //; last first.
-      by apply: ltn_trans ibnd. (* lia?*)
-    set g := nth _ _.
-    case eqa : (g i) => [sa | sa]; case eqb : (g i.+1) => [sb | sb].
-  - move => habs'.
-Admitted.
-
-
-
-(* Hypothesis N1_left: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz (x @ y) >= sz(x))%N.
-Hypothesis N1_right: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) ->
-  (sz(x @ y) >= sz(y))%N. *)
-
-(* Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: forall i, (i < size l)%N -> (nth e l i) \in U)
-  (non_trvl: forall i, (i < size l - 1)%N -> non_trivial (nth e l i) (nth e l (i.+1))):
-  (sz(prod l) >= size l)%N. *)
-
-
-HB.instance Definition _ :=
-  isInjective.Build (FreeGroup 'I_rank) (generatedSubgroup gens) friso friso_injectivity_property.
-
 
 End WordSplitting.
 
@@ -4557,11 +4489,12 @@ HB.instance Definition _ :=
 
 (* composition of the two isomorphisms *)
 
-Definition subfree_group_iso := id_gen_morphism \o friso.
+Definition subfree_group_iso: isomorphism _ _ := id_gen_morphism \o friso.
+
+HB.about id_gen_morphism.
+HB.about friso.
 
 Check subfree_group_iso.
-
-
 
 
 End NielsenConstructionCorrection.

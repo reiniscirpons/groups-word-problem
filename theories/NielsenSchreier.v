@@ -1521,13 +1521,47 @@ Proof.
 Qed.
 
 Lemma cmp_invK_left (w w': word):
-  ((inv w) <= w' :> word)%O <-> (w <= w')%O.
+  ((inv w) <= w' :> word)%O = (w <= w')%O.
 Proof.
   rewrite /Order.le /= /CmpOrder.cmp_le /CmpOrder.sz /CmpOrder.transform /=.
   rewrite !FreeGroup_norm_inv !size_inv.
   rewrite !rev_half !rev_upperhalf !inv_eq_invol.
   by rewrite CmpOrder.min_wordC CmpOrder.max_wordC.
 Qed.
+
+Lemma cmp_invK_right (w w': word):
+  (w <= inv w' :> word)%O = (w <= w' :> word)%O.
+Proof.
+  rewrite /Order.le /= /CmpOrder.cmp_le /CmpOrder.sz /CmpOrder.transform /=.
+  rewrite !FreeGroup_norm_inv !size_inv.
+  rewrite !rev_half !rev_upperhalf !inv_eq_invol.
+  pose t1 := (inv (CmpOrder.upperhalf (FreeGroup_norm w') :> word)).
+  pose t2 := (CmpOrder.half (FreeGroup_norm w')).
+  rewrite -/t1 -/t2.
+  by rewrite [CmpOrder.min_word (InverseAlphabet Sigma) _ _ t1 t2]CmpOrder.min_wordC [CmpOrder.max_word (InverseAlphabet Sigma) _ _ t1 t2]CmpOrder.max_wordC.
+Qed.
+
+Lemma cmp_lt_invK_left (w w': word):
+  ((inv w) < w' :> word)%O = (w < w')%O.
+Proof.
+  rewrite /Order.lt /= /CmpOrder.cmp_lt /CmpOrder.sz /CmpOrder.transform /=.
+  rewrite !FreeGroup_norm_inv !size_inv.
+  rewrite !rev_half !rev_upperhalf !inv_eq_invol.
+  by rewrite CmpOrder.min_wordC CmpOrder.max_wordC.
+Qed.
+
+Lemma cmp_lt_invK_right (w w': word):
+  (w < inv w' :> word)%O = (w < w' :> word)%O.
+Proof.
+  rewrite /Order.lt /= /CmpOrder.cmp_lt /CmpOrder.sz /CmpOrder.transform /=.
+  rewrite !FreeGroup_norm_inv !size_inv.
+  rewrite !rev_half !rev_upperhalf !inv_eq_invol.
+  pose t1 := (inv (CmpOrder.upperhalf (FreeGroup_norm w') :> word)).
+  pose t2 := (CmpOrder.half (FreeGroup_norm w')).
+  rewrite -/t1 -/t2.
+  by rewrite [CmpOrder.min_word (InverseAlphabet Sigma) _ _ t1 t2]CmpOrder.min_wordC [CmpOrder.max_word (InverseAlphabet Sigma) _ _ t1 t2]CmpOrder.max_wordC.
+Qed.
+  
 (* *)
 
 Hypothesis N0: forall x, (x \in U) -> FreeGroup_norm x <> e.
@@ -2005,9 +2039,6 @@ Proof.
           by rewrite Order.PreorderTheory.ltxx in habs'.
 Qed.
 
-Hypothesis frU: forall x, x \in U -> freely_reduced x.
-Hypothesis minU: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) -> ~ ((x @ y) < x :> word)%O.
-
 Lemma inv_inU (x: FreeGroup Sigma):
   (x \in U) -> (inv x \in U).
 Proof.
@@ -2023,6 +2054,10 @@ Proof.
     move/mapP: xino => [y yingens eqxinvy].
     by rewrite eqxinvy inv_eq_invol mem_cat yingens /=.
 Qed.
+
+
+Hypothesis frU: forall x, x \in U -> freely_reduced x.
+Hypothesis minU: forall x y, (x \in U) -> (y \in U) -> (non_trivial x y) -> ~ ((x @ y) < x :> word)%O.
     
 Lemma prod_leq_size (l: seq (FreeGroup Sigma)) (inU: {subset l <= U})
   (non_trvl: forall p q x y, (l = p ++ [:: x; y] ++ q) -> non_trivial x y):
@@ -3543,10 +3578,296 @@ else if (k == 3)%B then t1 (t2 (t1 (t1 v iy) ix) ix iy) iy else v.
 Qed.
 (* *)
 
+Section InvNat.
+
+Context {gens: vec}.
+Let U := gens ++ [seq (inv w) | w <- gens].
+  
+Definition invnat k := ((k + size gens) %% (size U))%N.
+
+Lemma invnat_invol (k: nat) (ltk: (k < size U)%N) :
+  invnat (invnat k) = k.
+Proof.
+  have eqsz: (size U) = (size gens).*2.
+    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map addnn.
+
+  by rewrite /invnat modnDml -addnA addnn -eqsz addnC -{1}[size U]mul1n modnMDl modn_small.
+Qed.
+
+Lemma invnat_boundU (k: nat) (kbndU: (k < size U)%N):
+  (invnat k < size U)%N.
+Proof.
+  case: (posnP (size U)) => [eq0|eqlt].
+  - by rewrite eq0 ltn0 in kbndU.
+  rewrite /invnat ltn_pmod //.
+Qed.
+  
+Lemma invnat_bound (k: nat) (khighbnd: (k < size U)%N):
+  (invnat k < size gens)%N = (k >= size gens)%N.
+Proof.
+  have eqsz: ((size U) = (size gens + size gens))%N.
+    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
+  case: (ltnP k (size gens)) => [klt | klowbnd]; last first.
+  + rewrite /invnat -[k](subnK klowbnd) -addnA addnC -eqsz.
+    rewrite -{1}[size U]mul1n modnMDl.
+    have ltU: ((k - size gens) < size U)%N.
+      by lia.
+    rewrite modn_small //.
+    rewrite ltn_subLR //.
+    + by rewrite -eqsz.
+  + rewrite ltnNge; apply/negbTE; rewrite negbK.
+    rewrite /invnat modn_small; last by rewrite eqsz ltn_add2r.
+    by rewrite -{1}[size gens]add0n leq_add2r.
+Qed.
+
+Lemma invnat_val (k: nat) (klowbnd: (k >= size gens)%N) (khighbnd: (k < size U)%N):
+  (invnat k = k - size gens)%N.
+Proof.
+  have eqsz: ((size U) = (size gens + size gens))%N.
+    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
+  rewrite /invnat -{1}[k](subnK klowbnd) -addnA addnC -eqsz.
+  rewrite -{1}[size U]mul1n modnMDl.
+  have ltU: ((k - size gens) < size U)%N.
+    by lia.
+  rewrite modn_small //.
+Qed.
+
+Lemma index_in_gens (i: nat) (ibnd: (i < size U)%N):
+  (i < size gens)%N -> nth e gens i = nth e U i.
+Proof.
+  have eqsz: ((size U) = (size gens + size gens))%N.
+    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
+
+  move => ibnd'.
+  rewrite /U nth_cat ifT //.
+Qed.
+
+Lemma invindex_in_gens (i: nat) (ibnd: (i < size U)%N):
+  (i >= size gens)%N -> inv (nth e gens (invnat i)) = nth e U i.
+Proof.
+  have eqsz: ((size U) = (size gens + size gens))%N.
+    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
+
+  move => ilowbnd.
+  rewrite /U nth_cat ifF //.
+  rewrite [nth e [seq inv w  | w <- gens] (i - size gens)](nth_map e).
+  by rewrite invnat_val.
+  + rewrite ltn_subLR.
+    rewrite -eqsz.
+  + by done.
+  + by done.
+  + by rewrite leqNgt in ilowbnd; move/negPf in ilowbnd.
+Qed.
+
+Lemma invnat_not_eq_low (i j: nat) (ibndU: (i < size U)%N) (jbndU: (j < size U)%N)
+  (ibnd: (i < size gens)%N) (jbnd: (j < size gens)%N):
+  i != invnat j.
+Proof.
+  rewrite /invnat modn_small.
+  by lia.
+  rewrite /U size_cat size_map.
+  by rewrite ltn_add2r.
+Qed.
+
+Lemma invnat_not_eq_high (i j: nat) (ibndU: (i < size U)%N) (jbndU: (j < size U)%N)
+  (ibnd: (i >= size gens)%N) (jbnd: (j >= size gens)%N):
+  i != invnat j.
+Proof.
+  rewrite -invnat_bound // in jbnd.
+  by lia.
+Qed.
+
+End InvNat.
+
+
 
 Definition NielsenReduction (gens: vec) :=
   map (FreeGroup_norm) (t3 (second_reduce gens)).
 
+
+Lemma NielsenR_fixpoint (gens: vec):
+  let U := gens ++ [seq (inv x) | x <- gens] in
+  (forall (i j: nat), (i < size U)%N -> (j < size U)%N -> (i != (@invnat gens j)) ->
+               ~ ((nth e U i) @ (nth e U j) < (nth e U i) :> word)%O) ->
+  (forall x, x \in gens -> freely_reduced x) -> (forall x, x \in gens -> FreeGroup_norm x != e) ->
+  NielsenReduction gens = gens.
+Proof.
+  move => U Hminimal Hfrx Hnontrvl.
+  have: (second_reduce_step gens = [::]).
+  + rewrite /second_reduce_step; apply: size0nil; rewrite size_flatten /shape.
+    apply/eqP /natnseq0P /(@eq_from_nth _ 0%N).
+    - by rewrite size_nseq.
+    move => k ;rewrite nth_nseq => kbnd.
+    rewrite kbnd (nth_map [::] 0%N size).
+    rewrite (nth_map ((0, e), (0, e))).
+    set l := [seq _ <- allpairs _ _ _ | _].
+
+    case Hnth: (nth (0, e, (0, e)) l k) => [[ix x] [iy y]].
+
+    have inl: ((ix, x), (iy, y)) \in l.
+      rewrite -Hnth mem_nth //.
+      rewrite !size_map size_filter in kbnd.
+      rewrite (leq_trans kbnd) //.
+      + by rewrite /l size_filter.
+
+   rewrite /l mem_filter in inl; move/andP: inl => [xydiff inpairs].
+   move/allpairsP: inpairs => [[[ix' x'] [iy' y']] [xin yin eqxy]].
+   rewrite /= in xin yin eqxy.
+   case: eqxy xydiff => [-> -> -> ->] xydiff.
+
+   rewrite size_pmap; apply/eqP; rewrite eqn0Ngt -has_count.
+   apply/hasPn => [[ixy xy] xyin].
+
+   pose flst := [:: FreeGroup_norm (x' @ y'); FreeGroup_norm (x' @ inv y'); FreeGroup_norm (inv x' @ y'); FreeGroup_norm (inv x' @ inv y')].
+
+   move: (@in_enumerate _ e 0 flst ixy xy xyin) => eqxy.
+   move: (@in_enumerate _ e 0 gens ix' x' xin) => eqx.
+   move: (@in_enumerate _ e 0 gens iy' y' yin) => eqy.
+
+   move: (@bound_enumerate _ e 0 gens ix' x' xin) => x'bnd.
+   move: (@bound_enumerate _ e 0 gens iy' y' yin) => y'bnd.
+
+   have x'bndU: (ix' < size U)%N.
+     by rewrite /U size_cat size_map ltn_addr.
+   have y'bndU: (iy' < size U)%N.
+     by rewrite /U size_cat size_map ltn_addr.
+
+   case: ixy xyin eqxy => [|[|[|[|]]]] xyin eqxy.
+    - move: (Hminimal ix' iy' x'bndU y'bndU (invnat_not_eq_low _ _ x'bndU y'bndU x'bnd y'bnd)) => /negP /negPf Hneg.
+      rewrite index_in_gens -/U in eqx.
+      rewrite index_in_gens -/U in eqy.
+
+      rewrite /flst /= in eqxy.
+      
+      rewrite eqx eqy in Hneg.
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= -eqxy.
+      rewrite FreeGroup_norm_involutive.
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= in Hneg.
+      by rewrite Hneg.
+      1-4: by done.
+    - have hdiff: ix' != (@invnat gens (@invnat gens iy')).
+        by rewrite invnat_invol.
+      
+      move: (Hminimal ix' (invnat iy') x'bndU (invnat_boundU iy' y'bndU) hdiff) => /negP /negPf Hneg.
+      rewrite index_in_gens -/U in eqx.
+      rewrite -[nth e U (invnat iy')]invindex_in_gens in Hneg.
+      rewrite invnat_invol in Hneg.
+      rewrite eqx eqy in Hneg.
+
+      rewrite /flst /= in eqxy.
+
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= -eqxy.
+      rewrite FreeGroup_norm_involutive.
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= in Hneg.
+      by rewrite Hneg.
+      by rewrite -/U.
+      by rewrite -/U; apply: invnat_boundU; rewrite -/U.
+      have ybnd': (iy' < size U)%N.
+        by done.
+      rewrite -[iy'](@invnat_invol gens) in y'bndU.
+      rewrite -invnat_bound.
+      rewrite invnat_invol.
+      by done.
+      by rewrite -/U.
+      by rewrite -/U invnat_boundU.
+      by rewrite -/U.
+      1-2: by done.
+    - have hdiff: (@invnat gens ix') != (@invnat gens iy').
+        rewrite /invnat -/U.
+        rewrite !modn_small.
+        by rewrite eqn_add2r.
+        by rewrite /U size_cat size_map ltn_add2r.
+        by rewrite /U size_cat size_map ltn_add2r.
+      
+      move: (Hminimal (invnat ix') iy' (invnat_boundU ix' x'bndU) y'bndU hdiff) => /negP /negPf Hneg.
+        
+      rewrite index_in_gens -/U in eqy.
+      rewrite -[nth e U (invnat ix')]invindex_in_gens in Hneg.
+      rewrite invnat_invol in Hneg.
+      rewrite eqx eqy in Hneg.
+
+      rewrite /flst /= in eqxy.
+      rewrite cmp_lt_invK_right in Hneg.
+
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= -eqxy.
+      rewrite FreeGroup_norm_involutive.
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= in Hneg.
+
+      by rewrite  Hneg.
+      by rewrite -/U.
+      by rewrite -/U; apply: invnat_boundU; rewrite -/U.
+      have ybnd': (iy' < size U)%N.
+        by done.
+      rewrite -[iy'](@invnat_invol gens) in y'bndU.
+      rewrite -invnat_bound.
+      rewrite invnat_invol.
+      by done.
+      by rewrite -/U.
+      by rewrite -/U invnat_boundU.
+      by rewrite -/U.
+      1-2: by done.
+    - have hdiff: (@invnat gens ix') != @invnat gens (@invnat gens iy').
+        rewrite invnat_invol; first apply/eqP.
+        apply: not_eq_sym; apply/eqP.
+        apply: invnat_not_eq_low.
+        1-2: by rewrite -/U.
+        1-2: by done.
+        by rewrite -/U.
+      
+      move: (Hminimal (invnat ix') (invnat iy') (invnat_boundU ix' x'bndU) (invnat_boundU iy' y'bndU) hdiff) => /negP /negPf Hneg.
+        
+      rewrite -[nth e U (invnat iy')]invindex_in_gens in Hneg.
+      rewrite -[nth e U (invnat ix')]invindex_in_gens in Hneg.
+      rewrite !invnat_invol in Hneg.
+      rewrite eqx eqy cmp_lt_invK_right in Hneg.
+
+      rewrite /flst /= in eqxy.
+
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= -eqxy.
+      rewrite FreeGroup_norm_involutive.
+      rewrite /Order.lt /= /CmpOrder.cmp_lt /= /CmpOrder.sz /CmpOrder.transform /= in Hneg.
+
+      by rewrite  Hneg.
+      by rewrite -/U.
+      by rewrite -/U.
+      by apply: invnat_boundU; rewrite -/U.
+      rewrite /invnat modn_small -{1}[size gens]add0n //; first rewrite leq_add2r //.
+      by rewrite add0n size_cat size_map ltn_add2r.
+      rewrite /invnat modn_small -{1}[size gens]add0n //.
+      1-2: by rewrite add0n size_cat size_map ltn_add2r.
+      rewrite /invnat modn_small -{1}[size gens]add0n //.
+      by rewrite leq_add2r.
+      by rewrite add0n size_cat size_map ltn_add2r.
+    - (* last case, cannot happen*)
+      move: (@bound_enumerate _ e 0 flst xyin.+4 xy eqxy) => habs.
+      rewrite /flst /= in habs.
+      by lia.
+  - by rewrite size_map size_map in kbnd.
+  - by rewrite size_map in kbnd.
+  move => Q.
+  rewrite /NielsenReduction second_reduce_equation Q.
+  clear Q Hminimal.
+  elim eql: gens U Hfrx Hnontrvl => [//|a t IH] U Hfrx Hnontrvl.
+  rewrite /t3 /filter.
+  have ->: ~~ FreeGroup_dec_eq Sigma a e.
+    rewrite /FreeGroup_dec_eq.
+    rewrite FreeGroup_norm_e.
+    apply: Hnontrvl.
+    by rewrite mem_head.
+  rewrite map_cons.
+  have : freely_reduced a.
+    by apply: Hfrx; rewrite mem_head.
+  rewrite freely_reduced_correct => eqH.
+  symmetry in eqH; rewrite {}eqH.
+  congr (_ :: _).
+  apply: IH.
+  exact: t.
+  move => x xint.
+  by apply: Hfrx; apply: (@mem_drop 1); rewrite /= drop0.
+  move => x xint.
+  by apply: Hnontrvl; apply: (@mem_drop 1); rewrite /= drop0.
+Qed.
+  
 Context {v: vec}.
 Let gens := NielsenReduction v.
 Let U := gens ++ [seq (inv w) | w <- gens].
@@ -3737,76 +4058,9 @@ Proof.
   by rewrite eqsrs.
 Qed.
 
-Definition invnat k := ((k + size gens) %% (size U))%N.
-
-Lemma invnat_invol (k: nat) (ltk: (k < size U)%N) :
-  invnat (invnat k) = k.
-Proof.
-  have eqsz: (size U) = (size gens).*2.
-    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map addnn.
-
-  by rewrite /invnat modnDml -addnA addnn -eqsz addnC -{1}[size U]mul1n modnMDl modn_small.
-Qed.
-
-Lemma invnat_bound (k: nat) (khighbnd: (k < size U)%N):
-  (invnat k < size gens)%N = (k >= size gens)%N.
-Proof.
-  have eqsz: ((size U) = (size gens + size gens))%N.
-    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
-  case: (ltnP k (size gens)) => [klt | klowbnd]; last first.
-  + rewrite /invnat -[k](subnK klowbnd) -addnA addnC -eqsz.
-    rewrite -{1}[size U]mul1n modnMDl.
-    have ltU: ((k - size gens) < size U)%N.
-      by lia.
-    rewrite modn_small //.
-    rewrite ltn_subLR //.
-    + by rewrite -eqsz.
-  + rewrite ltnNge; apply/negbTE; rewrite negbK.
-    rewrite /invnat modn_small; last by rewrite eqsz ltn_add2r.
-    by rewrite -{1}[size gens]add0n leq_add2r.
-Qed.
-
-Lemma invnat_val (k: nat) (klowbnd: (k >= size gens)%N) (khighbnd: (k < size U)%N):
-  (invnat k = k - size gens)%N.
-Proof.
-  have eqsz: ((size U) = (size gens + size gens))%N.
-    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
-  rewrite /invnat -{1}[k](subnK klowbnd) -addnA addnC -eqsz.
-  rewrite -{1}[size U]mul1n modnMDl.
-  have ltU: ((k - size gens) < size U)%N.
-    by lia.
-  rewrite modn_small //.
-Qed.
-
-Lemma index_in_gens (i: nat) (ibnd: (i < size U)%N):
-  (i < size gens)%N -> nth e gens i = nth e U i.
-Proof.
-  have eqsz: ((size U) = (size gens + size gens))%N.
-    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
-
-  move => ibnd'.
-  rewrite /U nth_cat ifT //.
-Qed.
-
-Lemma invindex_in_gens (i: nat) (ibnd: (i < size U)%N):
-  (i >= size gens)%N -> inv (nth e gens (invnat i)) = nth e U i.
-Proof.
-  have eqsz: ((size U) = (size gens + size gens))%N.
-    by rewrite /U size_cat [size [seq inv w  | w <- gens]]size_map.
-
-  move => ilowbnd.
-  rewrite /U nth_cat ifF //.
-  rewrite [nth e [seq inv w  | w <- gens] (i - size gens)](nth_map e).
-  by rewrite invnat_val.
-  + rewrite ltn_subLR.
-    rewrite -eqsz.
-  + by done.
-  + by done.
-  + by rewrite leqNgt in ilowbnd; move/negPf in ilowbnd.
-Qed.
 
 Lemma NielsenR_minimal:
-  forall (i j: nat), (i < size U)%N -> (j < size U)%N -> (i != invnat j) ->
+  forall (i j: nat), (i < size U)%N -> (j < size U)%N -> (i != (@invnat gens j)) ->
   ~ ((nth e U i) @ (nth e U j) < (nth e U i) :> word)%O.
 Proof.
   move => i j ibnd jbnd diffij.
@@ -3866,13 +4120,13 @@ Proof.
       rewrite /gens /NielsenReduction !size_map in Hlt invj_bnd.
       rewrite /gens /NielsenReduction !(nth_map e) // in eqnthi eqnthj.
       set ix := subseq_injection s t Hsub i.
-      set iy := subseq_injection s t Hsub (invnat j).
+      set iy := subseq_injection s t Hsub (@invnat gens j).
 
       set x' := nth e (t3 (second_reduce v)) i.
-      set y' := nth e (t3 (second_reduce v)) (invnat j).
+      set y' := nth e (t3 (second_reduce v)) (@invnat gens j).
 
       move: (@injection_correct _ e s t Hsub i Hlt) => eqiinj.
-      move: (@injection_correct _ e s t Hsub (invnat j) invj_bnd) => eqjinj.
+      move: (@injection_correct _ e s t Hsub (@invnat gens j) invj_bnd) => eqjinj.
 
       have ixbound : (ix < size t)%N by apply: injection_bnd.
       have iybound : (iy < size t)%N by apply: injection_bnd.
@@ -3898,10 +4152,10 @@ Proof.
 
       rewrite /gens /NielsenReduction !size_map in Hltj invi_bnd.
       rewrite /gens /NielsenReduction !(nth_map e) // in eqnthi eqnthj.
-      set ix := subseq_injection s t Hsub (invnat i).
+      set ix := subseq_injection s t Hsub (@invnat gens i).
       set iy := subseq_injection s t Hsub j.
 
-      set x' := nth e (t3 (second_reduce v)) (invnat i).
+      set x' := nth e (t3 (second_reduce v)) (@invnat gens i).
       set y' := nth e (t3 (second_reduce v)) j.
 
       move: (@injection_correct _ e s t Hsub (invnat i) invi_bnd) => eqiinj.
@@ -3911,7 +4165,7 @@ Proof.
       have iybound : (iy < size t)%N by apply: injection_bnd.
 
       case: (ix =P iy) => [Heq | /eqP Hdiff].
-      + move: (@subseq_injection_inj _ s t Hsub (invnat i) j invi_bnd Hltj Heq) => Q; move/negP in diffij; move/(f_equal invnat) in Q; rewrite invnat_invol // in Q.
+      + move: (@subseq_injection_inj _ s t Hsub (@invnat gens i) j invi_bnd Hltj Heq) => Q; move/negP in diffij; move/(f_equal (@invnat gens)) in Q; rewrite invnat_invol // in Q.
         by rewrite Q /= eqxx in diffij.
         
       move => Habs. (* proof by contradiction to avoid crashing Rocq *)
@@ -3930,11 +4184,11 @@ Proof.
 
       rewrite /gens /NielsenReduction !size_map in invi_bnd invj_bnd.
       rewrite /gens /NielsenReduction !(nth_map e) // in eqnthi eqnthj.
-      set ix := subseq_injection s t Hsub (invnat i).
-      set iy := subseq_injection s t Hsub (invnat j).
+      set ix := subseq_injection s t Hsub (@invnat gens i).
+      set iy := subseq_injection s t Hsub (@invnat gens j).
 
-      set x' := nth e (t3 (second_reduce v)) (invnat i).
-      set y' := nth e (t3 (second_reduce v)) (invnat j).
+      set x' := nth e (t3 (second_reduce v)) (@invnat gens i).
+      set y' := nth e (t3 (second_reduce v)) (@invnat gens j).
 
       move: (@injection_correct _ e s t Hsub (invnat i) invi_bnd) => eqiinj.
       move: (@injection_correct _ e s t Hsub (invnat j) invj_bnd) => eqjinj.
@@ -4495,6 +4749,7 @@ HB.about id_gen_morphism.
 HB.about friso.
 
 Check subfree_group_iso.
+
 
 
 End NielsenConstructionCorrection.

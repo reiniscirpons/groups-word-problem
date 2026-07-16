@@ -12,3 +12,5 @@ theories/Utils.v
 theories/Sizelexi.v
 theories/WellFounded.v
 theories/Preorder.v
+theories/NielsenSchreier.v
+theories/APBQ.v

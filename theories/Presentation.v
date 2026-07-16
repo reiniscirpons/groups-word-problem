@@ -339,6 +339,7 @@ Qed.
 
 HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
 
+
 Lemma power_inv_word' (w: G) (x: nat):
   power w (- (x: int)) = inv_word (power w x).
 Proof.
@@ -355,12 +356,31 @@ Proof.
   by rewrite NegzE power_inv_word' inv_word_involutive. 
 Qed.
 
+Lemma FreeGroup_powerC' (w: G) (x: nat):
+  power w x ++ w = w ++ power w x.
+Proof.
+  elim/nat_pairs_ind: x => [||n IH1 IH2].
+  - by rewrite power0 /= cats0.
+  - by rewrite !powerS power0 -!cat_law cats0.
+  - by rewrite powerS -cat_law -{2}IH2 catA.
+Qed.
+
+Lemma FreeGroup_powerC'' (w: G) (x: nat):
+  power w (- (x:int)) ++ inv w = inv w ++ power w (- (x: int)).
+Proof.
+  elim/nat_pairs_ind: x => [||n IH1 IH2].
+  - by rewrite power0 /= cats0.
+  - by rewrite !powerP power0 -!cat_law cats0.
+  - by rewrite powerP -cat_law -{2}IH2 catA.
+Qed.
+
 Lemma power_rev1 c (x: int):
   rev (power ([::c]: G) x) = power ([::c]: G) x.
 Proof.
   elim: x => [//||] n IH.
-  - rewrite powerS.
-Admitted.
+  - by rewrite powerS rev_cat -!cat_law -FreeGroup_powerC' IH.
+  - by rewrite powerP rev_cat -!cat_law -FreeGroup_powerC'' IH.
+Qed.
 
 End InvertiblePresentedGroup.
 

@@ -441,6 +441,7 @@ Proof.
   --- by move/(f_equal rev): Hnorm; rewrite -FreeGroup_norm_rev.
 Qed.
 
+
 End FreeGroup.
 Arguments FreeGroup_norm {_}.
 
@@ -617,6 +618,63 @@ Proof.
     rewrite /freely_reduced in frqr.
     move: (frqr a z c) => habs'.
     by rewrite eqz catA in habs'.
+Qed.
+
+Lemma freely_reduced_power (w: FreeGroup Sigma) (ks: seq int) (Hsize: size w = size ks) (Hn0: forall k, k \in ks -> k != 0) (Hdistinct: forall p q x y, p ++ [:: x; y] ++ q = w -> x != y):
+  freely_reduced w ->
+  freely_reduced (prod (map (fun '(x, k) => power (`[x]_(FGP Sigma)) k) (zip w ks))).
+Proof.
+  elim: w ks Hn0 Hsize Hdistinct => [|x t IH].
+  - move => ks Hn0 Q; rewrite /= in Q; symmetry in Q; move/size0nil in Q; rewrite {}Q.
+    by rewrite /= => _ _; apply freely_reduced_nil.
+  - move => [|k kt] Hn0.
+  --- by done.
+  - case: t IH => [|y t'] IH Hsize Hdistinct.
+  --- rewrite /= in Hsize; case: Hsize => Hsize; symmetry in Hsize; move/size0nil in Hsize; rewrite Hsize.
+      rewrite /= !freely_reduced_correct -{1}cat_law cats0 neutral_right.
+      by rewrite FreeGroup_norm_power1.
+  --- case: kt Hn0 Hsize => [|k' kt'] Hn0 Hsize frw.
+      + by done.
+
+      rewrite /= in Hsize; case: Hsize => Hsize.
+      have frxy: freely_reduced (power ([:: x] \mod (FGP Sigma)) k @ power ([::y] \mod (FGP Sigma)) k').
+        rewrite freely_reduced_correct.
+        rewrite FreeGroup_norm_power2 //.
+        by apply: (Hdistinct [::] t' x y).
+        symmetry; rewrite -freely_reduced_correct; apply: (@freely_reducedW _ [:: x, y & t']) => //.
+        by apply: prefix_infix.
+
+        rewrite [power]lock /= -lock.
+      pose ks' := [:: k' & kt'].
+      have Hn0': forall k, k \in ks' -> k != 0.
+        move => n inks'.
+        apply: Hn0.
+        change [:: k, k' & kt'] with ([:: k] ++ [:: k' & kt']).
+        by rewrite mem_cat; apply/orP; right.
+      have Hsize': size [:: y & t'] = size [:: k' & kt'].
+        by rewrite /=; lia.
+      have Hdistinct': forall p q x' y', p ++ [:: x'; y'] ++ q = y :: t' -> x' != y'.
+        move => p q x' y' Heq.
+        apply: (Hdistinct [::x & p] q).
+        by rewrite cat_cons Heq.
+
+      have fryt: freely_reduced [::y & t'].
+        apply: (@freely_reducedW _ [:: x, y & t']); first by apply: frw.
+        apply/infixP; exists ([::x]); exists([::]).
+        by rewrite cats0.
+      
+      move: (IH [:: k' & kt'] Hn0' Hsize' Hdistinct' fryt) => frIH.
+      rewrite [power]lock /= -lock in frIH.
+      rewrite -cat_law in frIH; rewrite -cat_law.
+
+      apply: freely_reduced_cat_overlap.
+      by exact: frxy.
+      by exact: frIH.
+
+      apply: size0_power.
+      apply: Hn0.
+      rewrite (@mem_drop 1) //.
+      by rewrite /= mem_head.
 Qed.
 
 End FreelyReduced.

@@ -103,6 +103,9 @@ Admitted.
 Local Lemma H0q: (0 < q)%N.
 Proof. by case: q Hpq. Qed.
 
+Local Lemma Hltpq: (p < q)%N.
+Proof. by lia. Qed.
+
 Local Lemma HPqq: (q.-1 < q)%N.
 Proof. by case: q H0q. Qed.
 
@@ -648,6 +651,7 @@ Proof.
     rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
     rewrite subnn.
     by apply IH.
+    1-2: by lia.
   - rewrite Stallings_automaton_mod_power_b => [|//].
     rewrite modnDr modn_small => [|//].
     apply IH.
@@ -662,10 +666,11 @@ Proof.
     rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
     rewrite subnn.
     by apply IH.
+    1-2: by lia.
   - have: (q = q.-1.+1) => [|{1}->]; first by lia.
     move: (refl (inv (b_encoding q.-1.+1))).
     rewrite {2}/b_encoding powerS -powerC'
-            (inverse_law _ (`[b]_F2P)) -!cat_law /= /invl /=.
+      (inverse_law _ (`[b]_F2P)) -!cat_law /= /invl /=.
     move /congruent_right /Stallings_automaton_mod_proper => ->;
       last by apply Stallings_automaton_reachable_configuration0nil.
     move => /=.

@@ -1,9 +1,10 @@
 From HB Require Import structures.
 Require Import RelationClasses.
 Require Import Setoid Morphisms.
-From mathcomp Require Import ssreflect ssrfun ssrbool.
+From mathcomp Require Import ssreflect ssrint ssrfun ssrbool.
 From mathcomp Require Import seq eqtype fintype
-  ssrnat ssrint ring all_algebra.
+  ssrnat ssrint ring lra zify all_algebra.
+Import GRing.Theory.
 
 From GWP Require Import Equivalence EquivalenceAlgebra.
 
@@ -382,6 +383,14 @@ Proof.
   - by rewrite powerP rev_cat -!cat_law -FreeGroup_powerC'' IH.
 Qed.
 
+Lemma size0_power c (x: int):
+  x != 0 -> (size (power ([::c]: G) x) > 0)%N.
+Proof.
+  case: (intP x) => [//|n|n].
+  - by rewrite powerS -cat_law size_cat /=.
+  - by rewrite powerP -cat_law size_cat /=.
+Qed.
+    
 End InvertiblePresentedGroup.
 
 Section Cancelation.

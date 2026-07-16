@@ -2,7 +2,8 @@ From HB Require Import structures.
 Require Import RelationClasses.
 Require Import Setoid Morphisms.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import seq eqtype fintype.
+From mathcomp Require Import seq eqtype fintype
+  ssrnat ssrint ring all_algebra.
 
 From GWP Require Import Equivalence EquivalenceAlgebra.
 
@@ -152,6 +153,8 @@ Notation "`[ x ]_ P" := ([:: x] : presented P)
 Notation "`[ x ; y ; .. ; z ]_ P" :=
   ((x :: (cons y .. [:: z] ..)) : presented P)
   (format "`[ '[' x ; '/' y ; '/' .. ; '/' z ']' ]_ P").
+Notation "x \mod P" := (x : presented P)
+  (at level 10, format "x  \mod  P").
 End PresentationNotations.
 
 Import PresentationNotations.
@@ -334,8 +337,30 @@ Proof.
   by rewrite /= IH invlK.
 Qed.
 
-
 HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
+
+Lemma power_inv_word' (w: G) (x: nat):
+  power w (- (x: int)) = inv_word (power w x).
+Proof.
+  elim/nat_pairs_ind: x => [//||n IH1 IH2].
+  - by rewrite powerP powerS power0 -!cat_law !cats0.
+  - by rewrite powerP powerS IH2 {1}powerS inv_word_cat inv_word_cat
+    -IH2 powerP IH1 -catA.
+Qed.
+
+Lemma power_inv_word (w: G) (x: int):
+  power w (- x) = inv_word (power w x).
+Proof.
+  case: x => n; first by exact: power_inv_word'.
+  by rewrite NegzE power_inv_word' inv_word_involutive. 
+Qed.
+
+Lemma power_rev1 c (x: int):
+  rev (power ([::c]: G) x) = power ([::c]: G) x.
+Proof.
+  elim: x => [//||] n IH.
+  - rewrite powerS.
+Admitted.
 
 End InvertiblePresentedGroup.
 

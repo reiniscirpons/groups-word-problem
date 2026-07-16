@@ -154,7 +154,7 @@ Lemma FreeGroup_invlK : forall c: sigma FGP,
 Proof. by case. Qed.
 
 Lemma FreeGroup_invl_left : forall c: sigma FGP,
-  `[c; FreeGroup_invl c]_FGP == `[]_FGP.
+  [:: c; FreeGroup_invl c] \mod FGP == [::] \mod FGP.
 Proof.
   move=> c; apply: reduction_rule; case: c => a;
   rewrite /relations /= /free_group_relations mem_cat; apply /orP.
@@ -163,7 +163,7 @@ Proof.
 Qed.
 
 Lemma FreeGroup_invl_right : forall c: sigma FGP,
-  `[FreeGroup_invl c; c]_FGP == `[]_FGP.
+  [:: FreeGroup_invl c; c] \mod FGP == [:: ] \mod FGP.
 (* TODO(reiniscirpons): fix *)
 Proof.
   case => a /=.
@@ -185,9 +185,9 @@ HB.instance Definition _ :=
 (* NOTE(reiniscirpons): in theory we could do this more efficiently with the
  complete rewriting system *)
 Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
-  | [::] => `[]_FGP
+  | [::] => [:: ] \mod FGP
   | c::w' => match (FreeGroup_norm w') with
-    | [::] => `[c]_FGP
+    | [::] => [:: c] \mod FGP
     | d::n =>
       if (c == invl d)%B then n
       else c::(d::n)
@@ -199,7 +199,7 @@ Lemma FreeGroup_norm_e:
 Proof. done. Qed.
 
 Lemma FreeGroup_norm_1: forall (c: sigma FGP),
-  FreeGroup_norm (`[c]_FGP) = (`[c]_FGP).
+  FreeGroup_norm ([:: c] \mod FGP) = ([:: c] \mod FGP).
 Proof.
   by case => c.
 Qed.
@@ -239,7 +239,7 @@ Qed.
 Lemma FreeGroup_norm_rcons w c:
   FreeGroup_norm (rcons w c) =
   match rev (FreeGroup_norm w) with
-  | [::] => `[c]_FGP
+  | [::] => [:: c] \mod FGP
   | d :: n => 
       if (c == invl d)%B then rev n
       else rcons (rcons (rev n) d) c
@@ -375,25 +375,71 @@ apply /(iffP idP) => eq.
 - exact: eqprop_to_FreeGroup_dec_eq.
 Qed.
 
-Global Instance : Proper (eq ==> eq_op) FreeGroup_norm.
+Global Instance : Proper (eq ==> Logic.eq) FreeGroup_norm.
 Proof.
   by move => x y; move/FreeGroup_norm_unique => ->.
 Qed.
 
 
 Lemma FreeGroup_norm_power1: forall c n,
-  FreeGroup_norm (power (`[c]_FGP) n) = power (`[c]_FGP) n.
+  FreeGroup_norm (power ([:: c] \mod FGP) n) = power ([:: c] \mod FGP) n.
 Proof.
   (*move => c; elim => [//||] [//|n IH].*)
   (* TODO: Why does it not allow me to do this rewrite despite FreeGroup_norm
            being Proper? *)
-  (*- apply/eqP; rewrite {1}powerS powerC'.*)
+  (*- apply/eqP; rewrite {1}powerS.*)
   move => c; case; elim/nat_pairs_ind => [//|//|n IH1 _].
   - rewrite !powerS /= {}IH1; case: n; by case: c.
   - by case: c.
   - move: IH1; rewrite !powerP => /= -> /=; by case: c.
 Qed.
 
+Lemma FreeGroup_norm_power2': forall x y (n: nat) m,
+  let xy :=  ([:: x; y] \mod FGP) in
+  let xnym := 
+    ((power ([:: x] \mod FGP) n) @ (power ([:: y] \mod FGP)) m) in
+      x != y ->
+      FreeGroup_norm xy = xy ->
+      FreeGroup_norm xnym = xnym.
+Proof.
+  move => x y n m xy xnym;
+  rewrite /xy /xnym => {xy xnym}.
+  move: n m; elim/nat_pairs_ind => [||n IH1 IH2] m Hneq H.
+  - by rewrite power0 -cat_law /= FreeGroup_norm_power1.
+  - case: m; elim/nat_pairs_ind => [//|//|m IH1 IH2];
+    rewrite {2}[power]lock /= -lock FreeGroup_norm_power1.
+  -- move: H Hneq; case: ifP => [/eqP -> /=| //];
+    by rewrite eq_refl.
+  1-3: rewrite /= invlK; move: Hneq; by case: ifP.
+  - rewrite powerS [power]lock /= -lock IH2 => [|//|//].
+    rewrite powerS /=; case: ifP => [|//]; by case: x IH1 IH2 Hneq H.
+Qed.
+
+Lemma FreeGroup_norm_power2: forall x y n m,
+  let xy :=  ([:: x; y] \mod FGP) in
+  let xnym := 
+    ((power ([:: x] \mod FGP) n) @ (power ([:: y] \mod FGP)) m) in
+      x != y ->
+      FreeGroup_norm xy = xy ->
+      FreeGroup_norm xnym = xnym.
+Proof.
+  move => x y n m xy xnym;
+  rewrite /xy /xnym => {xy xnym}.
+  case: n => n Heq Hnorm.
+  - by rewrite FreeGroup_norm_power2'.
+  - case: m => m;
+    rewrite !NegzE; last first.
+  -- rewrite {1}power_inv {1}power_inv -inverse_law.
+     rewrite FreeGroup_norm_inv FreeGroup_norm_power2'.
+  --- by rewrite !power_inv_word /inv /= inv_word_cat.
+  --- by apply /eqP; symmetry; apply/eqP.
+  --- by move/(f_equal rev): Hnorm; rewrite -FreeGroup_norm_rev.
+  -- rewrite -[FreeGroup_norm _]revK -{2}[_ @ _]revK.
+     apply/(f_equal rev).
+     rewrite -FreeGroup_norm_rev rev_cat !power_rev1 FreeGroup_norm_power2' => [//||].
+  --- by apply /eqP; symmetry; apply/eqP.
+  --- by move/(f_equal rev): Hnorm; rewrite -FreeGroup_norm_rev.
+Qed.
 
 End FreeGroup.
 Arguments FreeGroup_norm {_}.
@@ -486,9 +532,91 @@ Proof.
 Qed.
 
 Lemma freely_reduced_power1: forall c n,
-  freely_reduced (power (`[c]_(FGP Sigma)) n).
+  freely_reduced (power ([:: c] \mod (FGP Sigma)) n).
 Proof.
   by move => c n; rewrite freely_reduced_correct FreeGroup_norm_power1.
+Qed.
+
+(* freely reduced lemmas *)
+
+Lemma freely_reducedW (x y : FreeGroup Sigma) (fry: freely_reduced y) (sub: infix x y):
+  freely_reduced x.
+Proof.
+  rewrite /freely_reduced /=.
+  move => p s c.
+  move => Habs.
+  move/infixP: sub => [s0 [s0' eqy]].
+  rewrite Habs -[(p ++ [:: invl (c: sigma(FGP Sigma)),  c  & s]) ++ s0']catA !cat_cons catA in eqy.
+  have hcontradict: y <> (s0 ++ p) ++ [:: invl (c: sigma(FGP Sigma)), c & s ++ s0'].
+    rewrite /freely_reduced in fry.
+    apply (fry (s0 ++ p) (s ++ s0') c).
+  contradiction.
+Qed.
+
+Lemma freely_reduced_cat_overlap (q r s: FreeGroup Sigma) (frqr: freely_reduced (q ++ r)) (frrs: freely_reduced (r ++ s)) (Hsz: (size r >= 1)%N):
+  freely_reduced (q ++ r ++ s).
+Proof.
+  rewrite /freely_reduced /=.
+  move => a b c habs.
+  case: (boolP (size a < size q)%N) => [Hlt | /negPf Hf]; last first.
+  + have sfx: suffix [:: invl (c :> sigma (FGP Sigma)),  c  & b] (r ++ s).
+      have eqsz: (size a - size q = (size (r ++ s) - size [:: invl (c: sigma (FGP Sigma)),  c  & b]))%N.
+        move/(f_equal size) in habs; rewrite !size_cat in habs.
+        move/(f_equal (fun n => subn n (size q))) in habs.
+        rewrite -addnCBA in habs.
+        rewrite subnn addn0 in habs.
+        move/(f_equal (fun n => subn n (size [:: invl (c:>sigma (FGP Sigma)),  c  & b]))) in habs.
+        have eqswap : (size a + size [:: invl (c:> sigma (FGP Sigma)), c & b] - size q - size [:: invl (c: sigma (FGP Sigma)), c & b] 
+          = size a - size q)%N.
+          rewrite subnAC -addnBA.
+          by rewrite subnn addn0.
+          by done.
+        rewrite eqswap in habs.
+        by rewrite size_cat; symmetry.
+        by done.
+
+      move/(f_equal (drop (size a))) in habs.
+      rewrite [drop (size a) (a ++ [:: invl (c: sigma (FGP Sigma)),  c  & b])]drop_size_cat in habs => //.
+      by rewrite drop_cat Hf eqsz in habs; move/eqP in habs; rewrite -suffixE in habs.
+
+    move/suffixP: sfx => [z eqrs].
+    rewrite /(freely_reduced) in frrs; move: (frrs z b c) => frrs'.
+    rewrite eqrs in frrs'.
+    contradiction.
+  + have prfx: prefix (a ++ [:: invl (c:> sigma (FGP Sigma));  c]) (q ++ r).
+      have lesz: (size (a ++ [:: invl (c:> sigma (FGP Sigma));  c]) <= size (q ++ r))%N.
+        rewrite !size_cat /=.
+        rewrite addn2 -addn1.
+        by apply: leq_add.
+      rewrite prefixE.
+      move/(f_equal (take (size (a ++ [:: invl (c:> sigma (FGP Sigma));  c])))) in habs.
+      rewrite catA take_cat in habs.
+      case: (boolP ((size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]) < size (q ++ r))%N)) => [Ht | Hf].
+      + rewrite ifT // in habs.
+        have eqtake: take (size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c])) (a ++ [:: invl (c :> sigma ((FGP Sigma))),  c  & b]) = (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]).
+          apply/eqP; rewrite -prefixE.
+          change (a ++ [:: invl (c :> sigma ((FGP Sigma))), c & b]) with (a ++ [:: invl (c :> sigma ((FGP Sigma))); c] ++ b).
+          by rewrite catA prefix_prefix.
+        apply/eqP.
+        by rewrite eqtake in habs.
+      + move/negPf in Hf.
+        rewrite ifF // in habs.
+        move/negP in Hf.
+        rewrite ltnNge in Hf.
+        move/negP in Hf. rewrite negbK in Hf.
+        have eq: (size (q ++ r) = size (a ++ [:: invl (c: sigma (FGP Sigma));  c]))%N.
+          by apply/eqP; rewrite eqn_leq Hf lesz.
+        rewrite eq subnn take0 cats0 in habs.
+        have eqtake: take (size (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c])) (a ++ [:: invl (c :> sigma ((FGP Sigma))),  c  & b]) = (a ++ [:: invl (c :> sigma ((FGP Sigma)));  c]).
+          apply/eqP; rewrite -prefixE.
+          change (a ++ [:: invl (c :> sigma ((FGP Sigma))), c & b]) with (a ++ [:: invl (c :> sigma ((FGP Sigma))); c] ++ b).
+          by rewrite catA prefix_prefix.
+        rewrite eqtake in habs.
+        by rewrite habs take_size.
+    move/prefixP: prfx => [z eqz].
+    rewrite /freely_reduced in frqr.
+    move: (frqr a z c) => habs'.
+    by rewrite eqz catA in habs'.
 Qed.
 
 End FreelyReduced.

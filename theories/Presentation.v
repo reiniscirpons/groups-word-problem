@@ -2,7 +2,7 @@ From HB Require Import structures.
 Require Import RelationClasses.
 Require Import Setoid Morphisms.
 From mathcomp Require Import ssreflect ssrint ssrfun ssrbool.
-From mathcomp Require Import seq eqtype fintype
+From mathcomp Require Import seq eqtype fintype choice
   ssrnat ssrint ring lra zify all_algebra.
 Import GRing.Theory.
 
@@ -60,6 +60,8 @@ Definition presented P := (seq (sigma P)).
 Section InstancesFromList.
 Variable P: presentation.
 HB.instance Definition _ := Equality.copy (presented P) (seq (sigma P)).
+HB.instance Definition _ := Countable.copy (presented P) (seq (sigma P)).
+
 End InstancesFromList.
 
 (* In a presented structure, equality is given as whether two words are derived. *)

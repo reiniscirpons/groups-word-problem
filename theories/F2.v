@@ -669,7 +669,7 @@ Lemma freely_reduced_power
     (Hsize: (size w == size ks)%B)
     (Hn0: all (fun k => k != 0) ks)
     (Hdistinct: freely_reduced_helper w):
-  freely_reduced w ->
+  (w == FreeGroup_norm w)%B ->
   freely_reduced (prod (map (fun '(x, k) => power (`[x]_(FGP Sigma)) k) (zip w ks))).
 Proof.
   move/eqP in Hsize.
@@ -684,7 +684,7 @@ Proof.
   --- rewrite /= in Hsize; case: Hsize => Hsize; symmetry in Hsize; move/size0nil in Hsize; rewrite Hsize.
       rewrite /= !freely_reduced_correct -{1}cat_law cats0 neutral_right.
       by rewrite FreeGroup_norm_power1.
-  --- case: kt Hn0 Hsize => [|k' kt'] Hn0 Hsize frw.
+  --- case: kt Hn0 Hsize => [|k' kt'] Hn0 Hsize /eqP /freely_reduced_correct frw.
       + by done.
 
       rewrite /= in Hsize; case: Hsize => Hsize.
@@ -713,7 +713,7 @@ Proof.
         apply: (@freely_reducedW _ [:: x, y & t']); first by apply: frw.
         apply/infixP; exists ([::x]); exists([::]).
         by rewrite cats0.
-      
+      move/freely_reduced_correct/eqP in fryt. 
       move: (IH [:: k' & kt'] Hn0' Hsize' Hdistinct' fryt) => frIH.
       rewrite [power]lock /= -lock in frIH.
       rewrite -cat_law in frIH; rewrite -cat_law.

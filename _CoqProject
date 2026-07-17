@@ -12,4 +12,5 @@ theories/Utils.v
 theories/Sizelexi.v
 theories/WellFounded.v
 theories/Preorder.v
+theories/SeqExtension.v
 theories/NielsenSchreier.v

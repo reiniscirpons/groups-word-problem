@@ -2,13 +2,12 @@ From elpi.apps Require Import coercion.
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrint ssrnat all_order.
 From mathcomp Require Import eqtype seq fintype all_algebra div.
-From mathcomp Require Import ring lra zify.
-Import GRing.Theory.
+From mathcomp Require Import ring lra zify choice.
 Require Import Setoid Morphisms.
 
 From GWP Require Import Utils Equivalence
   EquivalenceAlgebra Presentation F2 GeneratedSubgroup
-  NielsenSchreier Sizelexi.
+  NielsenSchreier Sizelexi Preorder.
 
 Open Scope int_scope.
 Open Scope ring_scope.
@@ -64,28 +63,6 @@ Proof. by move => [|] [] [|[|//]]. Qed.
 
 Variable Hpq: (p*2 < q)%N.
 
-Let U := gens ++ [:: inv (a_encoding p); inv (b_encoding q)].
-
-Lemma U_mem: forall x, x \in U ->
-  (x = a_encoding p) \/
-  (x = b_encoding q) \/
-  (x = inv (a_encoding p)) \/
-  (x = inv (b_encoding q)).
-Proof.
-  move => x.
-  rewrite mem_cat !in_cons in_nil => /orP [] /orP [| /orP [] //] /eqP ->.
-  - by left.
-  - by right; left.
-  - by right; right; left.
-  - by right; right; right.
-Qed.
-
-Lemma FreeGroup_norm_cancel: forall (x y z: F2),
-  x @ y == z -> FreeGroup_norm (x @ y) = FreeGroup_norm z.
-Proof.
-  by move => x y z /FreeGroup_norm_unique.
-Qed.
-
 Goal forall n, n!=0 -> freely_reduced (a_encoding n).
 Proof.
   move => n Hn;
@@ -95,22 +72,64 @@ Proof.
   [power]lock -!cat_law -catA !cat_law -lock.
   apply (freely_reduced_power _
           ([::b; a; b] \mod (FGP Sigma))
-          [:: n; 1; -n]) => [//||//|].
-  - apply /allP => m.
-    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
-  - by apply freely_reduced_correct. 
+          [:: n; 1; -n]) => [//||//|//].
+  apply /allP => m.
+  rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
 Qed.
 
-Lemma apbq_minimal: forall x y,
-  (x \in U) ->
-  (y \in U) ->
-  (non_trivial x y) ->
-  ~ ((x @ y) < x :> F2)%O.
+(* TODO(reiniscirpons): remove once lemma is proved. *)
+Lemma size_power: forall (w: FreeGroup Sigma) (n: int),
+  size (power w n) = `|n|%N.
 Proof.
-  move => x y /U_mem [|[|[]]] -> /U_mem [|[|[]]] ->;
-  rewrite /non_trivial /a_encoding /b_encoding.
-  - move => _. rewrite /a_encoding.
 Admitted.
+
+Lemma apbq_minimal: @minimality_condition _ gens.
+Proof.
+  have Hred: (forall w, freely_reduced w -> FreeGroup_norm w = w);
+    first by move => T w /freely_reduced_correct.
+  move => [|[|[|[|//]]]] [|[|[|[|//]]]] _ _ // _ /=;
+  rewrite /a_encoding /b_encoding /= =>
+    /Order.PreorderTheory.ltW /CmpOrder.cmp_sz_le /=;
+  rewrite /CmpOrder.sz /=;
+  case Hp: p Hpq => [//|p'] Hpq';
+  case Hq: q Hpq' => [//|q'] Hpq'.
+  (* Make tactic to take care of this *)
+  rewrite -Hp !associativity -5!associativity 
+          [(inv _) @ _]associativity inverse_right
+          neutral_left -(FreeGroup_power1 _ ([::a]: F2))
+          -power_inv [power]lock !associativity -lock
+          -[(_ @ _) @ power _ 1]associativity
+          -power_add -[power _ (- _)]cats0
+          [power]lock
+          -!associativity -lock.
+  rewrite !Hred.
+  - by rewrite !size_cat !size_power /=; lia.
+  - apply (freely_reduced_power _
+          ([::b; a; b] \mod (FGP Sigma))
+          [:: (p: int); 1; -(p: int)]) => [//||//|//].
+    apply/allP => m.
+    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+  - apply (freely_reduced_power _
+          ([::b; a; b] \mod (FGP Sigma))
+          [:: (p: int); 2; -(p: int)]) => [//||//|//].
+    apply/allP => m.
+    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+  (* Only 21 cases to go! *)
+Admitted.
+
+Definition apbq_isomorphism: isomorphism F2 K.
+Admitted.
+
+(*Definition apbq_isomorphism_inv': K -> F2.*)
+(*Proof.*)
+(*  move => x.*)
+(*  move: (@surjectivity_property _ _ apbq_isomorphism x) => H.*)
+(*  move: (xchoose H).*)
+
+(*Definition apbq_isomorphism_inv: isomorphism K F2.*)
+(*Proof.*)
+  
+
 End NielsenSchreierStallings.
 
 Section apbqIsomorphismHousekeeping.
@@ -295,19 +314,18 @@ Qed.
 
 (* TODO(reiniscirpons): uncomment and fix once we have a lemma
    for the isomorphism. *)
-(*Definition pqpq_isomorphism*)
-(*  (p1 q1: int) (H1: (q1 != 0)%Z)*)
-(*  (p2 q2: int) (H2: (q2 != 0)%Z):*)
-(*    isomorphism*)
-(*      (generatedSubgroup [:: a_encoding p1; b_encoding q1])*)
-(*      (generatedSubgroup [:: a_encoding p2; b_encoding q2]).*)
-(*Proof.*)
-(*  move: (pq_isomorphism_nat p1 q1 H1) => f1.*)
-(*  have: (`|(p1 %% q1)%Z|%N < `|q1|%N)%N => [|H1']; first by lia.*)
-(*  move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1') => f2.*)
-(*  have: (`|(p2 %% q2)%Z|%N < `|q2|%N)%N => [|H2']; first by lia.*)
-(*  move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2') => f3.*)
-(*  move: (pq_isomorphism_nat' p2 q2 H2) => f4.*)
-(*  exact: (f4 \o f3 \o f2 \o f1).*)
-(*Defined.*)
-(**)
+Definition pqpq_isomorphism
+  (p1 q1: int) (H1: (q1 != 0)%Z)
+  (p2 q2: int) (H2: (q2 != 0)%Z):
+    isomorphism
+      (generatedSubgroup [:: a_encoding p1; b_encoding q1])
+      (generatedSubgroup [:: a_encoding p2; b_encoding q2]).
+Proof.
+  move: (pq_isomorphism_nat p1 q1 H1) => f1.
+  have: (`|(p1 %% q1)%Z|%N < `|q1|%N)%N => [|H1']; first by lia.
+  move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1') => f2.
+  have: (`|(p2 %% q2)%Z|%N < `|q2|%N)%N => [|H2']; first by lia.
+  move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2') => f3.
+  move: (pq_isomorphism_nat' p2 q2 H2) => f4.
+  exact: (f4 \o f3 \o f2 \o f1).
+Defined.

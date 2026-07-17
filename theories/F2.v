@@ -679,6 +679,7 @@ Qed.
 
 End FreelyReduced.
 Arguments freely_reduced {_}.
+Arguments freely_reducedW {_}.
 
 Section FreeGroupUniversal.
 

@@ -390,6 +390,17 @@ Proof.
   - by rewrite powerS -cat_law size_cat /=.
   - by rewrite powerP -cat_law size_cat /=.
 Qed.
+
+Lemma size_power c (x: int):
+  size (power ([::c]: G) x) = absz x.
+Proof.
+  case x => n; elim n => [//|n0 IH].
+  - by rewrite powerS -cat_law size_cat /= IH.
+  - rewrite powerP /=.
+    rewrite /= in IH.
+    by rewrite IH.
+Qed.
+
     
 End InvertiblePresentedGroup.
 

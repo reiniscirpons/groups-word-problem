@@ -375,6 +375,12 @@ Proof.
   - by rewrite powerP -cat_law -{2}IH2 catA.
 Qed.
 
+Lemma FreeGroup_power1 (w: G):
+  power w 1 = w.
+Proof.
+  by rewrite powerS power0 -cat_law cats0.
+Qed.
+
 Lemma power_rev1 c (x: int):
   rev (power ([::c]: G) x) = power ([::c]: G) x.
 Proof.

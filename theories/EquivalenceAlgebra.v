@@ -358,6 +358,9 @@ Definition power {G: group} (w: G) (k: int) : G :=
 Lemma power0 {G: group} (w: G): power w 0 = e.
 Proof. done. Qed.
 
+Lemma power1 {G: group} (w: G): power w 1 = w @ e.
+Proof. done. Qed.
+
 Lemma powerS {G: group} (w: G) (x: nat):
   power w x.+1 = w @ (power w x).
 Proof. done. Qed.

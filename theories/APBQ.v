@@ -2,13 +2,12 @@ From elpi.apps Require Import coercion.
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrint ssrnat all_order.
 From mathcomp Require Import eqtype seq fintype all_algebra div.
-From mathcomp Require Import ring lra zify.
-Import GRing.Theory.
+From mathcomp Require Import ring lra zify choice.
 Require Import Setoid Morphisms.
 
 From GWP Require Import Utils Equivalence
   EquivalenceAlgebra Presentation F2 GeneratedSubgroup
-  NielsenSchreier Sizelexi.
+  NielsenSchreier Sizelexi Preorder.
 
 Open Scope int_scope.
 Open Scope ring_scope.
@@ -64,839 +63,74 @@ Proof. by move => [|] [] [|[|//]]. Qed.
 
 Variable Hpq: (p*2 < q)%N.
 
-Let U := gens ++ [:: inv (a_encoding p); inv (b_encoding q)].
-
-Lemma U_mem: forall x, x \in U ->
-  (x = a_encoding p) \/
-  (x = b_encoding q) \/
-  (x = inv (a_encoding p)) \/
-  (x = inv (b_encoding q)).
+Goal forall n, n!=0 -> freely_reduced (a_encoding n).
 Proof.
-  move => x.
-  rewrite mem_cat !in_cons in_nil => /orP [] /orP [| /orP [] //] /eqP ->.
-  - by left.
-  - by right; left.
-  - by right; right; left.
-  - by right; right; right.
+  move => n Hn;
+  rewrite /a_encoding /inv /= -power_inv_word -[power _ (- n)]cats0.
+  set x := [::a] \mod (FGP Sigma).
+  rewrite -[x]FreeGroup_power1 /x
+  [power]lock -!cat_law -catA !cat_law -lock.
+  apply (freely_reduced_power _
+          ([::b; a; b] \mod (FGP Sigma))
+          [:: n; 1; -n]) => [//||//|//].
+  apply /allP => m.
+  rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
 Qed.
 
-Lemma FreeGroup_norm_cancel: forall (x y z: F2),
-  x @ y == z -> FreeGroup_norm (x @ y) = FreeGroup_norm z.
+(* TODO(reiniscirpons): remove once lemma is proved. *)
+Lemma size_power: forall (w: FreeGroup Sigma) (n: int),
+  size (power w n) = `|n|%N.
 Proof.
-  by move => x y z /FreeGroup_norm_unique.
-Qed.
-
-Lemma apbq_minimal: forall x y,
-  (x \in U) ->
-  (y \in U) ->
-  (non_trivial x y) ->
-  ~ ((x @ y) < x :> F2)%O.
-Proof.
-  move => x y /U_mem [|[|[]]] -> /U_mem [|[|[]]] ->;
-  rewrite /non_trivial.
-  - move => _. rewrite /a_encoding.
 Admitted.
 
-
-
-(* TODO(reiniscirpons): Is Local Lemma the correct thing here? *)
-Local Lemma H0q: (0 < q)%N.
-Proof. by case: q Hpq. Qed.
-
-Local Lemma Hltpq: (p < q)%N.
-Proof. by lia. Qed.
-
-Local Lemma HPqq: (q.-1 < q)%N.
-Proof. by case: q H0q. Qed.
-
-
-(* NOTE(reiniscirpons): The `Stallings automaton` A associated to a
-       subgroup H of a free group is a minimal finite state
-       automaton such that:
-       i)  For every element of H, the unique freely reduced word
-           representing it lies in the language of A.
-       ii) Every word in the language of A represents some element of H.
-       The automaton A is constructed as follows:
-         1. Start with an automaton with a single state 0, this is going to be
-            both the initial and terminal state.
-         2. Fix a generating set {w_1, ..., w_n} for H.
-         3. Construct a `bouquet` from the generating set:
-            for each i in {1, ..., n} do
-         3.1. Construct a linear automaton accepting w_i
-         3.2. Identify the initial and terminal states of this linear automaton
-              with the 0 state of A, thereby attaching a `petal` to the
-              bouquet (hence the terminology).
-         4. After doing so, you should now have a non-deterministic automaton
-            accepting the language (w_1 | ... | w_n)*. This is not quite strong
-            enough since it does not handle free-reductions, i.e.
-            (ba | a^{-1})* does not accept b despite the equation baa^{-1} = b.
-         5. To fix this, `fold` the automaton, i.e.:
-            If there exists a non-deterministic pair of transitions
-            (s, a) -> t_1 and (s, a) -> t_2 for distinct states t_1 and t_2,
-            then identify the states t_1 and t_2 in A. Repeat until A is
-            deterministic.
-         6. The automaton obtained after folding is the Stallings automaton.
-
-       We add two minor extensions to the Stallings automaton:
-         1. We equip the automaton with output, turning it into a
-            transducer, so that the automaton additionally greedily
-            factors the input word into a maximal right factor that belongs
-            to H. This only works if the input word is freely reduced, but:
-         2. We add a stack to the automaton, turning it into a pushdown
-            automaton. The stack is used to freely reduce the input word
-            as it is read, therefore mitigating the issue noted above.
-            The final state of the stack can be seen as the remainder
-            after greedy left-division by H.
-
-       The resulting pushdown transducer gives us an effective coset
-       representative function for H.
-
-   TODO(reiniscirpons): Find a source where this transducer and pushdown
-       idea is used.
-
-   In our particular case, we manually implement the Stallings pushdown
-   transducer (which we call an automaton for simplicity) for
-   the sugroup generated by <a_p, b^q>.
-
-   A configuration (state, stack) is reached by reading a word `w`
-   whose remainder after greedy left-division by H is b^state * stack.
-   The state tracks the largest prefix of a generator read so far,
-   and the stack keeps track of a suffix that prevents us from
-   reading a longer prefix of a generator.
-*)
-Definition Stallings_automaton_transition
-  (state: nat) (stack: F2) (letter: sigma F2P): nat * F2 * IndexFG :=
-match stack with 
-(* NOTE(reiniscirpons): Empty stack means we have always been able to
-       read a prefix of either a_p or b^q and don't need to perform
-       reductions yet. *)
-| [::] => 
-  match letter with
-  | Base o =>
-    if o == 0 then
-      (* NOTE(reiniscirpons): State p corresponds to prefix b^p, if we
-         read "a" here, then we need to use the first gen, hence we output
-         an "a" too. It is a loop since b^p a b^{-p}^k = b^p a^k b^{-p}. *)
-      if state == p then (state, [::], [:: a])
-      (* NOTE(reiniscirpons): Can't have a prefix of a_p or b^q anymore,
-            unless we can freely reduce it.*)
-      else (state, [:: a], [::])
-    else
-      (* NOTE(reiniscirpons): Since F2 is 2-generated, these are
-         in this case we must have that o == 1. *)
-      (* NOTE(reiniscirpons): b's move the state around in a loop modulo q.
-        b^{-1}'s do the same thing only in reverse. We count a b^q after
-        a full loop and emit a b when its done. For b^-q, we count
-        it immediately, as soon as the first b^{-1} is used. This is 
-        a techical requirement because of how we calculate the coset representative
-        later on. *)
-      if state == (q.-1) then (0, [::], [:: b])
-      else (state.+1, [::], [::])
-  | Inverse o =>
-    if o == 0 then
-      (* NOTE(reiniscirpons): a^{-1} is treated exactly the same, can only
-         read it after b^p, in which case we can read an arbitrary amount. *)
-      if state == p then (state, [::], [:: a^-1])
-      else (state, [:: a^-1], [::])
-    else 
-      if state == 0 then (q.-1, [::], [:: b^-1])
-      else (state.-1, [::], [::])
-  end
-(* NOTE(reiniscirpons): A non-empty stack means we need to do
-       free reductions. *)
-| stack_head::stack_tail => 
-  if letter == invl stack_head then (state, stack_tail, [::])
-  else (state, letter::stack, [::])
-end.
-
-(* TODO(reiniscirpons): Is this the correct way to define
-   a sort-of induction principle for the transition system? *)
-Lemma Stallings_automaton_transition_invariant_ind:
-  forall P: nat -> F2 -> sigma F2P -> (nat * F2 * IndexFG) -> Prop,
-    P p [::] a (p, [::], [:: a]) ->
-    (forall state,
-      (state == p)%B = false ->
-      P state [::] a (state, [:: a], [::])) ->
-    P q.-1 [::] b (0, [::], [:: b]) ->
-    (forall state,
-      (state == q.-1)%B = false ->
-      P state [::] b (state.+1, [::], [::])) ->
-    P p [::] a^-1 (p, [::], [:: a^-1]) ->
-    (forall state,
-      (state == p)%B = false ->
-      P state [::] a^-1 (state, [:: a^-1], [::])) ->
-    P 0 [::] b^-1 (q.-1, [::], [:: b^-1]) ->
-    (forall state,
-      (state == 0)%B = false ->
-      P state [::] b^-1 (state.-1, [::], [::])) ->
-    (forall state stack_head stack_tail,
-      P state (stack_head::stack_tail) (invl stack_head)
-        (state, stack_tail, [::])
-    ) ->
-    (forall state stack_head stack_tail letter,
-      (letter == invl stack_head)%B = false ->
-      P state (stack_head::stack_tail) letter
-        (state, letter::stack_head::stack_tail, [::])
-    ) ->
-    (forall state stack letter,
-      P state stack letter
-      (Stallings_automaton_transition state stack letter)
-    ).
+Lemma apbq_minimal: @minimality_condition _ gens.
 Proof.
-  assert (Hletter: forall letter: Sigma, 
-    (letter == 0)%B = false -> (letter == 1)%B).
-  - by move => [] [|[|]].
-  move => P Hnilap HnilapF Hnilbq HnilbqF
-          Hnilinvap HnilinvapF Hnilinvb0 Hnilinvb0F
-          Hbehead Hcons;
-  move => state [|stack_head stack_tail letter].
-  case => letter /=; case: ifP => [|/Hletter] /eqP ->;
-  case: ifP => [/eqP -> //|].
-  - by apply HnilapF.
-  - by apply HnilbqF.
-  - by apply HnilinvapF.
-  - by apply Hnilinvb0F.
-  rewrite /=; case: ifP => [/eqP ->|].
-  - by apply Hbehead.
-  - by apply Hcons.
-Qed.
+  have Hred: (forall w, freely_reduced w -> FreeGroup_norm w = w);
+    first by move => T w /freely_reduced_correct.
+  move => [|[|[|[|//]]]] [|[|[|[|//]]]] _ _ // _ /=;
+  rewrite /a_encoding /b_encoding /= =>
+    /Order.PreorderTheory.ltW /CmpOrder.cmp_sz_le /=;
+  rewrite /CmpOrder.sz /=;
+  case Hp: p Hpq => [//|p'] Hpq';
+  case Hq: q Hpq' => [//|q'] Hpq'.
+  (* Make tactic to take care of this *)
+  rewrite -Hp !associativity -5!associativity 
+          [(inv _) @ _]associativity inverse_right
+          neutral_left -(FreeGroup_power1 _ ([::a]: F2))
+          -power_inv [power]lock !associativity -lock
+          -[(_ @ _) @ power _ 1]associativity
+          -power_add -[power _ (- _)]cats0
+          [power]lock
+          -!associativity -lock.
+  rewrite !Hred.
+  - by rewrite !size_cat !size_power /=; lia.
+  - apply (freely_reduced_power _
+          ([::b; a; b] \mod (FGP Sigma))
+          [:: (p: int); 1; -(p: int)]) => [//||//|//].
+    apply/allP => m.
+    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+  - apply (freely_reduced_power _
+          ([::b; a; b] \mod (FGP Sigma))
+          [:: (p: int); 2; -(p: int)]) => [//||//|//].
+    apply/allP => m.
+    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+  (* Only 21 cases to go! *)
+Admitted.
 
-(* TODO(reiniscirpons): use the following for ternary casework on
-   a pair of naturals:
-    ltngtP: 3 case analysis*)
+Definition apbq_isomorphism: isomorphism F2 K.
+Admitted.
 
-Lemma Stallings_automaton_transition_product:
-  forall state stack letter,
-    (state < q)%N ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-      (power (`[b]_F2P) state) @ (rev stack: F2) @ (`[letter]_F2P) ==
-      (apbq_projection output) @ (power (`[b]_F2P) state') @ (rev stack': F2).
-Proof.
-  move => state stack letter.
-  apply Stallings_automaton_transition_invariant_ind => 
-    [_|state' _ _|/=|state' _ _|/= _|state' _ _|/=|
-    |state' stack_head stack_tail _
-    |state' stack_head stack_tail letter' _ _].
-  (* TODO: by group *)
-  - by rewrite -!associativity !neutral_left !neutral_right
-                inverse_right neutral_right.
-  (* TODO: by group *)
-  - by rewrite neutral_left neutral_right.
-  - case: q => [//|m _ /=].
-  (* TODO: by group_powers *)
-    by rewrite /b_encoding !neutral_right powerS powerC'.
-  (* TODO: by group_powers *)
-  - by rewrite !neutral_right neutral_left powerS powerC'.
-  (* TODO: by group *)
-    by rewrite !inverse_law !inv_involutive -!associativity !neutral_left
-              !neutral_right inverse_right neutral_right.
-  (* TODO: by group *)
-  - by rewrite neutral_left neutral_right.
-  - case: q => [//|m _ /=].
-     (* TODO: by solve_group_powers *)
-     by rewrite /b_encoding power0 !neutral_right !neutral_left powerS
-                -powerC' inverse_law -associativity inverse_right
-                neutral_right.
-  - case => [//|m _ _ /=].
-     (* TODO: by solve_group_powers *)
-    by rewrite neutral_left neutral_right powerS -powerC' -associativity
-             inverse_left neutral_right.
-  - rewrite rev_cons rcons_law.
-    (* TODO: by group *)
-    by rewrite neutral_left -!associativity inverse_left
-             neutral_right.
-  - rewrite !rev_cons !rcons_law.
-    (* TODO: by group *)
-    by rewrite neutral_left -!associativity. 
-Qed.
+(*Definition apbq_isomorphism_inv': K -> F2.*)
+(*Proof.*)
+(*  move => x.*)
+(*  move: (@surjectivity_property _ _ apbq_isomorphism x) => H.*)
+(*  move: (xchoose H).*)
 
-Lemma Stallings_automaton_transition_state_ltq:
-  forall state stack letter,
-    (state < q)%N ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-      (state' < q)%N.
-Proof.
-  move => state stack letter.
-  apply Stallings_automaton_transition_invariant_ind => 
-    [//|//|||//|//|||//|//]; by lia.
-Qed.
-
-Lemma Stallings_automaton_transition_stack_reduced:
-  forall state stack letter,
-    freely_reduced stack ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-    freely_reduced stack'.
-Proof.
-  move => state stack letter;
-  apply Stallings_automaton_transition_invariant_ind =>
-    [//|_ _ _|//|//|//|_ _ _|//|//
-    |_ stack_head stack_tail|_ stack_head stack_tail letter' /eqP].
-  - apply freely_reduced_cons1.
-  - apply freely_reduced_cons1.
-  - apply freely_reduced_behead.
-  - apply freely_reduced_cons2.
-Qed.
-
-Definition Stallings_automaton_stack_last_a
-  (state: nat) (stack: F2) :=
-    (stack = [::] \/
-      ((state == p)%B = false /\
-      exists pfx,
-        stack = rcons pfx a \/
-        stack = rcons pfx a^-1)).
-
-Lemma Stallings_automaton_transition_stack_last_a:
-  forall state stack letter,
-    Stallings_automaton_stack_last_a state stack ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-        Stallings_automaton_stack_last_a state' stack'.
-Proof.
-  move => state stack letter;
-  apply Stallings_automaton_transition_invariant_ind =>
-    [//|state' H _|_|state' _ _|//|state' H _|_|state' _ _
-    |state' stack_head stack_tail|state' stack_head stack_tail letter' _].
-  - by right; split => [//|]; exists [::]; left.
-  - by left.
-  - by left.
-  - by right; split => [//|]; exists [::]; right.
-  - by left.
-  - by left.
-  - move => [//|] [] H [] [|pfxh pfxt] [|] [] _ ->.
-  -- by left.
-  -- by left.
-  -- by right; split => [//|]; exists pfxt; left.
-  -- by right; split => [//|]; exists pfxt; right.
-  - move => [//| [] Hp [] pfx [] ->];
-    right; split => [//|]; exists (letter'::pfx).
-  -- by left.
-  -- by right.
-Qed.
-
-(* NOTE(reiniscirpons): The following characterizes all configurations
-   of stack and state that are reachable by repeatedly applying
-   the transition function to the initial configuration consisting
-   of state 0 and empty stack [::]. *)
-Definition Stallings_automaton_reachable_configuration
-  (state:nat) (stack: F2) :=
-    (state < q)%N /\ 
-    freely_reduced stack /\
-    Stallings_automaton_stack_last_a state stack.
-
-Lemma Stallings_automaton_reachable_configuration0nil:
-  Stallings_automaton_reachable_configuration 0 [::].
-Proof.
-  split.
-  - by apply H0q.
-  split.
-  - by apply freely_reduced_nil.
-  - by left.
-Qed.
-
-Lemma Stallings_automaton_transition_reachable_configuration:
-  forall state stack letter,
-    Stallings_automaton_reachable_configuration state stack ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-        Stallings_automaton_reachable_configuration state' stack'.
-Proof.
-  move => state stack letter [Hsq [Hred Hlast]].
-  move: (Stallings_automaton_transition_stack_last_a state stack letter Hlast).
-  move: (Stallings_automaton_transition_stack_reduced state stack letter Hred).
-  move: (Stallings_automaton_transition_state_ltq state stack letter Hsq).
-  by move: (Stallings_automaton_transition state stack letter) =>
-    [] [] state' letter' _.
-Qed.
-
-Lemma Stallings_automaton_transitionK:
-  forall state stack letter,
-    Stallings_automaton_reachable_configuration state stack ->
-    let: (state', stack', output) :=
-      Stallings_automaton_transition state stack letter in
-      let: (state'', stack'', output') :=
-        Stallings_automaton_transition state' stack' (invl letter) in
-          state = state'' /\ stack = stack'' /\ output = inv output'.
-Proof.
-  move => state stack letter;
-  apply Stallings_automaton_transition_invariant_ind =>
-  [_ /=|//|//|//|_ /=|//|_ /= |state' /=
-  |state' stack_head stack_tail /=
-  |state' stack_head stack_tail letter' _ _ /=].
-  (* TODO(reiniscirpons): Why did it not simplify automatically? *)
-  - by rewrite eq_refl.
-  - by rewrite eq_refl.
-  - by rewrite eq_refl.
-  - move => Hs0 [Hsq _]; have: (state'.-1 == q.-1)%B = false => [|->].
-  -- by move: Hs0 Hsq H0q Hpq; lia.
-  -- by move: Hs0 Hsq; case: state'.
-  - move => [_ [Hred [//|[] Hp [] pfx []]]];
-    case: stack_tail Hred => [_|stack_head' stack_tail Hred _ /=].
-  (* TODO(reiniscirpons): Is there a way to join up cases after a split?
-     Or do I need to change the definition of transition function? *)
-  -- case: pfx => [[] -> /= |pfxh [] //]; by rewrite Hp.
-  -- rewrite invlK; case: ifP => [/eqP H|//].
-     exfalso; rewrite /freely_reduced /not in Hred;
-     apply Hred with [::] stack_tail stack_head';
-     by rewrite -H.
-  -- case: pfx => [[] -> /= |pfxh [] //]; by rewrite Hp.
-  -- rewrite invlK; case: ifP => [/eqP H|//].
-     exfalso; rewrite /freely_reduced /not in Hred;
-     apply Hred with [::] stack_tail stack_head';
-     by rewrite -H.
-  -- by rewrite eq_refl.
-Qed.
+(*Definition apbq_isomorphism_inv: isomorphism K F2.*)
+(*Proof.*)
   
 
-(* TODO(reiniscirpons): Would be nice if there was some "monoid" or
-    "group" tactic that essentially does all the busywork in the above
-    proof and allows us to do rewrites modulo associativity. *)
-(* NOTE(reiniscirpons): To handle group with exponents, check out
-   https://www.jstor.org/stable/1993539?seq=1
-*)
-
-(* NOTE: Stallings foldings. *)
-(* NOTE(reiniscirpons):
-   The output of Stallings_automaton_div is a word in the index free group,
-   which, when mapped by apbq_projection, gives the largest, in the sense that
-   its reduced length is maximal, left factor of w that is in H. *)
-Fixpoint Stallings_automaton_div
-  (state: nat) (stack: F2) (word: F2): IndexFG :=
-match word with
-| nil => e
-| c::w =>
-  match (Stallings_automaton_transition state stack c) with
-  | (state', stack', output) =>
-    output @ (Stallings_automaton_div state' stack' w)
-  end
-end.
-
-(* NOTE(reiniscirpons):
-   The output of Stallings_automaton_mod is a reduced word in F2 that remains
-   after removing the factor H returned by Stallings_automaton_div. *)
-Fixpoint Stallings_automaton_mod
-  (state: nat) (stack: F2) (word: F2): F2 :=
-match word with
-| nil => (power (`[b]_F2P) state) @ (rev stack)
-| c::w =>
-  match (Stallings_automaton_transition state stack c) with
-  | (state', stack', _) => Stallings_automaton_mod state' stack' w
-  end
-end.
-
-Lemma Stallings_automaton_product:
-  forall (state: nat) (stack: F2) (word: F2),
-    (state < q)%N ->
-    (apbq_projection (Stallings_automaton_div state stack word)) @
-    (Stallings_automaton_mod state stack word) ==
-    (power (`[b]_F2P) state) @ (rev stack: F2) @ word.
-Proof.
-  move => state stack word; 
-  elim: word state stack => [/= |letter word IH] state stack Hq.
-  - by rewrite neutral_left neutral_right.
-  - rewrite {3}cons_law !associativity [apbq_projection]lock /= -lock.
-  move: (Stallings_automaton_transition_state_ltq state stack letter Hq).
-  move: (Stallings_automaton_transition_product state stack letter Hq).
-  move: (Stallings_automaton_transition state stack letter) =>
-        [[state' stack'] output] -> Hq'.
-  by rewrite morphism_preserve_law -associativity (IH _ _ Hq') !associativity.
-Qed.
-
-Lemma Stallings_automaton_mod_correct:
-  forall (x: F2), right_coset_eq K x (Stallings_automaton_mod 0 [::] x).
-Proof.
-  move => x; rewrite right_coset_eq'.
-  exists (subgroup_projection gens (Stallings_automaton_div 0 [::] x)).
-  by apply Stallings_automaton_product; exact H0q.
-Qed.
-
-Lemma Stallings_automaton_mod_reduced:
-  forall (state: nat) (stack: F2) (word: F2),
-    Stallings_automaton_reachable_configuration state stack ->
-    freely_reduced (Stallings_automaton_mod state stack word).
-Proof.
-  move => state stack word;
-  elim: word stack state => [/=|letter word IH] stack state.
-  - move => [_ [Hred Hlast]].
-    rewrite -cat_law; case: state Hlast => [_ /=|n];
-    first by apply freely_reduced_rev.
-  -- case => [->|[_ [pfx]]].
-  --- by rewrite cats0; apply freely_reduced_power1.
-  (* TODO: Is there any way to join up cases? *)
-  --- case => Hstack; elim: n => [|n IH].
-  ---- rewrite Hstack rev_rcons /= -cat1s.
-      have: ([::b] = rcons [::] b) => [//|->];
-      apply freely_reduced_cat => [//||].
-  ----- by apply freely_reduced_cons1.
-  ----- by rewrite -rev_rcons -Hstack; apply freely_reduced_rev.
-  --- rewrite !powerS -!cons_law !cat_cons.
-      by apply freely_reduced_cons2.
-  ---- rewrite Hstack rev_rcons /= -cat1s.
-      have: ([::b] = rcons [::] b) => [//|->];
-      apply freely_reduced_cat => [//||].
-  ----- by apply freely_reduced_cons1.
-  ----- by rewrite -rev_rcons -Hstack; apply freely_reduced_rev.
-  -- rewrite !powerS -!cons_law !cat_cons.
-     by apply freely_reduced_cons2.
-  - rewrite [freely_reduced]lock /= -lock.
-    move/(Stallings_automaton_transition_reachable_configuration
-      _ _ letter).
-    move: (Stallings_automaton_transition state stack letter) =>
-      [[state' stack'] _].
-    by apply IH.
-Qed.
-
-Lemma Stallings_automaton_mod_reduction:
-  forall (state: nat) (stack: F2) (word: F2),
-    Stallings_automaton_reachable_configuration state stack ->
-    Stallings_automaton_mod state stack word =
-    Stallings_automaton_mod state stack (FreeGroup_norm word).
-Proof.
-  move => state stack word;
-  elim: word state stack => [//|letter word IH /=] state stack Hreach.
-  move: (Stallings_automaton_transition_reachable_configuration
-    _ _ letter Hreach).
-  case H: (Stallings_automaton_transition state stack letter) =>
-    [statestack output].
-  case: statestack H => [state' stack'] H.
-  move/IH => ->.
-  case: (FreeGroup_norm word) H => [/= -> //|letter' word'].
-  case: ifP => [/eqP -> /= H|Heq /= ->].
-  - move: (Stallings_automaton_transitionK
-      state stack (invl letter') Hreach).
-    rewrite H invlK.
-    by move: (Stallings_automaton_transition state' stack' letter') =>
-      [[state'' stack''] output'] [-> [-> _]].
-  - by move: (Stallings_automaton_transition state' stack' letter') =>
-      [[state'' stack''] output'].
-Qed.
-
-(* TODO: how can I make Stallings_automaton_mod proper so that I can use setoid
-   tactics? Problem is that I have constraint on state and stack. *)
-Lemma Stallings_automaton_mod_proper:
-  forall (state: nat) (stack: F2) (word1 word2: F2),
-    Stallings_automaton_reachable_configuration state stack ->
-    word1 == word2 ->
-    Stallings_automaton_mod state stack word1 =
-    Stallings_automaton_mod state stack word2.
-Proof.
-  move => state stack word1 word2 Hreach /FreeGroup_dec_eqP /eqP.
-  rewrite Stallings_automaton_mod_reduction => [|//].
-  by rewrite (Stallings_automaton_mod_reduction _ _ word2) => [->|//].
-Qed.
-
-Lemma Stallings_automaton_mod_power_b:
-  forall state (n: nat) x,
-    (state < q)%N ->
-    Stallings_automaton_mod state [::] ((power (`[b]_F2P) n) ++ x) =
-    Stallings_automaton_mod ((state + n) %% q)%N [::] x.
-Proof.
-  move => state n x; elim: n state => [state /modn_small /=|n IH state HsnS].
-  - by rewrite addn0 => ->.
-  rewrite powerS -cons_law cat_cons /=.
-  case: ifP => [/eqP ->|Hsq].
-  - rewrite IH => [|]; last by exact H0q.
-    have: (q.-1 + n.+1 = q + n)%N => [|->]; first by lia.
-    by rewrite add0n modnDl.
-  - rewrite IH; last by lia.
-    by rewrite addSn addnS.
-Qed.
-
-Lemma Stallings_automaton_mod_inv_power_b:
-  forall state n (x: F2),
-    (state < q)%N ->
-    (n <= state)%N ->
-    Stallings_automaton_mod state [::] (inv (power (`[b]_F2P) n) ++ x) =
-    Stallings_automaton_mod (state-n)%N [::] x.
-Proof.
-  move => state n x; elim: n state => [|n IH state Hsq Hsn];
-    first by case.
-  move: (refl (inv (power (`[b]_F2P) n.+1))).
-  rewrite {2}powerS -powerC' (inverse_law _ (`[b]_F2P)).
-  (* TODO(reiniscirpons): Probably improve this. *)
-  rewrite {2}/inv /= /inv_word /= /invl /=.
-  move /(congruent_right x)
-       /(Stallings_automaton_mod_proper state [::]) => -> /=.
-  - move: Hsn; case: ifP => [/eqP -> //| Hs0 Hns].
-    have: (state - n.+1 = state.-1 - n)%N => [|->];
-    first by lia.
-    by apply IH; lia.
-  split => [//|]; split.
-  - by apply freely_reduced_nil.
-  - by left.
-Qed.
-
-Lemma Stallings_automaton_mod_subgroup:
-  forall (x: F2) (h: K),
-  (* TODO(reiniscirpons): Why did we need to explicitly
-     specify F2 and H here? *)
-  Stallings_automaton_mod 0 [::] ((@subgroup_inj F2 K h) @ x) =
-  Stallings_automaton_mod 0 [::] x.
-Proof.
-  move => x [] /= y [w] /(congruent_right x) Hwy.
-  rewrite -(Stallings_automaton_mod_proper _ _ _ _ _ Hwy) => [|];
-  last by apply Stallings_automaton_reachable_configuration0nil.
-  move => {Hwy y}.
-  elim: w => [//|hw tw IH].
-  rewrite hat_cons.
-  case: hw => [|] [] [|[|//]] /= _;
-  rewrite -cat_law -catA;
-  move: H0q => H0q.
-  - rewrite {1}/a_encoding -!cat_law -!catA
-    Stallings_automaton_mod_power_b /= => [|//].
-    rewrite modn_small add0n => [|//].
-    case: ifP => [_|/eqP //].
-    rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
-    rewrite subnn.
-    by apply IH.
-    1-2: by lia.
-  - rewrite Stallings_automaton_mod_power_b => [|//].
-    rewrite modnDr modn_small => [|//].
-    apply IH.
-  - move: (refl (inv (a_encoding p))).
-    rewrite {2}/a_encoding {2}inverse_law inv_involutive
-    (inverse_law _ (`[a]_F2P)) -!cat_law.
-    move /congruent_right /Stallings_automaton_mod_proper => ->;
-      last by apply Stallings_automaton_reachable_configuration0nil.
-    rewrite -cat_law -!catA Stallings_automaton_mod_power_b /= => [|//].
-    rewrite modn_small add0n => [|//].
-    case: ifP => [_|/eqP //].
-    rewrite Stallings_automaton_mod_inv_power_b => [|//|//].
-    rewrite subnn.
-    by apply IH.
-    1-2: by lia.
-  - have: (q = q.-1.+1) => [|{1}->]; first by lia.
-    move: (refl (inv (b_encoding q.-1.+1))).
-    rewrite {2}/b_encoding powerS -powerC'
-      (inverse_law _ (`[b]_F2P)) -!cat_law /= /invl /=.
-    move /congruent_right /Stallings_automaton_mod_proper => ->;
-      last by apply Stallings_automaton_reachable_configuration0nil.
-    move => /=.
-    rewrite Stallings_automaton_mod_inv_power_b => [||//];
-      last by lia.
-    rewrite subnn.
-    by apply IH.
-Qed.
-
-Lemma Stallings_automaton_mod_unique:
-  forall (x y: F2),
-  right_coset_eq K x y  ->
-  Stallings_automaton_mod 0 [::] x =
-  Stallings_automaton_mod 0 [::] y.
-Proof.
-  move => x y /right_coset_eq' [] h /Stallings_automaton_mod_proper => <-;
-    last by apply Stallings_automaton_reachable_configuration0nil.
-  apply Stallings_automaton_mod_subgroup.
-Qed.
-
-Definition apbq_coset_rep (w: F2) :=
-  Stallings_automaton_mod 0 [::] w.
-
-HB.instance Definition _ :=
-  isRightCosetRep.Build _ _
-    apbq_coset_rep
-    Stallings_automaton_mod_correct
-    Stallings_automaton_mod_unique.
-
-Lemma Stallings_automaton_div_power_b:
-  forall state (n: nat) x,
-    (state + n < q)%N ->
-    Stallings_automaton_div state [::] ((power (`[b]_F2P) n) ++ x) ==
-    Stallings_automaton_div (state + n)%N [::] x.
-Proof.
-  move => state n x; elim: n state => [state _|n IH state Hsnq];
-    first by rewrite power0 /= addn0.
-  rewrite powerS -cat_law -catA /=.
-  case: ifP => [// Hsq|_];
-    first by lia.
-  move: Hsnq.
-  have: (state + n.+1 = state.+1 +n)%N => [|->];
-    first by lia.
-  rewrite neutral_left;
-  by apply IH.
-Qed.
-
-(* TODO(reiniscirpons): Avoid having such lemmas or at least
-   make this more uniform. *)
-Lemma F2_powerS':
-  forall (w: F2) (n: nat),
-    power w n.+1 = power w n @ w.
-Proof.
-  move => w; elim/nat_pairs_ind => [||n IH1 IH2].
-  - by rewrite power0 /power /= -!cat_law cat0s cats0.
-  - by rewrite /power /= -!cat_law !cats0.
-  - by rewrite powerS {1}IH2 [power w n.+2]powerS -!cat_law catA.
-Qed.
-
-Lemma Stallings_automaton_div_inv_power_b:
-  forall state n (x: F2),
-    (state < q)%N ->
-    (n <= state)%N ->
-    Stallings_automaton_div state [::] (inv (power (`[b]_F2P) n) ++ x) ==
-    Stallings_automaton_div (state-n)%N [::] x.
-Proof.
-  move => state n x; elim: n state => [|n IH state Hsq Hsn];
-    first by case.
-  rewrite F2_powerS' -rcons_law /inv /= inv_word_rcons cat_cons /=.
-  case: ifP => [|] Hs0;
-    first by lia.
-  have: (state - n.+1 = state.-1 - n)%N => [|->];
-    first by lia.
-  by apply IH; lia.
-Qed.
-
-Lemma Stallings_automaton_div_reduction:
-  forall (state: nat) (stack: F2) (word: F2),
-    Stallings_automaton_reachable_configuration state stack ->
-    Stallings_automaton_div state stack word ==
-    Stallings_automaton_div state stack (FreeGroup_norm word).
-Proof.
-  move => state stack word;
-  elim: word state stack => [//|letter word IH /=] state stack Hreach.
-  move: (Stallings_automaton_transition_reachable_configuration
-    _ _ letter Hreach).
-  case H: (Stallings_automaton_transition state stack letter) =>
-    [statestack output].
-  case: statestack H => [state' stack'] H.
-  move/IH => ->.
-  case: (FreeGroup_norm word) H => [/= -> //|letter' word'].
-  case: ifP => [/eqP -> /= H|Heq /= ->].
-  - move: (Stallings_automaton_transitionK
-      state stack (invl letter') Hreach).
-    rewrite H invlK.
-    move: (Stallings_automaton_transition state' stack' letter') =>
-      [[state'' stack''] output'] [-> [-> ->]].
-    by rewrite associativity inverse_right neutral_left.
-  - by move: (Stallings_automaton_transition state' stack' letter') =>
-      [[state'' stack''] output'].
-Qed.
-
-(* TODO(reiniscirpons): How can I make this proper so that I can use
-   setoid tactics? Problem is the state and stack constraint.*)
-(* NOTE(reiniscirpons): *)
-(* Unclear implementation choice, look at docs for Proper. *)
-(* Generalized rewriting. Essentially the same thing. *)
-(* Automate synthesis of relatedness proofs. 
-   Generalized rewriting generalizes to non-symmetric
-   relations. *)
-(* <-> : setoid relation of Prop.
-   -> : Not symmetric. However if A -> B then get
-   some properties e.g. (A -> B) -> (A /\ C -> B /\ C).
-*)
-Lemma Stallings_automaton_div_proper:
-  forall (state: nat) (stack: F2) (word1 word2: F2),
-    Stallings_automaton_reachable_configuration state stack ->
-    word1 == word2 ->
-    Stallings_automaton_div state stack word1 ==
-    Stallings_automaton_div state stack word2.
-Proof.
-  move => state stack word1 word2 Hreach /FreeGroup_dec_eqP /eqP.
-  rewrite Stallings_automaton_div_reduction => [|//].
-  by rewrite (Stallings_automaton_div_reduction _ _ word2) => [->|//].
-Qed.
-
-HB.instance Definition _ :=
-  isSetoidMorphism.Build _ _
-    (Stallings_automaton_div 0 [::])
-    (fun w1 w2 => 
-      Stallings_automaton_div_proper 0 [::] w1 w2
-      Stallings_automaton_reachable_configuration0nil).
-
-Lemma Stallings_automaton_div_subgroup:
-  forall (w: IndexFG),
-    Stallings_automaton_div 0 [::] (apbq_projection w) == w.
-Proof.
-  elim => [//|h t IH]; rewrite apbq_projection_cons.
-  case: h => o; case: ifP => [/eqP ->|].
-  - rewrite /a_encoding -!cat_law -!catA.
-    rewrite Stallings_automaton_div_power_b /=;
-      last by lia.
-    rewrite add0n.
-    case: ifP => [_|/eqP //].
-    rewrite Stallings_automaton_div_inv_power_b => [|//|//].
-    by rewrite subnn IH -cons_law.
-  - case: o => [] [//|[|//]] Hc _.
-    have: q = q.-1.+1 => [|->]; first by lia.
-    rewrite /b_encoding F2_powerS' -!cat_law -catA.
-    rewrite Stallings_automaton_div_power_b /=;
-      last by lia.
-    case: ifP => [_|]; last by lia.
-    rewrite IH.
-    (* TODO(reiniscirpons): I don't even want to talk about this ... :D *)
-    have: b = Base (Ordinal Hc) => [|<- //];
-    by apply /f_equal /eqP.
-  - rewrite /a_encoding -!cat_law -!catA /inv /=
-    !inv_word_cat inv_word_cons -!catA inv_word_involutive /=.
-    rewrite Stallings_automaton_div_power_b /=;
-      last by lia.
-    case: ifP => [_|]; last by lia.
-    rewrite Stallings_automaton_div_inv_power_b => [|//|//].
-    by rewrite subnn IH -cons_law.
-  - case: o => [] [//|[|//]] Hc _.
-    have: q = q.-1.+1 => [|->]; first by lia.
-    rewrite /b_encoding F2_powerS' -!cat_law /inv /= inv_word_cat /=.
-    rewrite Stallings_automaton_div_inv_power_b /= => [||//];
-      last by lia.
-    rewrite subnn IH.
-    (* TODO(reiniscirpons): Same as above. *)
-    have: b^-1 = Inverse (Ordinal Hc) => [|<- //].
-    by apply /f_equal /eqP.
-Qed.
-
-Lemma subgroup_projection_inj:
-  forall (x y: IndexFG), 
-    subgroup_projection gens x == subgroup_projection gens y ->
-    x == y.
-Proof.
-  move => x y /(@morphism_preserve_equiv _ _ (@subgroup_inj F2 K)).
-  rewrite -{2}[x]Stallings_automaton_div_subgroup
-          -{2}[y]Stallings_automaton_div_subgroup /=.
-  move/Stallings_automaton_div_proper => ->.
-  - by [].
-  - by exact: Stallings_automaton_reachable_configuration0nil.
-Qed.
-
-HB.instance Definition _ :=
-  isInjective.Build _ _
-    (subgroup_projection gens)
-    subgroup_projection_inj.
-
-Definition apbq_isomorphism: isomorphism F2 K := (subgroup_projection gens).
-
-Definition apbq_isomorphism_inv' :=
-  ((Stallings_automaton_div 0 [::]) \o (@subgroup_inj F2 K)).
-Arguments apbq_isomorphism_inv' / _.
-
-HB.instance Definition _ :=
-  isIsomorphismLeftInverse.Build _ _
-    apbq_isomorphism
-    apbq_isomorphism_inv'
-    morphism_preserve_equiv
-    Stallings_automaton_div_subgroup.
-
-(* TODO(reiniscirpons): Why do I need to do this weird dance? *)
-Definition apbq_isomorphism_inv: isomorphism K F2 := apbq_isomorphism_inv'.
 End NielsenSchreierStallings.
-
-(* NOTE(reiniscirpons): Housekeeping lemmas:
-
-   <a_p, b^q> \isomorphic <a_p, b^{-q}> (they both equal to <a_p, b^q, b^-q>)
-   <a_p, b^q> \isomorphic <a_-p, b^{-q}> (fix a and map b to b^{-1})
-   => every <a_p, b^q> is isomorphic to some <a_p', b^q'> with 0 <= p, q.
-   Furthermore, if p, q: nat and q != 0, then
-   <a_p, b^q> \isomorphic <a_(modulo p q), b^q>
-   (these subgroups are in fact equal since we get a_(p+kq) by
-    conjugating by b^q)
-
-   So, if q != 0 (which it has to be as otherwise we get a rank 1 subgroup,
-   which is bad), then we can additionally assume that p < q.
-
-   TODO(reiniscirpons): Implement these reductions
-   TODO(reiniscirpons): Add a lemma to show that if we can mutually derive
-       generating sets, then subgroups are isomorphic.
-*)
 
 Section apbqIsomorphismHousekeeping.
 
@@ -1078,8 +312,8 @@ Proof.
     by exact: (f2 \o f1).
 Qed.
 
-
-(* NOTE(reiniscirpos): Finally done!*)
+(* TODO(reiniscirpons): uncomment and fix once we have a lemma
+   for the isomorphism. *)
 Definition pqpq_isomorphism
   (p1 q1: int) (H1: (q1 != 0)%Z)
   (p2 q2: int) (H2: (q2 != 0)%Z):
@@ -1095,4 +329,3 @@ Proof.
   move: (pq_isomorphism_nat' p2 q2 H2) => f4.
   exact: (f4 \o f3 \o f2 \o f1).
 Defined.
-

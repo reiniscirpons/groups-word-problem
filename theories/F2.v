@@ -3,6 +3,7 @@ From mathcomp Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import eqtype seq fintype choice ssrnat all_algebra.
 From mathcomp Require Import ring lra zify.
 Require Import Setoid Morphisms.
+From Stdlib Require Import Btauto.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 
@@ -620,10 +621,60 @@ Proof.
     by rewrite eqz catA in habs'.
 Qed.
 
-Lemma freely_reduced_power (w: FreeGroup Sigma) (ks: seq int) (Hsize: size w = size ks) (Hn0: forall k, k \in ks -> k != 0) (Hdistinct: forall p q x y, p ++ [:: x; y] ++ q = w -> x != y):
-  freely_reduced w ->
+Fixpoint freely_reduced_helper (x: FreeGroup Sigma): bool :=
+  match x with
+  | [::] => true
+  | [:: c & y] =>
+    match y with
+    | [::] => true
+    | [:: d & z] => (c != d) && freely_reduced_helper y
+    end
+  end.
+
+
+Lemma freely_reduced_helper_cons2: forall c d x,
+  freely_reduced_helper [:: c, d & x] =
+  (c != d) && freely_reduced_helper x &&
+  freely_reduced_helper [:: d & x].
+Proof.
+  move => c d x; elim: x c d => [c d/=|e x IH c d];
+    first by case: (c != d).
+  rewrite IH /=; case: x {IH} => [|f x] /=;
+    by btauto.
+Qed.
+
+Lemma freely_reduced_helperP: forall x,
+  reflect
+    (forall p q c d, p ++ [:: c; d] ++ q = x -> c != d)
+    (freely_reduced_helper x).
+Proof.
+  move => x; apply/(iffP idP).
+  - elim: x => [_ [//|//]|c [_ _ [//|? [//|//]]|d x IH]].
+    rewrite freely_reduced_helper_cons2 =>
+      /andP [/andP [Hcd _ /IH {}IH]] [|e y] q c' d' /=;
+      first by move => [-> -> _].
+    by case => [_ /IH].
+  - elim: x => [//|c x IH H /=];
+    case: x IH H => [//|d x IH H].
+    apply/andP; split.
+  -- by apply H with [::] x.
+  -- apply IH => p q c' d' Hpcdq.
+     apply H with (c::p) q => /=.
+     by rewrite Hpcdq.
+Qed.
+
+Lemma freely_reduced_power
+    (w: FreeGroup Sigma)
+    (ks: seq int)
+    (Hsize: (size w == size ks)%B)
+    (Hn0: all (fun k => k != 0) ks)
+    (Hdistinct: freely_reduced_helper w):
+  (w == FreeGroup_norm w)%B ->
   freely_reduced (prod (map (fun '(x, k) => power (`[x]_(FGP Sigma)) k) (zip w ks))).
 Proof.
+  move/eqP in Hsize.
+  move/allP in Hn0.
+  move/freely_reduced_helperP in Hdistinct.
   elim: w ks Hn0 Hsize Hdistinct => [|x t IH].
   - move => ks Hn0 Q; rewrite /= in Q; symmetry in Q; move/size0nil in Q; rewrite {}Q.
     by rewrite /= => _ _; apply freely_reduced_nil.
@@ -633,7 +684,7 @@ Proof.
   --- rewrite /= in Hsize; case: Hsize => Hsize; symmetry in Hsize; move/size0nil in Hsize; rewrite Hsize.
       rewrite /= !freely_reduced_correct -{1}cat_law cats0 neutral_right.
       by rewrite FreeGroup_norm_power1.
-  --- case: kt Hn0 Hsize => [|k' kt'] Hn0 Hsize frw.
+  --- case: kt Hn0 Hsize => [|k' kt'] Hn0 Hsize /eqP /freely_reduced_correct frw.
       + by done.
 
       rewrite /= in Hsize; case: Hsize => Hsize.
@@ -656,13 +707,13 @@ Proof.
       have Hdistinct': forall p q x' y', p ++ [:: x'; y'] ++ q = y :: t' -> x' != y'.
         move => p q x' y' Heq.
         apply: (Hdistinct [::x & p] q).
-        by rewrite cat_cons Heq.
+        by rewrite /= Heq.
 
       have fryt: freely_reduced [::y & t'].
         apply: (@freely_reducedW _ [:: x, y & t']); first by apply: frw.
         apply/infixP; exists ([::x]); exists([::]).
         by rewrite cats0.
-      
+      move/freely_reduced_correct/eqP in fryt. 
       move: (IH [:: k' & kt'] Hn0' Hsize' Hdistinct' fryt) => frIH.
       rewrite [power]lock /= -lock in frIH.
       rewrite -cat_law in frIH; rewrite -cat_law.

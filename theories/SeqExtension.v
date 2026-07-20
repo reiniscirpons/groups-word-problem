@@ -1,3 +1,13 @@
+(** * Extension of the Seq library                    *)
+(******************************************************)
+(* *_zip: lemmas to uses \in with zip                 *)
+(* *_mask: lemmas to define a computable injection    *)
+(*         from a sub sequence to the sequence        *)
+(* enumerate: creates a sequence made of the elements *)
+(*            with their indices & Lemmas to use it   *)
+(******************************************************)
+
+
 From elpi.apps Require Import coercion.
 From HB Require Import structures.
 

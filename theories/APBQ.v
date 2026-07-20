@@ -148,26 +148,52 @@ Proof.
   by done.
 Qed.
 
+Definition isomorphismP (x: K) :=
+  (fun y => (FreeGroup_norm((apbq_isomorphism y).(sb_point)) == FreeGroup_norm (x.(sb_point)))%B).
+
+Lemma exist_isomorphismP (x: K):
+  exists x0 : F2, (isomorphismP x x0).
+Proof.
+  move: (@surjectivity_property _ _ apbq_isomorphism x); move: x.
+
+  rewrite /K /generatedSubgroup /isomorphismP => x H.
+
+  case: H => x0 Heq.
+  exists (x0).
+  rewrite /eq /= /subgroupby_eq /subgroupby_inj in Heq.
+  by rewrite Heq.
+Qed.
+  
+
 Definition apbq_isomorphism_inv': K -> F2.
 Proof.
   move => x.
-  move: (@surjectivity_property _ _ apbq_isomorphism x) => H.
+  by apply: (@xchoose F2 (isomorphismP x) (exist_isomorphismP x)).
+Defined.
 
-  rewrite /K /generatedSubgroup in x H.
-
-  have H_clean : exists x0 : F2, (fun y => (FreeGroup_norm((apbq_isomorphism y).(sb_point)) == FreeGroup_norm (x.(sb_point)))%B) x0.
-    case: H => x0 Heq.
-    exists (x0).
-    rewrite /eq /= /subgroupby_eq /subgroupby_inj in Heq.
-    by rewrite Heq.
-  by apply: (@xchoose F2 _ H_clean).
+Lemma apbq_inverse_right: forall x, apbq_isomorphism (apbq_isomorphism_inv' x) == x.
+Proof.
+  rewrite /apbq_isomorphism_inv' /= => x.
+  move: (xchooseP (exist_isomorphismP x)).
+  rewrite /isomorphismP /subgroupby_eq /subgroupby_inj -/FreeGroup_dec_eq.
+  by apply: FreeGroup_dec_eq_to_eqprop.
 Qed.
 
-  
-Definition apbq_isomorphism_inv: isomorphism K F2.
+Lemma apbq_preserve_equiv: forall x y, x == y -> apbq_isomorphism_inv' x == apbq_isomorphism_inv' y.
 Proof.
-Admitted.
-  
+  move => x y eqxy.
+  rewrite /apbq_isomorphism_inv'.
+  rewrite (eq_xchoose (exist_isomorphismP x) (exist_isomorphismP y)) //.
+  rewrite /isomorphismP => z.
+  by rewrite /eq /= /subgroupby_eq /subgroupby_inj in eqxy; move/eqprop_to_FreeGroup_dec_eq in eqxy; rewrite /FreeGroup_dec_eq in eqxy; move/eqP in eqxy; rewrite {}eqxy.
+Qed.
+
+HB.instance Definition _ :=
+    isIsomorphismRightInverse.Build _ _ apbq_isomorphism apbq_isomorphism_inv'
+      apbq_preserve_equiv
+      apbq_inverse_right.
+
+Definition apbq_isomorphism_inv: isomorphism K F2 := apbq_isomorphism_inv'.
 
 End NielsenSchreierStallings.
 
@@ -368,6 +394,7 @@ Proof.
   move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) Hlt1) => f2.
   move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) Hlt2) => f3.
   move: (pq_isomorphism_nat' p2 q2 H2) => f4.
+  
   exact: (f4 \o f3 \o f2 \o f1).
 Qed.
 

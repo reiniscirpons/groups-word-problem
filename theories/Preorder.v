@@ -1,3 +1,7 @@
+(** * Define a Preordre for a proof of the theorem of Nielsen Schreier *)
+
+
+
 Require Import ssreflect ssrbool ssrfun.
 From HB Require Import structures.
 

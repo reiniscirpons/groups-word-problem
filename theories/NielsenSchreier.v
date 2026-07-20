@@ -3234,8 +3234,7 @@ Qed.
 
 
 Lemma NielsenR_minimal:
-  forall (i j: nat), (i < size U)%N -> (j < size U)%N -> (i != (@invnat gens j)) ->
-  ~ ((nth e U i) @ (nth e U j) < (nth e U i) :> word)%O.
+  @minimality_condition gens.
 Proof.
   move => i j ibnd jbnd diffij.
 

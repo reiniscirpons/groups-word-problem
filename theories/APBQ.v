@@ -5,6 +5,8 @@ From mathcomp Require Import eqtype seq fintype all_algebra div.
 From mathcomp Require Import ring lra zify choice.
 Require Import Setoid Morphisms.
 
+Import GRing.Theory.
+
 From GWP Require Import Utils Equivalence
   EquivalenceAlgebra Presentation F2 GeneratedSubgroup
   NielsenSchreier Sizelexi Preorder.
@@ -33,7 +35,7 @@ Definition a_encoding (p: int): F2 :=
 (* NOTE(reiniscirpons): b^q is the other generator *)
 Definition b_encoding (q: int): F2 := power (`[b]_F2P) q.
 
-Variable p q: nat.
+Variable p q: int.
 
 Let gens := [:: a_encoding p; b_encoding q].
 (* TODO: Why is Gamma not equal to Sigma? Shouldn't they be because
@@ -61,11 +63,9 @@ Lemma apbq_projection_cons: forall h t,
     end) ++ apbq_projection t.
 Proof. by move => [|] [] [|[|//]]. Qed.
 
-Variable Hpq: (p*2 < q)%N.
-
-Lemma fra_encode: forall n, n!=0 -> freely_reduced (a_encoding n).
+Lemma fra_encode: forall n, freely_reduced (a_encoding n).
 Proof.
-  move => n Hn;
+  move => n; case: (n =P 0) => [Heq0 | Hdiff Hn]; last first.
   rewrite /a_encoding /inv /= -power_inv_word -[power _ (- n)]cats0.
   set x := [::a] \mod (FGP Sigma).
   rewrite -[x]FreeGroup_power1 /x
@@ -75,7 +75,14 @@ Proof.
           [:: n; 1; -n]) => [//||//|//].
   apply /allP => m.
   rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+
+  (* 0 case *)
+
+  by rewrite /a_encoding Heq0 /= power0 -!cat_law cats0 cat0s freely_reduced_correct.
 Qed.
+
+Variable Hqn0: (q != 0)%N.
+Variable Hpq: (`|p|*2 <= `|q|)%N.
 
 Lemma apbq_minimal: @minimality_condition _ gens.
 Proof.
@@ -98,12 +105,17 @@ Proof.
           -!associativity -lock.
   rewrite !Hred.
   - rewrite !size_cat !(@size_power F2P) /=; lia.
-  - apply (freely_reduced_power _
+  - case: (p =P 0) => [-> | Hn0].
+    + rewrite power0 -cat_law cats0 cat0s -cat_law cats0; apply: freely_reduced_power1.
+    apply (freely_reduced_power _
           ([::b; a; b] \mod (FGP Sigma))
           [:: (p: int); 1; -(p: int)]) => [//||//|//].
     apply/allP => m.
     rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
-  - apply (freely_reduced_power _
+  - case: (p =P 0) => [-> | Hn0].
+    + rewrite power0 -cat_law cats0 cat0s -cat_law cats0; apply: freely_reduced_power1.
+
+    apply (freely_reduced_power _
           ([::b; a; b] \mod (FGP Sigma))
           [:: (p: int); 2; -(p: int)]) => [//||//|//].
     apply/allP => m.
@@ -143,7 +155,7 @@ Qed.
 
 Definition apbq_isomorphism: isomorphism F2 K.
 Proof.
-  move: (@subfree_group_iso Sigma gens).
+  move: (@sub_freegroup_iso Sigma gens).
   move: (@NielsenR_fixpoint Sigma gens apbq_minimal frgens non_trivial) => -> /=.
   by done.
 Qed.
@@ -377,39 +389,208 @@ Proof.
     by exact: (f2 \o f1).
 Qed.
 
+Lemma nat''_eq_size (p q: int) (H: (q != 0)%Z) (Hp: (p != 0)%Z) (Hlt: `|p| < `|q|%N):
+  `|(p %% q)%Z| - `|q| = -(-p %% q)%Z.
+Proof.
+  case: (boolP (0 < p)%Z) => [Hpos | Hneg].
+  - rewrite -modz_abs.
+    rewrite modz_small.
+    rewrite -modz_abs.
+    have -> : (-p %% `|q|)%Z = ((`|q| - p) %% `|q|)%Z.
+      by rewrite modzDl.
+    rewrite modz_small.
+    have -> : `|p| = p.
+      by apply: gtz0_abs.
+    by lia.
+    - by lia.
+    - by lia.
+
+  - move: Hp; case: (p =P 0) => [-> // | Hn0 _].
+    + rewrite -modz_abs.
+      have -> : `|(p %% `|q|)%Z| = `|((`|q| + p) %% `|q|)%Z|.
+        by rewrite modzDl.
+      rewrite modz_small.
+      rewrite -modz_abs modz_small.
+      by lia.
+      + by lia.
+      + by lia.
+Qed.
+
+  
+Definition pq_isomorphism_nat'' (p q: int) (H: (q != 0)%Z):
+  isomorphism
+    (generatedSubgroup [:: a_encoding (p - q); b_encoding q])
+    (generatedSubgroup [:: a_encoding p; b_encoding q]).
+Proof.
+
+  pose s0 := [:: a_encoding p; b_encoding q].
+
+  pose s1 := t2 s0 0 1.
+  have H1: (0 < size s0)%N by done.
+  have H1': (1 < size s0)%N by done.
+  have Hdiff1: (0 <> 1)%N by done.
+  move: (@id_gen_morphism _ s0 s1 (t2_equal_subgroup s0 0 1 H1 H1' Hdiff1): isomorphism _ _) => f1.
+  
+  pose s2 := t1 s1 0.
+  have H2: (0 < size s1)%N by done.
+  move: (@id_gen_morphism _ s1 s2 (t1_equal_subgroup s1 0 H1): isomorphism _ _) => f2.
+
+  pose s3 := t2 s2 0 1.
+  have H3: (0 < size s2)%N by done.
+  have H3': (1 < size s2)%N by done.
+  have Hdiff3: (0 <> 1)%N by done.
+  move: (@id_gen_morphism _ s2 s3 (t2_equal_subgroup s2 0 1 H3 H3' Hdiff3): isomorphism _ _) => f3.
+
+  pose s4 := t1 s3 0.
+  have H4: (0 < size s3)%N by done.
+  move: (@id_gen_morphism _ s3 s4 (t1_equal_subgroup s3 0 H4): isomorphism _ _) => f4.
+
+  have eqs4 : s4 = [:: a_encoding (p - q); b_encoding q].
+    rewrite /s4 /s3 /s2 /s1 /s0 /t1 /t2 /= -!FreeGroup_norm_inv inverse_law -!FreeGroup_norm_inv.
+    have eqbq : b_encoding q = FreeGroup_norm (b_encoding q).
+      rewrite -freely_reduced_correct.
+      apply: freely_reduced_power1.
+    rewrite eqbq.
+    rewrite !FreeGroup_norm_involutive -FreeGroup_norm_inv -FreeGroup_norm_law.
+    rewrite -{1}eqbq inv_eq_invol.
+
+    move: (fra_encode (p - q)); rewrite freely_reduced_correct => ->.
+    apply: (@eq_from_nth _ e) => //.
+    move => i /= ibnd.
+    case: i ibnd => [|[//|//]] ibnd /=.
+    - apply: FreeGroup_norm_unique; rewrite /a_encoding !associativity power_add powerC.
+      by rewrite inverse_law power_inv inv_eq_invol !associativity.
+
+  rewrite -eqs4.
+  exact: (f1 \o f2 \o f3 \o f4).
+Qed.
+
+
+Definition pq_isomorphism_nat''_inv (p q: int) (H: (q != 0)%Z):
+  isomorphism
+    (generatedSubgroup [:: a_encoding p; b_encoding q])
+    (generatedSubgroup [:: a_encoding (p - q); b_encoding q]).
+Proof.
+
+  pose s0 := [:: a_encoding p; b_encoding q].
+
+  pose s1 := t2 s0 0 1.
+  have H1: (0 < size s0)%N by done.
+  have H1': (1 < size s0)%N by done.
+  have Hdiff1: (0 <> 1)%N by done.
+  move: (@id_gen_morphism_inv _ s0 s1 (t2_equal_subgroup s0 0 1 H1 H1' Hdiff1): isomorphism _ _) => f1.
+  
+  pose s2 := t1 s1 0.
+  have H2: (0 < size s1)%N by done.
+  move: (@id_gen_morphism_inv _ s1 s2 (t1_equal_subgroup s1 0 H1): isomorphism _ _) => f2.
+
+  pose s3 := t2 s2 0 1.
+  have H3: (0 < size s2)%N by done.
+  have H3': (1 < size s2)%N by done.
+  have Hdiff3: (0 <> 1)%N by done.
+  move: (@id_gen_morphism_inv _ s2 s3 (t2_equal_subgroup s2 0 1 H3 H3' Hdiff3): isomorphism _ _) => f3.
+
+  pose s4 := t1 s3 0.
+  have H4: (0 < size s3)%N by done.
+  move: (@id_gen_morphism_inv _ s3 s4 (t1_equal_subgroup s3 0 H4): isomorphism _ _) => f4.
+
+  have eqs4 : s4 = [:: a_encoding (p - q); b_encoding q].
+    rewrite /s4 /s3 /s2 /s1 /s0 /t1 /t2 /= -!FreeGroup_norm_inv inverse_law -!FreeGroup_norm_inv.
+    have eqbq : b_encoding q = FreeGroup_norm (b_encoding q).
+      rewrite -freely_reduced_correct.
+      apply: freely_reduced_power1.
+    rewrite eqbq.
+    rewrite !FreeGroup_norm_involutive -FreeGroup_norm_inv -FreeGroup_norm_law.
+    rewrite -{1}eqbq inv_eq_invol.
+
+    move: (fra_encode (p - q)); rewrite freely_reduced_correct => ->.
+    apply: (@eq_from_nth _ e) => //.
+    move => i /= ibnd.
+    case: i ibnd => [|[//|//]] ibnd /=.
+    - apply: FreeGroup_norm_unique; rewrite /a_encoding !associativity power_add powerC.
+      by rewrite inverse_law power_inv inv_eq_invol !associativity.
+
+  rewrite -eqs4.
+  exact: (f4 \o f3 \o f2 \o f1).
+Qed.
+
+
 (* TODO(reiniscirpons): uncomment and fix once we have a lemma
    for the isomorphism. *)
 
-
-Definition pqpq_isomorphism'
-  (p1 q1: int) (H1: (q1 != 0)%Z)
-  (p2 q2: int) (H2: (q2 != 0)%Z)
-  (Hlt1: (`|(p1 %% q1)%Z|*2 < `|q1|)%N)
-  (Hlt2: (`|(p2 %% q2)%Z|*2 < `|q2|)%N):
-  isomorphism (generatedSubgroup [:: a_encoding p1; b_encoding q1])
-    (generatedSubgroup [:: a_encoding p2; b_encoding q2]).
+Lemma p2q_lt (p q: int) (H: (q != 0)%Z) (Hp: (p != 0)%Z) (H2lt: `|q| < `|(p %% q)%Z|*2):
+  ( `| (`|p %% q|%Z - `|q|%Z )%R| * 2 <= `| `|q|%R | )%N.
 Proof.
-  move: (pq_isomorphism_nat p1 q1 H1) => f1.
-  
-  move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) Hlt1) => f2.
-  move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) Hlt2) => f3.
-  move: (pq_isomorphism_nat' p2 q2 H2) => f4.
-  
-  exact: (f4 \o f3 \o f2 \o f1).
+  by lia.
 Qed.
 
 Definition pqpq_isomorphism
   (p1 q1: int) (H1: (q1 != 0)%Z)
   (p2 q2: int) (H2: (q2 != 0)%Z):
-    isomorphism
-      (generatedSubgroup [:: a_encoding p1; b_encoding q1])
-      (generatedSubgroup [:: a_encoding p2; b_encoding q2]).
+  isomorphism (generatedSubgroup [:: a_encoding p1; b_encoding q1])
+    (generatedSubgroup [:: a_encoding p2; b_encoding q2]).
 Proof.
-  case: (boolP ((`|(p1 %% q1)%Z|*2 < `|q1|)%N)) => [Hlt | Hn].
-  case: (boolP ((`|(p2 %% q2)%Z|*2 < `|q2|)%N)) => [Hlt2 | Hn2].
-  - by exact: pqpq_isomorphism'.
-  - admit.
-  case: (boolP ((`|(p2 %% q2)%Z|*2 < `|q2|)%N)) => [Hlt2 | Hn2].
-  - admit.
-  - admit.
+  move: (pq_isomorphism_nat p1 q1 H1) => f1.
+
+  have H1' : `|q1| != 0 by lia.
+  have H2' : `|q2| != 0 by lia.
+  
+  case: (boolP ((`|(p1 %% q1)%Z| * 2 <= `|q1|)%N)) => [Hs1|Hc1].
+  case: (boolP ((`|(p2 %% q2)%Z| * 2 <= `|q2|)%N)) => [Hs2|Hc2].
+  + move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1' Hs1) => f2.
+    move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2' Hs2) => f3.
+    move: (pq_isomorphism_nat' p2 q2 H2) => f4.
+  
+    exact: (f4 \o f3 \o f2 \o f1).
+  + move: (apbq_isomorphism_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1' Hs1) => f2.
+    move: (pq_isomorphism_nat'' (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2') => f4.
+    move: (pq_isomorphism_nat' p2 q2 H2) => f5.
+
+    have Hle2'' : (`|(`|(p2 %% q2)%Z| - `|q2|)%R| * 2 <= `| `|q2|%R |)%N.
+      apply : p2q_lt.
+      + exact: H2.
+      + apply/eqP => eq0.
+        by rewrite eq0 mod0z /= in Hc2.
+      + by lia.
+        
+    move: (apbq_isomorphism (`|(p2 %% q2)%Z| - `|q2|) (`|q2|%N) H2' Hle2'') => f3.
+    exact: (f5 \o f4 \o f3 \o f2 \o f1).
+  case: (boolP ((`|(p2 %% q2)%Z| * 2 <= `|q2|)%N)) => [Hs2|Hc2].
+  + move: (pq_isomorphism_nat''_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1') => f2.
+
+    have Hle1'' : (`|(`|(p1 %% q1)%Z| - `|q1|)%R| * 2 <= `| `|q1| |)%N.
+      apply : p2q_lt.
+      exact: H1.
+      + apply/eqP => eq0.
+        by rewrite eq0 mod0z /= in Hc1.
+      + by lia.
+
+    move: (apbq_isomorphism_inv ((`|(p1 %% q1)%Z| - `|q1|%Z)) (`|q1|%N) H1' Hle1'') => f3.
+    move: (apbq_isomorphism (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2' Hs2) => f4.
+    move: (pq_isomorphism_nat' p2 q2 H2) => f5.
+
+    exact: (f5 \o f4 \o f3 \o f2 \o f1).
+
+  + move: (pq_isomorphism_nat''_inv (`|(p1 %% q1)%Z|%N) (`|q1|%N) H1') => f2.
+
+    have Hle1'' : (`|(`|(p1 %% q1)%Z| - `|q1|)%R| * 2 <= `| `|q1| |)%N.
+      apply : p2q_lt.
+      exact: H1.
+      + apply/eqP => eq0.
+        by rewrite eq0 mod0z /= in Hc1.
+      + by lia.
+
+    move: (apbq_isomorphism_inv ((`|(p1 %% q1)%Z| - `|q1|%Z)) (`|q1|%N) H1' Hle1'') => f3.
+    move: (pq_isomorphism_nat'' (`|(p2 %% q2)%Z|%N) (`|q2|%N) H2') => f5.
+    move: (pq_isomorphism_nat' p2 q2 H2) => f6.
+
+    have Hle2'' : (`|(`|(p2 %% q2)%Z| - `|q2|)%R| * 2 <= `| `|q2|%R |)%N.
+      apply : p2q_lt.
+      + exact: H2.
+      + apply/eqP => eq0.
+        by rewrite eq0 mod0z /= in Hc2.
+      + by lia.
+        
+    move: (apbq_isomorphism (`|(p2 %% q2)%Z| - `|q2|) (`|q2|%N) H2' Hle2'') => f4.
+    exact: (f6 \o f5 \o f4 \o f3 \o f2 \o f1).
 Defined.

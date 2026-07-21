@@ -3499,15 +3499,25 @@ Proof.
     + by done.
 Qed.
 
-Definition id_gen_morphism (x: generatedSubgroup gens) := {|sb_point := x.(sb_point); sb_point_characterization := (NielsenR_subgroup_eq (x.(sb_point))).2 (x.(sb_point_characterization)) |}: generatedSubgroup v.
+End NielsenConstructionCorrection.
 
-Lemma id_preserve_eq (x y: generatedSubgroup gens):
+Section IdIsomorphism.
+
+Context {Sigma: finType}.
+  
+Variable (gens gens': seq (FreeGroup Sigma)).
+
+Hypothesis Hgroup_eq: forall x, in_generated_subgroup gens x <-> in_generated_subgroup gens' x.
+
+Definition id_gen_morphism (x: generatedSubgroup gens') := {|sb_point := x.(sb_point); sb_point_characterization := (Hgroup_eq (x.(sb_point))).2 (x.(sb_point_characterization)) |}: generatedSubgroup gens.
+
+Lemma id_preserve_eq (x y: generatedSubgroup gens'):
   x == y -> id_gen_morphism x == id_gen_morphism y.
 Proof.
   by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
 
-Lemma id_preserve_law (x y : generatedSubgroup gens):
+Lemma id_preserve_law (x y : generatedSubgroup gens'):
   id_gen_morphism (x @ y) == id_gen_morphism x @ id_gen_morphism y.
 Proof.
   by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
@@ -3519,22 +3529,23 @@ Proof.
   by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
 
+
 HB.instance Definition _ :=
 isSetoidMorphism.Build _ _ id_gen_morphism id_preserve_eq.
 
 HB.instance Definition _ :=
   isMonoidMorphism.Build _ _ id_gen_morphism id_preserve_e id_preserve_law.
 
-Lemma id_injective (x y : generatedSubgroup gens):
+Lemma id_injective (x y : generatedSubgroup gens'):
   id_gen_morphism x == id_gen_morphism y -> x == y.
 Proof.
   by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
 
-Lemma id_surjective (x : generatedSubgroup v):
-  exists (y: generatedSubgroup gens), (id_gen_morphism y) == x.
+Lemma id_surjective (x : generatedSubgroup gens):
+  exists (y: generatedSubgroup gens'), (id_gen_morphism y) == x.
 Proof.
-  exists {|sb_point := x.(sb_point); sb_point_characterization := (NielsenR_subgroup_eq (x.(sb_point))).1 (x.(sb_point_characterization)) |}.
+  exists {|sb_point := x.(sb_point); sb_point_characterization := (Hgroup_eq (x.(sb_point))).1 (x.(sb_point_characterization)) |}.
   by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
   
@@ -3545,8 +3556,23 @@ HB.instance Definition _ := isSurjective.Build
 HB.instance Definition _ :=
   isInjective.Build _ _ id_gen_morphism id_injective.
 
+Definition id_gen_morphism_inv (x: generatedSubgroup gens) := {|sb_point := x.(sb_point); sb_point_characterization := (Hgroup_eq (x.(sb_point))).1 (x.(sb_point_characterization)) |}: generatedSubgroup gens'.
 
-End NielsenConstructionCorrection.
+
+Lemma idg_preserve_equiv: forall x y, x == y -> id_gen_morphism_inv x == id_gen_morphism_inv y.
+Proof.
+  by move => x y; rewrite /id_gen_morphism_inv /eq /= /subgroupby_eq /= /subgroupby_inj.
+Qed.
+
+Lemma idg_left_inverse: forall x, id_gen_morphism_inv (id_gen_morphism x) == x.
+Proof.
+  by rewrite /id_gen_morphism /id_gen_morphism_inv /eq /= /subgroupby_eq /= /subgroupby_inj.
+Qed.
+  
+HB.instance Definition _ :=
+  isIsomorphismLeftInverse.Build _ _ id_gen_morphism id_gen_morphism_inv idg_preserve_equiv idg_left_inverse.
+
+End IdIsomorphism.
 
 Section NielsenIsomorphism.
 
@@ -3914,9 +3940,15 @@ Proof.
     move => x xinU; apply/eqP; apply: NielsenR_N0; apply: xinU.
   by apply : (@NielsenSchreier_friso__canonical__EquivalenceAlgebra_Isomorphism _ v NielsenR_minimal NielsenR_norm N0').
 Qed.
-  
+
+Definition idgen: isomorphism (generatedSubgroup v) (generatedSubgroup gens).
+Proof.
+  apply: id_gen_morphism.
+  apply: NielsenR_subgroup_eq.
+Qed.
+
 (* composition of the two isomorphisms to be a proof of the Nielsen Schreier thm*)
-Definition subfree_group_iso' := id_gen_morphism \o friso'.
+Definition subfree_group_iso' := idgen \o friso'.
 
 Definition sub_freegroup_iso: isomorphism _ _ := subfree_group_iso'.
   

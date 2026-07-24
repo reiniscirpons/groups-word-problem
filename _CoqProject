@@ -14,3 +14,4 @@ theories/WellFounded.v
 theories/Preorder.v
 theories/SeqExtension.v
 theories/NielsenSchreier.v
+theories/GroupTactic.v

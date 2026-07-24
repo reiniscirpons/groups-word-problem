@@ -9,7 +9,7 @@ Import GRing.Theory.
 
 From GWP Require Import Utils Equivalence
   EquivalenceAlgebra Presentation F2 GeneratedSubgroup
-  NielsenSchreier Sizelexi Preorder.
+  NielsenSchreier Sizelexi Preorder GroupTactic.
 
 Open Scope int_scope.
 Open Scope ring_scope.
@@ -23,14 +23,24 @@ Section NielsenSchreierStallings.
 Let Sigma := ordinal 2.
 Let F2P := FGP Sigma.
 Let F2 := FreeGroup Sigma.
-Notation a := (Base 0).
-Notation b := (Base 1).
-Notation "a^-1" := (Inverse 0).
-Notation "b^-1" := (Inverse 1).
+Notation a := (Base 0: sigma F2P).
+Notation b := (Base 1: sigma F2P).
+Notation "a^-1" := (Inverse 0: sigma F2P).
+Notation "b^-1" := (Inverse 1: sigma F2P).
 
 (* NOTE(reiniscirpons): a_p = b^p a b^{-p} *)
 Definition a_encoding (p: int): F2 :=
   (power (`[b]_F2P) p) @ (`[a]_F2P) @ inv (power (`[b]_F2P) p).
+
+
+Lemma a_encodingE: forall p,
+  a_encoding p =
+    (power (`[b]_F2P) p) @
+    (power (`[a]_F2P) 1) @
+    (power (`[b]_F2P) (- p)).
+Proof.
+  by move => p; rewrite /a_encoding /= power_inv_word.
+Qed.
 
 (* NOTE(reiniscirpons): b^q is the other generator *)
 Definition b_encoding (q: int): F2 := power (`[b]_F2P) q.
@@ -63,6 +73,7 @@ Lemma apbq_projection_cons: forall h t,
     end) ++ apbq_projection t.
 Proof. by move => [|] [] [|[|//]]. Qed.
 
+
 Lemma fra_encode: forall n, freely_reduced (a_encoding n).
 Proof.
   move => n; case: (n =P 0) => [Heq0 | Hdiff Hn]; last first.
@@ -81,24 +92,98 @@ Proof.
   by rewrite /a_encoding Heq0 /= power0 -!cat_law cats0 cat0s freely_reduced_correct.
 Qed.
 
+
 Variable Hqn0: (q != 0)%N.
 Variable Hpq: (`|p|*2 <= `|q|)%N.
+
+Goal FreeGroup_norm
+  (a_encoding 3 @
+   a_encoding 3 @
+   a_encoding 3 @ [:: a; b ; b; a]) =
+  (power ([::b] \mod (FGP Sigma)) 3) @
+  (power ([::a] \mod (FGP Sigma)) 1) @
+  (power ([::b] \mod (FGP Sigma)) (-3)).
+Proof.
+  rewrite /a_encoding.
+  ltac2:(free_group_normalize ()) => /=.
+Admitted.
+
+Goal forall n, FreeGroup_norm
+  (a_encoding n @
+   a_encoding n @
+   a_encoding n @ [:: a; b ; b; a]) =
+  (power ([::b] \mod (FGP Sigma)) 3) @
+  (power ([::a] \mod (FGP Sigma)) 1) @
+  (power ([::b] \mod (FGP Sigma)) (-3)).
+Proof.
+  rewrite /a_encoding => n.
+  ltac2:(free_group_collect_powers ()) => /=.
+Admitted.
 
 Lemma apbq_minimal: @minimality_condition _ gens.
 Proof.
   have Hred: (forall w, freely_reduced w -> FreeGroup_norm w = w);
     first by move => T w /freely_reduced_correct.
+  
+  (*move => [|[|[|[|//]]]] j _ Hj Hij;*)
+  (*set xj := nth _ _ j => /=; case Hp: p => [|p'];*)
+  (*rewrite ?a_encodingE /b_encoding =>*)
+  (*        /Order.PreorderTheory.ltW /CmpOrder.cmp_sz_le /=;*)
+  (*rewrite /CmpOrder.sz;*)
+  (*rewrite ?power0 ?inv_e ?neutral_right ?neutral_left*)
+  (*        -?power_inv ?FreeGroup_norm_inv ?size_inv*)
+  (*        -[_ @ xj]cats0 cat_law*)
+  (*        [(_ @ xj) @ _]lock.*)
+  (*- rewrite /=  /xj.*)
+  (*  move: j Hj Hij {xj} => [|[|[//|[|//]]]] _ _ /=;*)
+  (*  rewrite ?a_encodingE /b_encoding.*)
+  (*-- by rewrite Hp -lock /=.*)
+  (*-- rewrite -lock Hred;*)
+  (*     first by rewrite !size_cat !(@size_power F2P) /=; lia.*)
+  (*   apply (freely_reduced_power _*)
+  (*        ([::a; b] \mod (FGP Sigma))*)
+  (*        [:: 1; (q: int)]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; by lia.*)
+  (*-- rewrite -lock -power_inv Hred;*)
+  (*     first by rewrite !size_cat !(@size_power F2P) /=; lia.*)
+  (*   apply (freely_reduced_power _*)
+  (*        ([::a; b] \mod (FGP Sigma))*)
+  (*        [:: 1; - (q: int)]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; by lia.*)
+  (*- rewrite -Hp /=  /xj.*)
+  (*  move: j Hj Hij {xj} => [|[|[//|[|//]]]] _ _ /=;*)
+  (*  rewrite ?a_encodingE /b_encoding.*)
+
+  (* TODO: to here*)
+
   move => [|[|[|[|//]]]] [|[|[|[|//]]]] _ _ // _ /=;
   rewrite /a_encoding /b_encoding /= =>
     /Order.PreorderTheory.ltW /CmpOrder.cmp_sz_le /=;
   rewrite /CmpOrder.sz /=;
-  case Hp: p Hpq => [//|p'] Hpq';
-  case Hq: q Hpq' => [//|q'] Hpq'.
+  case Hp: (`|p|)%N => [//|p'];
+  ltac2:(free_group_collect_powers ()) => /=.
+  - have: (p = 0) => [|-> //]; first by lia.
+  - have: ((- (1 * p) + 1 * p) = 0) => [|->]; first by lia.
+    rewrite power0 -[e@ _]cat_law cat0s.
+    ltac2:(free_group_collect_powers ()) => /=.
+    rewrite Hred.
+    ltac2:(free_group_collect_powers ()) => /=.
+    rewrite Hred.
+  -- by rewrite !size_cat !(@size_power F2P) /=; lia.
+  -- apply (freely_reduced_power _
+            ([::b; a; b] \mod (FGP Sigma))
+            [:: (1 * p); 1; -(1 * p)]) => [//||//|//].
+    apply/allP => m.
+    by rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; lia.
+  
+
+  try rewrite -(FreeGroup_power1 _ ([::a]: F2))
+              [power _ 1]lock.
   (* Make tactic to take care of this *)
-  rewrite -Hp !associativity -5!associativity 
+  - rewrite -Hp !associativity -5!associativity 
           [(inv _) @ _]associativity inverse_right
-          neutral_left -(FreeGroup_power1 _ ([::a]: F2))
-          -power_inv [power]lock !associativity -lock
+          neutral_left
+          -power_inv [power]lock !associativity -!lock
           -[(_ @ _) @ power _ 1]associativity
           -power_add -[power _ (- _)]cats0
           [power]lock
@@ -118,8 +203,40 @@ Proof.
     apply (freely_reduced_power _
           ([::b; a; b] \mod (FGP Sigma))
           [:: (p: int); 2; -(p: int)]) => [//||//|//].
-    apply/allP => m.
-    rewrite !in_cons => /orP [|/orP [|/orP [|//]]]; by lia.
+     by apply/allP => m; rewrite !in_cons in_nil; lia.
+  (*- rewrite power0 -!associativity inv_e !neutral_left*)
+  (*          !neutral_right -[_ @ _]cats0 cat_law*)
+  (*          -!associativity -!lock.*)
+  (*  rewrite Hred.*)
+  (*-- rewrite !size_cat !(@size_power F2P) /=; by lia.*)
+  (*-- apply (freely_reduced_power _*)
+  (*        ([:: a; b] \mod (FGP Sigma))*)
+  (*        [:: 1; (q: int)]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; by lia.*)
+  (*- rewrite -Hp -!associativity -power_inv -power_add*)
+  (*          -[_ @ _]cats0 -[power _ (- _)]cats0 !cat_law*)
+  (*          -!associativity -!lock.*)
+  (*  rewrite !Hred.*)
+  (*-- rewrite !size_cat !(@size_power F2P) /=; by lia.*)
+  (*-- apply (freely_reduced_power _*)
+  (*        ([::b; a; b] \mod (FGP Sigma))*)
+  (*        [:: (p: int); 1; -(p: int)]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; by lia.*)
+  (*-- apply (freely_reduced_power _*)
+  (*        ([::b; a; b] \mod (FGP Sigma))*)
+  (*        [:: (p: int); 1; -(p: int) + q]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; lia.*)
+  (*- rewrite power0 -!associativity inv_e -power_inv !neutral_left*)
+  (*          !neutral_right -[_ @ _]cats0 cat_law*)
+  (*          -!associativity -!lock.*)
+  (*  rewrite Hred.*)
+  (*-- rewrite !size_cat !(@size_power F2P) /=; by lia.*)
+  (*-- apply (freely_reduced_power _*)
+  (*        ([:: a; b] \mod (FGP Sigma))*)
+  (*        [:: 1; -(q: int)]) => [//||//|//].*)
+  (*   by apply/allP => m; rewrite !in_cons in_nil; by lia.*)
+
+
   (* Only 21 cases to go! *)
 Admitted.
 

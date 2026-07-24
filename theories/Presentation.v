@@ -383,6 +383,10 @@ Proof.
   by rewrite powerS power0 -cat_law cats0.
 Qed.
 
+Lemma FreeGroup_inv1 (c: sigma P):
+  inv ([:: c] \mod P) = [:: invl c].
+Proof. done. Qed.
+
 Lemma power_rev1 c (x: int):
   rev (power ([::c]: G) x) = power ([::c]: G) x.
 Proof.

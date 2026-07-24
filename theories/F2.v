@@ -154,6 +154,7 @@ Lemma FreeGroup_invlK : forall c: sigma FGP,
   FreeGroup_invl (FreeGroup_invl c) = c.
 Proof. by case. Qed.
 
+
 Lemma FreeGroup_invl_left : forall c: sigma FGP,
   [:: c; FreeGroup_invl c] \mod FGP == [::] \mod FGP.
 Proof.

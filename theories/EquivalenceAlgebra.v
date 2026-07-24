@@ -607,6 +607,13 @@ coercion _ T {{ Type }} ExpectedType Solution :-
    I don't think it can be done via the vanilla Rocq coercions, and doing so via a coercion hook
    seems difficult without triggering an infinite coercion chain. *)
 
+(* TODO(reiniscirpons): Dont do this, the issue is the parametricity,
+  if we have G as a parameter for the coercion this will cause bad bad things
+  to happen.
+  Coercion subgroup_to_group {G} {H: subgroup G}:
+    H -> G := @subgroup_inj G H.
+*)
+
 Definition in_subgroup {G: group} (K: subgroup G) (x: G) :=
   exists x': K, subgroup_inj x' == x.
 Notation "x '\insubgroup' K" := (in_subgroup K x) (at level 10).
@@ -751,11 +758,11 @@ Variable P: subgroup_characterizer G.
 
 #[projections(primitive)]
 Record subgroup_by := {
-  sb_point: G;
+  sb_point :> G;
   sb_point_characterization: P sb_point;
 }.
 
-Definition subgroupby_inj (x: subgroup_by): G := x.(sb_point).
+Definition subgroupby_inj (x: subgroup_by): G := x.
 
 Definition subgroupby_eq (x y: subgroup_by) := (subgroupby_inj x) == (subgroupby_inj y).
 Lemma subgroupby_eq_refl: forall x, subgroupby_eq x x.

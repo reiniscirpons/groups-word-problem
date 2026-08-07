@@ -1,107 +1,114 @@
-From Stdlib Require Import Relations RelationClasses Ensembles Morphisms.
+From Stdlib Require Import Relations Morphisms.
 From HB Require Import structures.
 Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import monoid.
 
 Open Scope group_scope.
 
-(* TODO(reiniscirpons):
 
-   Should we use the mathcomp-analysis classical_sets library?
-   It builds up a sizeable library of set theory in the style
-   of mathcomp, but with Prop instead of bool, which is what 
-   we (generally) need.
+(* NOTE: Subsets are the wrong primitive for quotients of monoids.
+   This is different to groups, where subsets work to model
+   cosets for quotients.
 
-   However, using this library means accepting propext,
-   funext and CID (i.e. every existential prop allows us to
-   find its witness) axioms.
+   The problem is precisely that, unlike cosets, a single
+   equivalence class of a congruence does not necessarily
+   determine the whole congruence. On the other hand, if we
+   are given a coset C, then we can recover the group that
+   made it by computing C*g^-1 for any element g in C.
 
-   Maybe not in the first instance?
+   I believe the correct primitive is pointed relations,
+   i.e. a tuple (u, rho) consisting of an element u in U and a
+   relation rho on U, i.e. U * (U -> U -> Prop).
+   Define multiplication componentwise, with some reasonable
+   definition of multiplying two relations (see below).
+   Then, for a given rho, we just instantiate the elements of
+   -/rho as precisely those of the form (u, rho).
 *)
+Reserved Notation "A ~* B"
+  (at level 48, left associativity, format "A  ~*  B").
+Reserved Notation "A *~ B"
+  (at level 48, left associativity, format "A  *~  B").
+Reserved Notation "A \approx B"
+  (at level 70, no associativity).
+Reserved Notation "A ≈ B"
+  (at level 70, no associativity, format "A ≈ B").
 
-(* NOTE(reiniscirpons): Duplicate notations from mathcomp, but
-   capitalize to indicate they are Prop variants. *)
-Notation "{ 'Pred' U }" := (Ensemble U)
-  (at level 0, format "{ 'Pred'  U }").
-Notation "x \In A" := (In _ A x)
-  (at level 70, no associativity, format "'[hv' x '/ '  \In  A ']'").
-Notation "A =I B" := (Same_set _ A B)
-  (at level 70, no associativity,
-  format "'[hv' A '/ '  =I  B ']'").
-Notation "A :/\: B" := (Intersection _ A B)
-  (at level 48, left associativity, format "A  :/\:  B").
-Notation "A \Intersects B" := (Inhabited _ (A :/\: B))
-  (at level 70, no associativity,
-  format "A  \Intersects  B").
-Notation "{ 'Subset' A <= B }" := (Included _ A B)
-  (at level 0, A, B at level 69,
-  format "'[hv' { 'Subset'  A '/ '  <=  B } ']'").
-Notation "[ 'Set' u ]" := (Singleton _ u)
-  (u at level 99, format "[ 'Set'  u ]").
+(* A pointed relation is simply a relation together with
+    a point in that relation. *)
+Definition pointed_relation (U: Type) := (U * relation U)%type.
 
+Section PointedRelation.
+  Context {U: semigroupType}.
 
-Instance SameSetReflexivity U : Reflexive (Same_set U).
-Proof. by move => A; split. Qed.
-Instance SameSetSymmetry U: Symmetric (Same_set U).
-Proof. by move => A B []; split. Qed.
-Global Instance IncludedTransitivity U : Transitive (Included U).
-Proof. by move => A B C HAB HBC x /HAB /HBC. Qed.
-Instance SameSetTransitivity U : Transitive (Same_set U).
-Proof.
-  move => A B C [HAB HBA] [HBC HCB]; split;
-  by apply transitivity with B.
-Qed.
-Global Instance SameSetEquivalence U: Equivalence (Same_set U) | 10 := { }.
+  (* NOTE: If the underlying type is a monoid (or semigroup),
+     we can define multiplication on pointed relations.
+     There are many reasonable multiplications we could use:
 
-Section MonoidPred.
-(* Monoid of propositional predicate defined subsets of a
-   base monoid U. *)
-Context {U: monoidType}.
+     1. (u, rho)*(v, sigma) = (u*v, rho \vee sigma),
+        where vee is the congruence join operation, i.e.
+        rho \vee sigma is the least congruence containing
+        both rho and sigma. This is in some sense the most
+        mathematically accurate definition.
+        Accordingly, if we try to multiply two elements
+        such that rho >= sigma, i.e. U/rho is a smaller quotient
+        than U/sigma, then the product will drop down to U/rho.
+        So e.g. U * U/rho = U/rho for all rho in this case.
 
-Definition Pred_mul (A B: {Pred U}): {Pred U} :=
-  fun u => exists v w, (v \In A) /\ (w \In B) /\ u = v * w.
+        The main drawback: the congruence join is a fairly
+        difficult object to reason about, and could lead
+        to some pains later on.
 
-Local Notation "A :*: B" := (Pred_mul A B)
-  (at level 24, left associativity): group_scope.
+     2. (u, rho)*(v, sigma) = (u*v, rho \cap sigma), where
+        \cap is the intersection operation. Here we get
+        the opposite effect of the above: if rho >= sigma
+        then the product will ascend to sigma.
+        So e.g. U * U/rho = U with this convention.
+        The intersection is a much simpler object to reason about.
+        However, we still have a drawback that we need to
+        reason using setoid equality (since prop intersection is
+        is only associative in the weak sense, i.e.
+        <-> instead of =). And furthermore, always dropping
+        above is problematic, since we sometimes want to
+        stay in the lower level.
 
-Lemma Pred_mulgA: forall A B C,
-  A :*: (B :*: C) =I A :*: B :*: C.
-Proof.
-  move => A B C; split => u.
-  - case => [v [w [Hv [[x [y [Hx [Hy Hw]]]] Hu]]]].
-    exists (v * x); exists y.
-    split;
-      last by split => [//|]; rewrite -mulgA -Hw.
-    by exists v; exists x.
-  - case => [v [w [[x [y [Hx [Hy Hv]]]] [Hw Hu]]]].
-    exists x; exists (y * w).
-    split => [//|]; split;
-      last by rewrite mulgA -Hv.
-    by exists y; exists w.
-Qed.
+     3. Have two operations for left and right multiplication,
+        respectively. I.e.
+          (u, rho) ~* (v, sigma) = (u * v, rho)
+          (u, rho) *~ (v, sigma) = (u * v, sigma)
+        In this manner, we can always choose which
+        of the two monoids we drop down to.
+        With this convention U ~* U/rho = U and
+        U *~ U/rho = U/rho. Its also pretty simple to
+        implement and as a bonus associativity holds without
+        setoid. This is the approach we take below.
+        Note that when rho = sigma, both products coincide.
+     *)
+  Definition pointed_relation_lmul (A B: pointed_relation U):
+    pointed_relation U:=
+    match A, B with
+    | (u, rho), (v, sigma) => (u * v, rho)
+    end.
 
-Lemma Pred_mulg1: forall A,
-  A :*: [Set 1] =I A.
-Proof.
-  move => A; split => [u [v [w [Hv [[] ->]]]]|u Hu].
-  - by rewrite gsimp.
-  - exists u; exists 1; split => [//|]; split => [//|].
-    by rewrite gsimp.
-Qed.
+  Definition pointed_relation_rmul (A B: pointed_relation U):
+    pointed_relation U:=
+    match A, B with
+    | (u, rho), (v, sigma) => (u * v, sigma)
+    end.
 
-Lemma Pred_mul1g: forall A,
-  [Set 1] :*: A =I A.
-Proof.
-  move => A; split => [u [v [w [[] [Hw ->]]]]|u Hu].
-  - by rewrite gsimp.
-  - exists 1; exists u;
-    split => [//|]; split => [//|];
-    by rewrite gsimp.
-Qed.
-End MonoidPred.
-Notation "A :*: B" := (Pred_mul A B)
-  (at level 24, left associativity): group_scope.
+  Lemma pointed_relation_lmulA: associative pointed_relation_lmul.
+  Proof.
+    move => [u rho] [v sigma] [w tau] /=.
+    by rewrite mulgA.
+  Qed.
 
+  Lemma pointed_relation_rmulA: associative pointed_relation_rmul.
+  Proof.
+    move => [u rho] [v sigma] [w tau] /=.
+    by rewrite mulgA.
+  Qed.
+End PointedRelation.
+Notation "A ~* B" := (pointed_relation_lmul A B).
+Notation "A *~ B" := (pointed_relation_rmul A B).
 
 (* NOTE(reiniscirpons): mirrors Corelib.Classes.RelationClasses *)
 Section CongruenceRelationClass.
@@ -168,143 +175,97 @@ Proof.
   - by exact: congr_extl.
   - by exact: congr_extr.
 Qed.
-
 End CongruenceRelation.
+Arguments congruenceP {_} _.
 
 #[global]
-Create HintDb monoid_sets.
+Create HintDb congruences.
 
 #[global]
-Hint Unfold left_extensional right_extensional: monoid_sets.
+Hint Unfold left_extensional right_extensional: congruences.
 
 #[global]
 Hint Resolve Build_congruence congr_refl congr_trans
-  congr_sym congr_extl congr_extr: monoid_sets.
+  congr_sym congr_extl congr_extr: congruences.
 
 Section CongruenceRelationQuotient.
 Context {U: monoidType}.
 Variable rho: relation U.
 
-(* NOTE(reiniscirpons): Sadly we cannot improve the below
-   requirement that A is a subset of rho u. Ideally we would
-   want this to be set equivalence =I, but this is not
-   possible.
-
-   Indeed, consider the monoid on {0, 1, a, b} defined by
-   the following multiplication table
-
-   *|1ab0
-   ------
-   1|1ab0
-   a|abb0
-   b|bbb0
-   0|0000
-   
-   Then the equivalence rho with classes {1}, {a} and {b, 0} is a
-   congruence relation whose quotient is a monoid.
-   But the product of the class {a} with itself {a} is
-   {a} * {a} = {b}, which is not a congruence class.
-
-   So in fact, the best we can do is to require that the
-   product is a subset of a congruence class.
-*)
-Definition congruence_range: {Pred {Pred U}} :=
-  fun A => exists u, {Subset A <= rho u}.
+Definition congruence_range (A: pointed_relation U): Prop := 
+  snd A = rho.
+Arguments congruence_range / _.
 
 Record congruence_class_of : Type :=
   CongruenceClass {
-    pred_of_class :> {Pred U};
-    _ : congruence_range pred_of_class
+    pointed_relation_of_class :> pointed_relation U;
+    _ : congruence_range pointed_relation_of_class
   }.
 Arguments CongruenceClass {_} _.
 
+Definition congruence_class_equiv (A B: congruence_class_of) :=
+  rho
+    (fst (pointed_relation_of_class A))
+    (fst (pointed_relation_of_class B)).
+
+Notation "A \approx B" :=
+  (congruence_class_equiv A B) (only parsing).
+Notation "A ≈ B" := 
+  (congruence_class_equiv A B) (only printing, format "A  ≈  B").
+
 Hypothesis Hcong: congruence rho.
 
-Lemma congruence_class_one_proof : congruence_range [Set 1].
-Proof.
-  (* TODO(reiniscirpons): Can we make Hcong automatically
-     register rho as a Congruence instance without this line? *)
-  move/congruenceP: Hcong => Hcong'.
-  (* TODO(reiniscirpons): Can we make it so that \In auto
-     expands when needed? *)
-  exists 1 => x [] {x}.
-  (* TODO(reiniscirpons): Can we make it so that *)
-  by rewrite /(_ \In _); reflexivity.
-Qed.
+Lemma congruence_class_one_proof : congruence_range (1, rho).
+Proof. done. Qed.
 
 Definition congruence_class_one :=
   CongruenceClass congruence_class_one_proof.
-Local Notation "1_" := congruence_class_one.
 
+Notation "1" := congruence_class_one.
+
+(* NOTE: This choice subtly forces left actions. *)
 Lemma congruence_range_mul: forall A B : congruence_class_of,
-  congruence_range (A :*: B).
+  congruence_range (A ~* B).
 Proof.
-  (* TODO(reiniscirpons): Can we make Hcong automatically
-     register rho as a Congruence instance without this line? *)
-  move/congruenceP: Hcong => Hcong'.
-  move => [A /= [u Hu]] [B /= [v Hv]].
-  exists (u * v) => w [x [y [/Hu Hx [/Hv Hy -> {w}]]]].
-  (* TODO(reiniscirpons): Can we make it so that \In auto
-     expands when needed? *)
-  rewrite /(_ \In _); transitivity (u * y).
-  - by apply congr_extl.
-  - by apply congr_extr.
+  by move => [[u sigma] /= ->] [[v tau] /= _].
 Qed.
 
 Definition congruence_class_mul A B :=
   CongruenceClass (congruence_range_mul A B).
-Local Notation "A *_ B" := (congruence_class_mul A B)
-  (at level 24, left associativity).
+
+Notation "A * B" := (congruence_class_mul A B).
 
 Lemma congruence_class_mulgA: forall A B C,
-  A *_ (B *_ C) =I A *_ B *_ C.
+  A * (B * C) \approx A * B * C.
 Proof.
-  by move => A B C; apply Pred_mulgA.
+  (* TODO(reiniscirpons): why do I need to do this,
+     why can't Rocq just automatically figure this out? *)
+  move/congruenceP: Hcong => Hcong'.
+  move => [[u sigma] /= Hs] [[v tau] /= Ht] [[w ypsilon] /= Hy].
+  (* TODO(reiniscirpons): Why do I need to call reflexivity here?
+     Shouldn't the "by" tactic close it? *)
+  by rewrite /(_ \approx _) /= mulgA; reflexivity.
 Qed.
 
 Lemma congruence_class_mulg1: forall A,
-  A *_ 1_ =I A.
+  A * 1 \approx A.
 Proof.
-  by move => A; apply Pred_mulg1.
+  move/congruenceP: Hcong => Hcong'.
+  move => [[u sigma Hu] /=];
+  by rewrite /(_ \approx _) /= mulg1; reflexivity.
 Qed.
 
 Lemma congruence_class_mul1g: forall A,
-  1_ *_ A =I A.
+  A * 1 \approx A.
 Proof.
-  by move => A; apply Pred_mul1g.
+  move/congruenceP: Hcong => Hcong'.
+  move => [[u sigma Hu] /=];
+  by rewrite /(_ \approx _) /= mulg1; reflexivity.
 Qed.
-
-(* TODO(reiniscirpons): This gives us a monoid structure, but what
-   about equality? We cant use =I since, as we remarked above,
-   we may shrink the equivalence class when multiplying.
-  
-   I was thingking maybe A \Intersects B, i.e. to consider
-   two sets equal if they have non-empty intersection, but this
-   is also no good, since its possible to have two disjoint
-   subsets of an equivalence class of rho.
-
-   We don't want to use rho precisely because we want the
-   objects to have equality independent of the underlying relation.
-*)
-
-(* TODO(reiniscirpons): I conclude that subsets are the wrong
-   primitive for monoids.
-
-   I think the correct primitive is pointed relations,
-   i.e. a tuple (u, rho) consisting of an element u in U and a
-   relation rho on U, i.e. U * (U -> U -> Prop).
-   Define multiplication componentwise, using intersection of
-   relations as the operation on relations so
-   (u, rho) * (v, nu) = (u * v, rho /\ nu).
-   Equality operator is given by checking if the elements belong
-   to the intersection, i.e. (u, rho) =R (v, nu) if and only if
-   (u, v) in (rho /\ nu), i.e. if both rho u v and nu u v hold
-   (need to flip one of the relations for this to be symmetric, but
-   maybe it doesn't matter?).
-
-   Then, for a given rho, we just instantiate the elements of
-   -/rho as precisely those of the form (u, rho), and reap the
-   benefits.
-*)
-
 End CongruenceRelationQuotient.
+Notation "A \approx B" :=
+  (congruence_class_equiv A B) (only parsing).
+Notation "A ≈ B" := 
+  (congruence_class_equiv A B) (only printing, format "A  ≈  B").
+(* TODO(reiniscirpons): canonical instances for base group,
+   left, right multiplication etc. *)

@@ -1,10 +1,17 @@
-From Stdlib Require Import Relations Morphisms.
+From Stdlib Require Import Relations Morphisms Ensembles.
 From HB Require Import structures.
 Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import monoid.
 
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
 Open Scope group_scope.
 
+Declare Scope setoid_group_scope.
+Delimit Scope setoid_group_scope with sg.
+Local Open Scope setoid_group_scope.
 
 (* NOTE: Subsets are the wrong primitive for quotients of monoids.
    This is different to groups, where subsets work to model
@@ -31,11 +38,20 @@ Reserved Notation "A *~ B"
 Reserved Notation "A \approx B"
   (at level 70, no associativity).
 Reserved Notation "A ≈ B"
-  (at level 70, no associativity, format "A ≈ B").
+  (at level 70, no associativity, format "A  ≈  B").
+Reserved Notation "{ 'Set' T }"
+  (at level 0, format "{ 'Set'  T }").
+Reserved Notation "x \In A"
+  (at level 70, no associativity, format "'[hv' x '/ '  \In  A ']'").
+Reserved Notation "[ x ]_ rho"
+  (at level 0, format "[ x ]_ rho").
 
 (* A pointed relation is simply a relation together with
     a point in that relation. *)
-Definition pointed_relation (U: Type) := (U * relation U)%type.
+Record pointed_relation (U: Type) := PointedRelation {
+  relation_of: relation U;
+  point_of: U
+}.
 
 Section PointedRelation.
   Context {U: semigroupType}.
@@ -84,15 +100,17 @@ Section PointedRelation.
         Note that when rho = sigma, both products coincide.
      *)
   Definition pointed_relation_lmul (A B: pointed_relation U):
-    pointed_relation U:=
+    pointed_relation U :=
     match A, B with
-    | (u, rho), (v, sigma) => (u * v, rho)
+    | PointedRelation rho u, PointedRelation sigma v =>
+      PointedRelation rho (u * v)
     end.
 
   Definition pointed_relation_rmul (A B: pointed_relation U):
-    pointed_relation U:=
+    pointed_relation U :=
     match A, B with
-    | (u, rho), (v, sigma) => (u * v, sigma)
+    | PointedRelation rho u, PointedRelation sigma v =>
+      PointedRelation sigma (u * v)
     end.
 
   Lemma pointed_relation_lmulA: associative pointed_relation_lmul.
@@ -106,33 +124,44 @@ Section PointedRelation.
     move => [u rho] [v sigma] [w tau] /=.
     by rewrite mulgA.
   Qed.
+
+  Definition pointed_relation_equiv (A B: pointed_relation U): Prop :=
+    (forall u v, relation_of A u v <-> relation_of B u v) /\
+    (relation_of A (point_of A) (point_of B)).
+
 End PointedRelation.
 Notation "A ~* B" := (pointed_relation_lmul A B).
 Notation "A *~ B" := (pointed_relation_rmul A B).
+Notation "A \approx B" :=
+  (pointed_relation_equiv A B) (only parsing).
+Notation "A ≈ B" := 
+  (pointed_relation_equiv A B) (only printing, format "A  ≈  B").
+
+Notation "[ u ]_ rho" := (PointedRelation rho u) : setoid_group_scope.
 
 (* NOTE(reiniscirpons): mirrors Corelib.Classes.RelationClasses *)
 Section CongruenceRelationClass.
 
-Context {U: monoidType}.
+  Context {U: monoidType}.
 
-Class LeftExtensional (rho : relation U) :=
-  left_extensionality:
-    forall z x y, rho x y -> rho (z * x) (z * y).
+  Class LeftExtensional (rho : relation U) :=
+    left_extensionality:
+      forall z x y, rho x y -> rho (z * x) (z * y).
 
-Class RightExtensional (rho : relation U) :=
-  right_extensionality:
-  forall z x y, rho x y -> rho (x * z) (y * z).
+  Class RightExtensional (rho : relation U) :=
+    right_extensionality:
+    forall z x y, rho x y -> rho (x * z) (y * z).
 
-Class Congruence (rho : relation U) : Prop := {
-  #[global] Congruence_Reflexive :: Reflexive rho ;
-  #[global] Congruence_Symmetric :: Symmetric rho ;
-  #[global] Congruence_Transitive :: Transitive rho ;
-  #[global] Congruence_LeftExtensional :: LeftExtensional rho ;
-  #[global] Congruence_RightExtensional :: RightExtensional rho ;
-}.
+  Class Congruence (rho : relation U) : Prop := {
+    #[global] Congruence_Reflexive :: Reflexive rho ;
+    #[global] Congruence_Symmetric :: Symmetric rho ;
+    #[global] Congruence_Transitive :: Transitive rho ;
+    #[global] Congruence_LeftExtensional :: LeftExtensional rho ;
+    #[global] Congruence_RightExtensional :: RightExtensional rho ;
+  }.
 
-Global Instance Congruence_Equivalence {R}
-  `(E: Congruence R) : Equivalence R | 10 := { }.
+  Global Instance Congruence_Equivalence {R}
+    `(E: Congruence R) : Equivalence R | 10 := { }.
 
 End CongruenceRelationClass.
 
@@ -148,33 +177,33 @@ Qed.
 
 (* NOTE(reiniscirpons): mirrors Corelib.Relations.Relation_Definitions *)
 Section CongruenceRelation.
-Import Relation_Definitions.
+  Import Relation_Definitions.
 
-Context {U: monoidType}.
-Variable rho: relation U.
+  Context {U: monoidType}.
+  Variable rho: relation U.
 
-Definition left_extensional: Prop :=
-  forall z x y, rho x y -> rho (z * x) (z * y).
+  Definition left_extensional: Prop :=
+    forall z x y, rho x y -> rho (z * x) (z * y).
 
-Definition right_extensional: Prop :=
-  forall z x y, rho x y -> rho (x * z) (y * z).
+  Definition right_extensional: Prop :=
+    forall z x y, rho x y -> rho (x * z) (y * z).
 
-Record congruence : Prop :=
-  { congr_refl : reflexive U rho;
-    congr_trans : transitive U rho;
-    congr_sym : symmetric U rho;
-    congr_extl: left_extensional;
-    congr_extr: right_extensional}.
+  Record congruence : Prop :=
+    { congr_refl : reflexive U rho;
+      congr_trans : transitive U rho;
+      congr_sym : symmetric U rho;
+      congr_extl: left_extensional;
+      congr_extr: right_extensional}.
 
-Lemma congruenceP: congruence -> Congruence rho.
-Proof.
-  move => Hcong; split.
-  - by exact: congr_refl.
-  - by exact: congr_sym.
-  - by exact: congr_trans.
-  - by exact: congr_extl.
-  - by exact: congr_extr.
-Qed.
+  Lemma congruenceP: congruence -> Congruence rho.
+  Proof.
+    move => Hcong; split.
+    - by exact: congr_refl.
+    - by exact: congr_sym.
+    - by exact: congr_trans.
+    - by exact: congr_extl.
+    - by exact: congr_extr.
+  Qed.
 End CongruenceRelation.
 Arguments congruenceP {_} _.
 
@@ -188,12 +217,14 @@ Hint Unfold left_extensional right_extensional: congruences.
 Hint Resolve Build_congruence congr_refl congr_trans
   congr_sym congr_extl congr_extr: congruences.
 
+Notation "{ 'Set' T }" := (Ensemble T).
 Section CongruenceRelationQuotient.
 Context {U: monoidType}.
 Variable rho: relation U.
+Hypothesis Hcong: congruence rho.
 
 Definition congruence_range (A: pointed_relation U): Prop := 
-  snd A = rho.
+  relation_of A = rho.
 Arguments congruence_range / _.
 
 Record congruence_class_of : Type :=
@@ -203,37 +234,38 @@ Record congruence_class_of : Type :=
   }.
 Arguments CongruenceClass {_} _.
 
-Definition congruence_class_equiv (A B: congruence_class_of) :=
-  rho
-    (fst (pointed_relation_of_class A))
-    (fst (pointed_relation_of_class B)).
+Lemma relation_of_class: forall (A: congruence_class_of),
+  relation_of A = rho.
+Proof. by case. Qed.
 
-Notation "A \approx B" :=
-  (congruence_class_equiv A B) (only parsing).
-Notation "A ≈ B" := 
-  (congruence_class_equiv A B) (only printing, format "A  ≈  B").
-
-Hypothesis Hcong: congruence rho.
-
-Lemma congruence_class_one_proof : congruence_range (1, rho).
+Lemma congruence_class_one_proof : congruence_range (PointedRelation rho 1).
 Proof. done. Qed.
 
 Definition congruence_class_one :=
   CongruenceClass congruence_class_one_proof.
 
-Notation "1" := congruence_class_one.
+Notation "1" := congruence_class_one: setoid_group_scope.
+
+Lemma point_of_one: point_of 1 = 1%g.
+Proof. done. Qed.
 
 (* NOTE: This choice subtly forces left actions. *)
 Lemma congruence_range_mul: forall A B : congruence_class_of,
   congruence_range (A ~* B).
 Proof.
-  by move => [[u sigma] /= ->] [[v tau] /= _].
+  by move => [[sigma u] /= ->] [[tau v] /= _].
 Qed.
 
 Definition congruence_class_mul A B :=
   CongruenceClass (congruence_range_mul A B).
 
-Notation "A * B" := (congruence_class_mul A B).
+Notation "A * B" := (congruence_class_mul A B): setoid_group_scope.
+
+Lemma point_of_mul: forall A B,
+  point_of (A * B) = ((point_of A) * (point_of B))%g.
+Proof. 
+  by move => [[sigma u /=] Hu] [[]].
+Qed.
 
 Lemma congruence_class_mulgA: forall A B C,
   A * (B * C) \approx A * B * C.
@@ -241,31 +273,68 @@ Proof.
   (* TODO(reiniscirpons): why do I need to do this,
      why can't Rocq just automatically figure this out? *)
   move/congruenceP: Hcong => Hcong'.
-  move => [[u sigma] /= Hs] [[v tau] /= Ht] [[w ypsilon] /= Hy].
-  (* TODO(reiniscirpons): Why do I need to call reflexivity here?
-     Shouldn't the "by" tactic close it? *)
-  by rewrite /(_ \approx _) /= mulgA; reflexivity.
+  move => A B C; split => [u v|].
+  - by rewrite !relation_of_class.
+    (* TODO(reiniscirpons): Why do I need to call reflexivity here?
+      Shouldn't the "by" tactic close it? *)
+  - by rewrite relation_of_class !point_of_mul mulgA; reflexivity.
 Qed.
 
 Lemma congruence_class_mulg1: forall A,
   A * 1 \approx A.
 Proof.
   move/congruenceP: Hcong => Hcong'.
-  move => [[u sigma Hu] /=];
-  by rewrite /(_ \approx _) /= mulg1; reflexivity.
+  move => A; split => [u v|].
+  - by rewrite !relation_of_class.
+  - rewrite relation_of_class point_of_mul mulg1;
+    by reflexivity.
 Qed.
 
 Lemma congruence_class_mul1g: forall A,
-  A * 1 \approx A.
+  1 * A \approx A.
 Proof.
   move/congruenceP: Hcong => Hcong'.
-  move => [[u sigma Hu] /=];
-  by rewrite /(_ \approx _) /= mulg1; reflexivity.
+  move => A; split => [u v|].
+  - by rewrite !relation_of_class.
+  - rewrite relation_of_class point_of_mul mul1g;
+    by reflexivity.
 Qed.
+
+Variable Q: {Set U}.
+
+Definition quotient: {Set congruence_class_of} :=
+  fun A => exists u, Q u /\ (relation_of A (point_of A) u).
+
 End CongruenceRelationQuotient.
-Notation "A \approx B" :=
-  (congruence_class_equiv A B) (only parsing).
-Notation "A ≈ B" := 
-  (congruence_class_equiv A B) (only printing, format "A  ≈  B").
 (* TODO(reiniscirpons): canonical instances for base group,
    left, right multiplication etc. *)
+Arguments quotient {_} _.
+Notation "Q / rho" := (quotient rho Q) : setoid_group_scope.
+Notation "1" := congruence_class_one: setoid_group_scope.
+Notation "A * B" := (congruence_class_mul A B): setoid_group_scope.
+
+Notation "x \In A" := (In _ A x).
+Section Submonoids.
+  Context {U: monoidType}.
+  Variable M: {Set U}.
+  Variable rho: relation U.
+
+  Definition mulg_closed: Prop :=
+    forall (u v: U), u \In M -> v \In M -> (u * v)%g \In M.
+
+  Definition mul_closed (Q: {Set (congruence_class_of rho)}): Prop :=
+    forall (A B: congruence_class_of rho), A \In Q -> B \In Q -> A * B \In Q.
+
+  Lemma quotient_mul_closed:
+    mulg_closed ->
+    congruence rho ->
+    mul_closed (M / rho).
+  Proof.
+    move => HM /congruenceP Hrho A B [u [HMu HAu]] [v [HMv HBv]].
+    exists (u * v)%g; split.
+    - by apply HM.
+    - rewrite relation_of_class in HAu;
+      rewrite relation_of_class in HBv.
+      by rewrite relation_of_class point_of_mul HAu HBv; reflexivity.
+  Qed.
+End Submonoids.

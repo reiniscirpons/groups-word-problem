@@ -1,86 +1,114 @@
 From HB Require Import structures.
-Require Import ssreflect ssrfun RelationClasses Setoid Morphisms.
+Require Import ssreflect ssrbool ssrfun RelationClasses Morphisms.
 
-(* TODO(reiniscirpons): How does this differ from eqType? *)
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
 
-(* Types with an equality, noted `==`.
-   
-   All types have an equality in Rocq: `eq`.
-   However this equality type is essentially definitional equality,
-   while our `==` can be any equivalence relation. This is useful to
-   represent quotiented types. *)
-HB.mixin Record hasEq T := {
-  eq : T -> T -> Prop;
+Reserved Notation "x \approx y"
+  (at level 70, no associativity).
+Reserved Notation "x ≈ y"
+  (at level 70, no associativity, format "x  ≈  y").
+Reserved Notation "x \approx y :> T"
+  (at level 70, no associativity).
+Reserved Notation "x ≈ y :> T"
+  (at level 70, no associativity, format "x  ≈  y  :>  T").
 
-  refl : forall x, eq x x;
-  symm : forall x y, eq x y -> eq y x;
-  trans : forall x y z, eq x y -> eq y z -> eq x z;
+Declare Scope setoid_scope.
+Delimit Scope setoid_scope with S.
+Local Open Scope setoid_scope.
+
+(* NOTE: Setoids are sometimes defined in terms of their apartness relation,
+   such is the approach taken e.g. in CoRN. I believe this has to do with
+   the fact that for the real numbers, there is a simple witness of
+   apartness, but not necessarily a simple witness of equality.
+
+   We are in the opposite case: equivalence modulo a congruence has a simple
+   positive witness: the elementary sequence, but there is no simple negative
+   witness in general. So we take the equivalence as the basic relation
+   defining a setoid.
+*)
+
+HB.mixin Record hasEquiv T := {
+  equiv : T -> T -> Prop;
+
+  equiv_refl : forall x, equiv x x;
+  equiv_sym : forall x y, equiv x y -> equiv y x;
+  equiv_trans : forall x y z, equiv x y -> equiv y z -> equiv x z;
 }.
-#[short(type = "equivType")]
-HB.structure Definition EqProp := { T of hasEq T }.
+#[short(type = "setoidType")]
+HB.structure Definition Setoid := { T of hasEquiv T }.
 
-Hint Resolve refl : core.
+Bind Scope setoid_scope with Setoid.sort.
 
-Infix "==" := eq (at level 70, no associativity).
-Notation "x == y :> T" := ((x: T) == (y: T)) (at level 70, no associativity).
+Local Notation "x \approx y" := (equiv x y)
+  (only parsing): setoid_scope.
+Local Notation "x ≈ y" := (x \approx y)
+  (only printing) : setoid_scope.
+Local Notation "x \approx y :> T" := ((x: T) \approx (y: T))
+  (only parsing): setoid_scope.
+Local Notation "x ≈ y :> T" := (x \approx y :> T)
+  (only printing) : setoid_scope.
 
-(* Defining Rocq relation classes.
-   This enables the `reflexivity`/`symmetry`/`transitivity` tactics to work with `eqType`s. *)
+Hint Resolve equiv_refl equiv_sym equiv_trans : core.
+
 Section EqEquivalence.
-Variable T: equivType.
-Let eq := @eq T.
+Variable sT: setoidType.
+Let equiv := @equiv sT.
 
-Instance EqReflexivity : Reflexive eq.
-Proof. exact: hasEq.refl. Qed.
-Instance EqSymmetry : Symmetric eq.
-Proof. exact: hasEq.symm. Qed.
-Instance EqTransitivity : Transitive eq.
-Proof. exact: hasEq.trans. Qed.
-Instance EqEquivalence : Equivalence eq := {}.
+Instance EquivReflexivity : Reflexive equiv.
+Proof. exact: equiv_refl. Qed.
+Instance EquivSymmetry : Symmetric equiv.
+Proof. exact: equiv_sym. Qed.
+Instance EquivTransitivity : Transitive equiv.
+Proof. exact: equiv_trans. Qed.
+Instance EquivEquivalence : Equivalence equiv := {}.
 End EqEquivalence.
-Existing Instance EqReflexivity.
-Existing Instance EqSymmetry.
-Existing Instance EqTransitivity.
-Existing Instance EqEquivalence.
+Existing Instance EquivReflexivity.
+Existing Instance EquivSymmetry.
+Existing Instance EquivTransitivity.
+Existing Instance EquivEquivalence.
 
-(* TODO(reiniscirpons): Is this already part of the library? *)
-HB.mixin Record isSetoidMorphism (S T: equivType) (f: S -> T) := {
-  morphism_preserve_equiv: forall x y, x == y -> f x == f y;
+
+HB.mixin Record isSetoidMorphism (S T: setoidType) (f: S -> T) := {
+  equivfM: forall x y,
+    x \approx y -> f x \approx f y;
 }.
 #[short(type="setoidMorphism")]
-HB.structure Definition SetoidMorphism (G H: equivType) := { f of isSetoidMorphism G H f }.
+HB.structure Definition SetoidMorphism (G H: setoidType) :=
+  { f of isSetoidMorphism G H f }.
 
 Section ProperMorphism.
-Context {S T: equivType}.
+Context {S T: setoidType}.
 Variable f: setoidMorphism S T.
 
-(* NOTE(reiniscirpons): *)
-(* Ad-hoc polymorphism resolution *)
-(* 
-   (C t1), search C in known instances of Proper
-   not found, then tactic tries to decompose into
-   succession of proper Terms. Composition might
-   require other relations.
-   C1, C2 should be known as proper constants, if
-   not more decomposition. If no solution found then
-   error. Otherwise compose proofs.
-*)
-Global Instance : Proper (eq ==> eq) f.
-Proof. exact: morphism_preserve_equiv. Qed.
+Instance SetoidMorphismProper: Proper (equiv ==> equiv) f.
+Proof. exact: equivfM. Qed.
 End ProperMorphism.
+Existing Instance SetoidMorphismProper.
 
 Section SetoidMorphismComp.
-
-Context {A B C: equivType}.
+Context {A B C: setoidType}.
 Variable (f: setoidMorphism A B).
 Variable (g: setoidMorphism B C).
 
-Lemma comp_preserve_equiv :
-  forall x y, x == y -> (g \o f) x == (g \o f) y.
+Lemma comp_equiv: forall x y,
+  x \approx y -> (g \o f) x \approx (g \o f) y.
 Proof.
   move => x y H;
-  by apply /morphism_preserve_equiv /morphism_preserve_equiv.
+  by apply /equivfM /equivfM.
 Qed.
 
-HB.instance Definition _ := isSetoidMorphism.Build A C (g \o f) comp_preserve_equiv.
+HB.instance Definition _ :=
+  isSetoidMorphism.Build A C (g \o f) comp_equiv.
 End SetoidMorphismComp.
+
+Prenex Implicits equiv.
+Notation "x \approx y" := (equiv x y)
+  (only parsing): setoid_scope.
+Notation "x ≈ y" := (x \approx y)
+  (only printing) : setoid_scope.
+Notation "x \approx y :> T" := ((x: T) \approx (y: T))
+  (only parsing): setoid_scope.
+Notation "x ≈ y :> T" := (x \approx y :> T)
+  (only printing) : setoid_scope.

@@ -1,7 +1,7 @@
 From Stdlib Require Import Relations Morphisms Ensembles.
 From HB Require Import structures.
 Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import monoid.
+From mathcomp Require Import eqtype monoid.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -338,3 +338,22 @@ Section Submonoids.
       by rewrite relation_of_class point_of_mul HAu HBv; reflexivity.
   Qed.
 End Submonoids.
+
+Section DecidableCongruence.
+  Context {U: monoidType}.
+  Variable rho: relation U.
+  Hypothesis Hdec: forall u v, decidable (rho u v).
+
+  Definition congruence_class_of_eq (A B: congruence_class_of rho): bool :=
+    Hdec (point_of A) (point_of B).
+
+  Lemma congruence_class_of_eqP: forall (A B: congruence_class_of rho),
+    reflect (A \approx B) (congruence_class_of_eq A B).
+  Proof.
+    move => A B; apply (iffP idP) => [/sumboolP HAB|[_]];
+    rewrite /congruence_class_of_eq.
+    - by split => [u v|]; rewrite !relation_of_class.
+    - rewrite relation_of_class => HAB; by apply /sumboolP.
+  Qed.
+End DecidableCongruence.
+

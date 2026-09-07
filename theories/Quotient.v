@@ -1,7 +1,7 @@
 From Stdlib Require Import Relations Morphisms Ensembles.
 From HB Require Import structures.
 Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import eqtype monoid.
+From mathcomp Require Import choice eqtype monoid generic_quotient.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -181,6 +181,13 @@ Section CongruenceRelation.
 
   Context {U: monoidType}.
   Variable rho: relation U.
+  Print relation.
+  Print Equivalence.
+  Check equivalence.
+  Print Instances Equivalence.
+  Print Instances Reflexive.
+  Print relation_equivalence_equivalence.
+  Print predicate_equivalence.
 
   Definition left_extensional: Prop :=
     forall z x y, rho x y -> rho (z * x) (z * y).
@@ -207,6 +214,13 @@ Section CongruenceRelation.
 End CongruenceRelation.
 Arguments congruenceP {_} _.
 
+#[global] Instance congruence_Congruence
+  {U: monoidType} {rho: relation U} (Hcong: congruence rho): Congruence rho.
+Proof.
+  by apply/congruenceP.
+Qed.
+
+
 #[global]
 Create HintDb congruences.
 
@@ -219,91 +233,91 @@ Hint Resolve Build_congruence congr_refl congr_trans
 
 Notation "{ 'Set' T }" := (Ensemble T).
 Section CongruenceRelationQuotient.
-Context {U: monoidType}.
-Variable rho: relation U.
-Hypothesis Hcong: congruence rho.
+  Context {U: monoidType}.
+  Variable rho: relation U.
+  Hypothesis Hcong: congruence rho.
 
-Definition congruence_range (A: pointed_relation U): Prop := 
-  relation_of A = rho.
-Arguments congruence_range / _.
+  Definition congruence_range (A: pointed_relation U): Prop := 
+    relation_of A = rho.
+  Arguments congruence_range / _.
 
-Record congruence_class_of : Type :=
-  CongruenceClass {
-    pointed_relation_of_class :> pointed_relation U;
-    _ : congruence_range pointed_relation_of_class
-  }.
-Arguments CongruenceClass {_} _.
+  Record congruence_class_of : Type :=
+    CongruenceClass {
+      pointed_relation_of_class :> pointed_relation U;
+      _ : congruence_range pointed_relation_of_class
+    }.
+  Arguments CongruenceClass {_} _.
 
-Lemma relation_of_class: forall (A: congruence_class_of),
-  relation_of A = rho.
-Proof. by case. Qed.
+  Lemma relation_of_class: forall (A: congruence_class_of),
+    relation_of A = rho.
+  Proof. by case. Qed.
 
-Lemma congruence_class_one_proof : congruence_range (PointedRelation rho 1).
-Proof. done. Qed.
+  Lemma congruence_class_one_proof : congruence_range (PointedRelation rho 1).
+  Proof. done. Qed.
 
-Definition congruence_class_one :=
-  CongruenceClass congruence_class_one_proof.
+  Definition congruence_class_one :=
+    CongruenceClass congruence_class_one_proof.
 
-Notation "1" := congruence_class_one: setoid_group_scope.
+  Notation "1" := congruence_class_one: setoid_group_scope.
 
-Lemma point_of_one: point_of 1 = 1%g.
-Proof. done. Qed.
+  Lemma point_of_one: point_of 1 = 1%g.
+  Proof. done. Qed.
 
-(* NOTE: This choice subtly forces left actions. *)
-Lemma congruence_range_mul: forall A B : congruence_class_of,
-  congruence_range (A ~* B).
-Proof.
-  by move => [[sigma u] /= ->] [[tau v] /= _].
-Qed.
+  (* NOTE: This choice subtly forces left actions. *)
+  Lemma congruence_range_mul: forall A B : congruence_class_of,
+    congruence_range (A ~* B).
+  Proof.
+    by move => [[sigma u] /= ->] [[tau v] /= _].
+  Qed.
 
-Definition congruence_class_mul A B :=
-  CongruenceClass (congruence_range_mul A B).
+  Definition congruence_class_mul A B :=
+    CongruenceClass (congruence_range_mul A B).
 
-Notation "A * B" := (congruence_class_mul A B): setoid_group_scope.
+  Notation "A * B" := (congruence_class_mul A B): setoid_group_scope.
 
-Lemma point_of_mul: forall A B,
-  point_of (A * B) = ((point_of A) * (point_of B))%g.
-Proof. 
-  by move => [[sigma u /=] Hu] [[]].
-Qed.
+  Lemma point_of_mul: forall A B,
+    point_of (A * B) = ((point_of A) * (point_of B))%g.
+  Proof. 
+    by move => [[sigma u /=] Hu] [[]].
+  Qed.
 
-Lemma congruence_class_mulgA: forall A B C,
-  A * (B * C) \approx A * B * C.
-Proof.
-  (* TODO(reiniscirpons): why do I need to do this,
-     why can't Rocq just automatically figure this out? *)
-  move/congruenceP: Hcong => Hcong'.
-  move => A B C; split => [u v|].
-  - by rewrite !relation_of_class.
-    (* TODO(reiniscirpons): Why do I need to call reflexivity here?
-      Shouldn't the "by" tactic close it? *)
-  - by rewrite relation_of_class !point_of_mul mulgA; reflexivity.
-Qed.
+  Lemma congruence_class_mulgA: forall A B C,
+    A * (B * C) \approx A * B * C.
+  Proof.
+    (* TODO(reiniscirpons): why do I need to do this,
+      why can't Rocq just automatically figure this out? *)
+    move/congruenceP: Hcong => Hcong'.
+    move => A B C; split => [u v|].
+    - by rewrite !relation_of_class.
+      (* TODO(reiniscirpons): Why do I need to call reflexivity here?
+        Shouldn't the "by" tactic close it? *)
+    - by rewrite relation_of_class !point_of_mul mulgA; reflexivity.
+  Qed.
 
-Lemma congruence_class_mulg1: forall A,
-  A * 1 \approx A.
-Proof.
-  move/congruenceP: Hcong => Hcong'.
-  move => A; split => [u v|].
-  - by rewrite !relation_of_class.
-  - rewrite relation_of_class point_of_mul mulg1;
-    by reflexivity.
-Qed.
+  Lemma congruence_class_mulg1: forall A,
+    A * 1 \approx A.
+  Proof.
+    move/congruenceP: Hcong => Hcong'.
+    move => A; split => [u v|].
+    - by rewrite !relation_of_class.
+    - rewrite relation_of_class point_of_mul mulg1;
+      by reflexivity.
+  Qed.
 
-Lemma congruence_class_mul1g: forall A,
-  1 * A \approx A.
-Proof.
-  move/congruenceP: Hcong => Hcong'.
-  move => A; split => [u v|].
-  - by rewrite !relation_of_class.
-  - rewrite relation_of_class point_of_mul mul1g;
-    by reflexivity.
-Qed.
+  Lemma congruence_class_mul1g: forall A,
+    1 * A \approx A.
+  Proof.
+    move/congruenceP: Hcong => Hcong'.
+    move => A; split => [u v|].
+    - by rewrite !relation_of_class.
+    - rewrite relation_of_class point_of_mul mul1g;
+      by reflexivity.
+  Qed.
 
-Variable Q: {Set U}.
+  Variable Q: {Set U}.
 
-Definition quotient: {Set congruence_class_of} :=
-  fun A => exists u, Q u /\ (relation_of A (point_of A) u).
+  Definition quotient: {Set congruence_class_of} :=
+    fun A => Q (point_of A).
 
 End CongruenceRelationQuotient.
 (* TODO(reiniscirpons): canonical instances for base group,
@@ -326,26 +340,47 @@ Section Submonoids.
     forall (A B: congruence_class_of rho), A \In Q -> B \In Q -> A * B \In Q.
 
   Lemma quotient_mul_closed:
-    mulg_closed ->
     congruence rho ->
+    mulg_closed ->
     mul_closed (M / rho).
   Proof.
-    move => HM /congruenceP Hrho A B [u [HMu HAu]] [v [HMv HBv]].
-    exists (u * v)%g; split.
-    - by apply HM.
-    - rewrite relation_of_class in HAu;
-      rewrite relation_of_class in HBv.
-      by rewrite relation_of_class point_of_mul HAu HBv; reflexivity.
+    move => /congruenceP Hrho Hmulg A B HA HB.
+    (* TODO(reiniscirpons): Avoid the expansion here. *)
+    rewrite /(_ \In _) /= /(_ / _) point_of_mul.
+    by apply Hmulg.
+  Qed.
+
+  Definition compatible: Prop :=
+    forall (u v: U), rho u v -> u \In M -> v \In M.
+
+  Definition well_defined (Q: {Set (congruence_class_of rho)}): Prop := 
+    forall (A B: congruence_class_of rho),
+    A \approx B -> A \In Q -> B \In Q.
+
+  Lemma quotient_well_defined:
+    congruence rho ->
+    compatible ->
+    well_defined (M / rho).
+  Proof.
+    move => /congruenceP Hrho Hcomp A B [_].
+    rewrite relation_of_class => HAB HA.
+    rewrite /(_ \In _) /= /(_ / _).
+    (* TODO(reiniscirpons): Make this work without explicitly subbing in
+       point_of. *)
+    by apply (Hcomp (point_of A) (point_of B)).
   Qed.
 End Submonoids.
 
-Section DecidableCongruence.
+Section DecidableQuotient.
   Context {U: monoidType}.
   Variable rho: relation U.
-  Hypothesis Hdec: forall u v, decidable (rho u v).
 
+  (* Assume rho is decidable, then we can define a decidable equality
+     on the congruence classes of rho. *)
+  Hypothesis Hdec: forall u v, decidable (rho u v).
+  Let dec_rho: rel U := fun u v => Hdec u v.
   Definition congruence_class_of_eq (A B: congruence_class_of rho): bool :=
-    Hdec (point_of A) (point_of B).
+    dec_rho (point_of A) (point_of B).
 
   Lemma congruence_class_of_eqP: forall (A B: congruence_class_of rho),
     reflect (A \approx B) (congruence_class_of_eq A B).
@@ -355,5 +390,98 @@ Section DecidableCongruence.
     - by split => [u v|]; rewrite !relation_of_class.
     - rewrite relation_of_class => HAB; by apply /sumboolP.
   Qed.
-End DecidableCongruence.
+
+  (* Now assume that we have a decidable submonoid predicate too.
+     Then additionally the membership in the quotient is decidable. *)
+  Variable M: {Set U}.
+  Hypothesis HdecM: forall u, decidable (M u).
+  Let dec_M: pred U := fun u => HdecM u.
+  Definition congreuence_class_of_in (A: congruence_class_of rho): bool
+    := dec_M (point_of A).
+  
+  Lemma congruence_class_of_inP: forall (A: congruence_class_of rho),
+    reflect (A \In M / rho) (congreuence_class_of_in A).
+  Proof.
+    move => A; apply (iffP idP) => [/sumboolP //|].
+    rewrite /congreuence_class_of_in /(_ \In _) /(_ / _) => HA.
+    by apply /sumboolP.
+  Qed.
+
+  Definition quot_rel: rel U :=
+    fun u v => dec_rho u v.
+
+  Hypothesis Hcong: congruence rho.
+  
+  Lemma quot_rel_refl: reflexive quot_rel.
+  Proof.
+    move/congruenceP: Hcong => Hcong'.
+    move => u; by apply/sumboolP; reflexivity.
+  Qed.
+
+  Lemma quot_rel_symm: symmetric quot_rel.
+  Proof.
+    move/congruenceP: Hcong => Hcong'.
+    move => u v; rewrite /quot_rel.
+    case Hvu: (dec_rho v u);
+    apply/sumboolP; move/sumboolP in Hvu.
+    - by symmetry.
+    - move => Huv; apply Hvu; by symmetry.
+  Qed.
+
+  Lemma quot_rel_trans: transitive quot_rel.
+  Proof.
+    move/congruenceP: Hcong => Hcong'.
+    move => v u w /sumboolP Huv /sumboolP Hvw.
+    apply/sumboolP.
+    by transitivity v.
+  Qed.
+
+  Definition quot_equiv :=
+    EquivRel quot_rel quot_rel_refl quot_rel_symm quot_rel_trans.
+
+  (* Because monoidType is a choiceType we can now do the quotient. *)
+  Local Open Scope quotient_scope.
+
+  Definition decidable_quotient: (quotType U) := {eq_quot quot_equiv}.
+
+  (* TODO(reiniscirpons): Separate concerns here, first prove the global
+     quotient then do the subtype. *)
+
+  Hypothesis Hmulg: mulg_closed M.
+  Hypothesis Hcomp: compatible M rho.
+
+  Lemma mulg_closed_dec: forall u v,
+    u \in dec_M -> v \in dec_M -> (u * v)%g \in dec_M.
+  Proof.
+    move => u v /sumboolP /Hmulg H /sumboolP /H {}H.
+    by apply /sumboolP.
+  Qed.
+
+  Lemma compatible_dec: forall u v,
+    dec_rho u v -> u \in dec_M -> v \in dec_M.
+  Proof.
+    move => u v /sumboolP /Hcomp H /sumboolP /H {}H.
+    by apply /sumboolP.
+  Qed.
+
+  (* Now we will re-equip it with a monoid structure. *)
+  Definition decidable_quotient_mul
+    (u v: decidable_quotient): decidable_quotient :=
+      \pi ((repr u) * (repr v))%g.
+
+  Lemma decidable_quotient_mulE: forall u v,
+    (repr (decidable_quotient_mul u v)) == (repr u * repr v)%g %[mod decidable_quotient].
+  Proof.
+    move => u v; by rewrite reprK.
+  Qed.
+
+  Lemma decidable_quotient_mulgA: associative decidable_quotient_mul.
+  Proof.
+  Admitted.
+
+  Definition decidable_quotient_one: decidable_quotient := \pi 1%g.
+
+
+  
+End DecidableQuotient.
 

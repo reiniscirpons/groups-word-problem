@@ -860,7 +860,7 @@ Lemma non_trivialC (x y: FreeGroup Sigma):
 Proof.
   move => H; rewrite /non_trivial -FreeGroup_norm_e; move => habs.
   have approx: y @ x == e.
-    apply: (trans _ (FreeGroup_norm (y @ x))).
+    apply: (equiv_trans _ (FreeGroup_norm (y @ x))).
     + by apply /symm /FreeGroup_norm_correct.
     + by rewrite -FreeGroup_norm_e habs.
     move/(congruent_right (inv x)) in approx.
@@ -2503,9 +2503,9 @@ Proof.
     by rewrite eqixpix eqiypiy; apply/eqP.
 
   have szx : (ix < size gens)%N.
-      by rewrite eqixpix eqpixqix (@bound_enumerate _ e 0 gens qix qx q1in).
+      by rewrite eqixpix eqpixqix (@bound_enumerate _ [::] 0 gens qix qx q1in).
   have szy : (iy < size gens)%N.
-    by rewrite eqiypiy eqpiyqiy (@bound_enumerate _ e 0 gens qiy qy q2in).
+    by rewrite eqiypiy eqpiyqiy (@bound_enumerate _ [::] 0 gens qiy qy q2in).
 
   case: eqP => [Hkt | Hdiff0] => /=.
     rewrite -eqk in win; rewrite Hkt in win.
@@ -2912,12 +2912,12 @@ Proof.
 
    pose flst := [:: FreeGroup_norm (x' @ y'); FreeGroup_norm (x' @ inv y'); FreeGroup_norm (inv x' @ y'); FreeGroup_norm (inv x' @ inv y')].
 
-   move: (@in_enumerate _ e 0 flst ixy xy xyin) => eqxy.
-   move: (@in_enumerate _ e 0 gens ix' x' xin) => eqx.
-   move: (@in_enumerate _ e 0 gens iy' y' yin) => eqy.
+   move: (@in_enumerate _ [::] 0 flst ixy xy xyin) => eqxy.
+   move: (@in_enumerate _ [::] 0 gens ix' x' xin) => eqx.
+   move: (@in_enumerate _ [::] 0 gens iy' y' yin) => eqy.
 
-   move: (@bound_enumerate _ e 0 gens ix' x' xin) => x'bnd.
-   move: (@bound_enumerate _ e 0 gens iy' y' yin) => y'bnd.
+   move: (@bound_enumerate _ [::] 0 gens ix' x' xin) => x'bnd.
+   move: (@bound_enumerate _ [::] 0 gens iy' y' yin) => y'bnd.
 
    have x'bndU: (ix' < size U)%N.
      by rewrite /U size_cat size_map ltn_addr.
@@ -3031,7 +3031,7 @@ Proof.
       by rewrite leq_add2r.
       by rewrite add0n size_cat size_map ltn_add2r.
     - (* last case, cannot happen*)
-      move: (@bound_enumerate _ e 0 flst xyin.+4 xy eqxy) => habs.
+      move: (@bound_enumerate _ [::] 0 flst xyin.+4 xy eqxy) => habs.
       rewrite /flst /= in habs.
       by lia.
   - by rewrite size_map size_map in kbnd.
@@ -3068,7 +3068,7 @@ Lemma NielsenR_norm:
   forall x, (x \in U) -> freely_reduced x.
 Proof.
   move => x.
-  by rewrite /U /gens /NielsenReduction mem_cat; case/orP; move/(nthP e) => [i ibnd eqi]; rewrite !(nth_map e) // in eqi; rewrite !size_map // in ibnd; rewrite ?size_map //; rewrite freely_reduced_correct -eqi -?FreeGroup_norm_inv; rewrite FreeGroup_norm_involutive.
+  by rewrite /U /gens /NielsenReduction mem_cat; case/orP; move/(nthP [::]) => [i ibnd eqi]; rewrite !(nth_map e) // in eqi; rewrite !size_map // in ibnd; rewrite ?size_map //; rewrite freely_reduced_correct -eqi -?FreeGroup_norm_inv; rewrite FreeGroup_norm_involutive.
 Qed.
   
 Lemma NielsenR_N0:
@@ -3241,9 +3241,9 @@ Proof.
       + rewrite /=; apply/allpairsP.
         exists ((ix, x'), (iy, y')); split.
         - rewrite /=.
-          by apply: (@enumerate_in _ e) => //.
+          by apply: (@enumerate_in _ [::]) => //.
         - rewrite /=.
-          apply: (@enumerate_in _ e) => //.
+          apply: (@enumerate_in _ [::]) => //.
           by done.
       
       rewrite /t mem_pmap; apply/mapP.
@@ -3289,8 +3289,8 @@ Proof.
       set x' := nth e (t3 (second_reduce v)) i.
       set y' := nth e (t3 (second_reduce v)) j.
 
-      move: (@injection_correct _ e s t Hsub i Hlt) => eqiinj.
-      move: (@injection_correct _ e s t Hsub j Hltj) => eqjinj.
+      move: (@injection_correct _ [::] s t Hsub i Hlt) => eqiinj.
+      move: (@injection_correct _ [::] s t Hsub j Hltj) => eqjinj.
 
       have ixbound : (ix < size t)%N.
         by apply: injection_bnd.
@@ -3308,8 +3308,8 @@ Proof.
       + rewrite /x /x /x' -eqnthi. (* strange bug where the first unfold does nothing*)
         rewrite (cmp_le_proper (FreeGroup_norm (nth e (t3 (second_reduce v)) i)) (nth e (t3 (second_reduce v)) i) (FreeGroup_norm_correct _ _)).
         + by apply: CmpOrder.cmp_refl.
-        + by done.
-      + apply: (@enumerate_in _ e) => //.
+        + by reflexivity.
+      + apply: (@enumerate_in _ [::]) => //.
         by rewrite /x /y -eqnthi -eqnthj /x' /y' -FreeGroup_norm_law.
     + move: (invindex_in_gens j jbnd Hlej) => eqnthj.
       rewrite -invnat_bound // in Hlej.
@@ -3323,8 +3323,8 @@ Proof.
       set x' := nth e (t3 (second_reduce v)) i.
       set y' := nth e (t3 (second_reduce v)) (@invnat gens j).
 
-      move: (@injection_correct _ e s t Hsub i Hlt) => eqiinj.
-      move: (@injection_correct _ e s t Hsub (@invnat gens j) invj_bnd) => eqjinj.
+      move: (@injection_correct _ [::] s t Hsub i Hlt) => eqiinj.
+      move: (@injection_correct _ [::] s t Hsub (@invnat gens j) invj_bnd) => eqjinj.
 
       have ixbound : (ix < size t)%N by apply: injection_bnd.
       have iybound : (iy < size t)%N by apply: injection_bnd.
@@ -3338,8 +3338,8 @@ Proof.
       + rewrite /x /x /x' -eqnthi. (* strange bug where the first unfold does nothing*)
         rewrite (cmp_le_proper (FreeGroup_norm (nth e (t3 (second_reduce v)) i)) (nth e (t3 (second_reduce v)) i) (FreeGroup_norm_correct _ _)).
         + by apply: CmpOrder.cmp_refl.
-        + by done.
-      + apply: (@enumerate_in _ e) => //.
+        + by reflexivity.
+      + apply: (@enumerate_in _ [::]) => //.
         rewrite /x /y -eqnthi -eqnthj /x' /y'.
         by rewrite -FreeGroup_norm_inv -FreeGroup_norm_law.
   + move: (invindex_in_gens i ibnd Hle) => eqnthi.
@@ -3356,8 +3356,8 @@ Proof.
       set x' := nth e (t3 (second_reduce v)) (@invnat gens i).
       set y' := nth e (t3 (second_reduce v)) j.
 
-      move: (@injection_correct _ e s t Hsub (invnat i) invi_bnd) => eqiinj.
-      move: (@injection_correct _ e s t Hsub j Hltj) => eqjinj.
+      move: (@injection_correct _ [::] s t Hsub (invnat i) invi_bnd) => eqiinj.
+      move: (@injection_correct _ [::] s t Hsub j Hltj) => eqjinj.
 
       have ixbound : (ix < size t)%N by apply: injection_bnd.
       have iybound : (iy < size t)%N by apply: injection_bnd.
@@ -3372,8 +3372,8 @@ Proof.
         rewrite cmp_invK_left.
         rewrite (cmp_le_proper (FreeGroup_norm (nth e (t3 (second_reduce v)) (invnat i))) (nth e (t3 (second_reduce v)) (invnat i)) (FreeGroup_norm_correct _ _)).
         + by apply: CmpOrder.cmp_refl.
-        + by done.
-      + apply: (@enumerate_in _ e) => //.
+        + by reflexivity.
+      + apply: (@enumerate_in _ [::]) => //.
         rewrite /x /y -eqnthi -eqnthj /x' /y'.
         by rewrite -FreeGroup_norm_inv -FreeGroup_norm_law.
     + move: (invindex_in_gens j jbnd Hlej) => eqnthj.
@@ -3388,8 +3388,8 @@ Proof.
       set x' := nth e (t3 (second_reduce v)) (@invnat gens i).
       set y' := nth e (t3 (second_reduce v)) (@invnat gens j).
 
-      move: (@injection_correct _ e s t Hsub (invnat i) invi_bnd) => eqiinj.
-      move: (@injection_correct _ e s t Hsub (invnat j) invj_bnd) => eqjinj.
+      move: (@injection_correct _ [::] s t Hsub (invnat i) invi_bnd) => eqiinj.
+      move: (@injection_correct _ [::] s t Hsub (invnat j) invj_bnd) => eqjinj.
 
       have ixbound : (ix < size t)%N by apply: injection_bnd.
       have iybound : (iy < size t)%N by apply: injection_bnd.
@@ -3407,8 +3407,8 @@ Proof.
         rewrite cmp_invK_left.
         rewrite (cmp_le_proper (FreeGroup_norm (nth e (t3 (second_reduce v)) (invnat i))) (nth e (t3 (second_reduce v)) (invnat i)) (FreeGroup_norm_correct _ _)).
         + by apply: CmpOrder.cmp_refl.
-        + by done.
-      + apply: (@enumerate_in _ e) => //.
+        + by reflexivity.
+      + apply: (@enumerate_in _ [::]) => //.
         by rewrite /x /y -eqnthi -eqnthj /x' /y' -!FreeGroup_norm_inv -FreeGroup_norm_law.
 Qed.
 
@@ -3520,13 +3520,13 @@ Qed.
 Lemma id_preserve_law (x y : generatedSubgroup gens'):
   id_gen_morphism (x @ y) == id_gen_morphism x @ id_gen_morphism y.
 Proof.
-  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+  by rewrite /equiv /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
 
 Lemma id_preserve_e:
   id_gen_morphism e == e.
 Proof.
-  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+  by rewrite /equiv /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
 
 
@@ -3546,7 +3546,7 @@ Lemma id_surjective (x : generatedSubgroup gens):
   exists (y: generatedSubgroup gens'), (id_gen_morphism y) == x.
 Proof.
   exists {|sb_point := x.(sb_point); sb_point_characterization := (Hgroup_eq (x.(sb_point))).1 (x.(sb_point_characterization)) |}.
-  by rewrite /eq /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
+  by rewrite /equiv /= /subgroupby_eq /subgroupby_inj /id_gen_morphism /=.
 Qed.
   
 (* no new instance *)
@@ -3566,7 +3566,7 @@ Qed.
 
 Lemma idg_left_inverse: forall x, id_gen_morphism_inv (id_gen_morphism x) == x.
 Proof.
-  by rewrite /id_gen_morphism /id_gen_morphism_inv /eq /= /subgroupby_eq /= /subgroupby_inj.
+  by rewrite /id_gen_morphism /id_gen_morphism_inv /equiv /= /subgroupby_eq /= /subgroupby_inj.
 Qed.
   
 HB.instance Definition _ :=
@@ -3589,7 +3589,7 @@ Hypothesis Hminimal: @minimality_condition _ gens.
 Lemma Hminimal_simpl (x y: FreeGroup Sigma) (xinU: x \in U) (yinU: y \in U) (ntrvxy : non_trivial x y):
   ~ (x @ y < x:> FreeGroup Sigma)%O.
 Proof.
-  move/(nthP e): xinU => [i ibnd eqx]; move/(nthP e): yinU => [j jbnd eqy].
+  move/(nthP [::]): xinU => [i ibnd eqx]; move/(nthP [::]): yinU => [j jbnd eqy].
   
   move => Habs.
   apply: (Hminimal i j ibnd jbnd).
@@ -3646,9 +3646,8 @@ Qed.
 Hypothesis frU : forall x, x \in U -> freely_reduced x.
 Hypothesis ntrvlU: forall x, x \in U -> FreeGroup_norm x != e.
 
-
 HB.instance Definition _ :=
-isSetoidMorphism.Build _ _ friso (subgroup_projection_preserve_equiv gens).
+  isSetoidMorphism.Build _ _ friso (subgroup_projection_preserve_equiv gens).
 
 HB.instance Definition _ :=
   isMonoidMorphism.Build _ _ friso (subgroup_projection_preserve_e gens) (subgroup_projection_preserve_law gens).
@@ -3701,7 +3700,7 @@ Proof.
       by rewrite /x /U mem_cat; apply/orP; left; rewrite mem_nth.
     move: (ntrvlU x xinU) => L.
     by rewrite eqe' in L.
-
+  + by reflexivity.
   + rewrite /g /= .
     move => Hdiff.
     have Hdiffs: m != n.
@@ -3733,7 +3732,7 @@ Proof.
       rewrite Hdiff; rewrite (cmp_lt_proper _ e _ _(nth e gens m)) => //.
       apply: cmp_bot_uniq_contra; apply: ntrvlU x xinU.
       by apply: inverse_right.
-      by rewrite Hdiff.
+      by rewrite Hdiff; reflexivity.
       1-2: by rewrite size_cat size_map ltn_addr.
 
   + move => y; case: y => n.
@@ -3769,7 +3768,7 @@ Proof.
       rewrite Hdiff; rewrite (cmp_lt_proper _ e _ _(nth e gens m)) => //.
       apply: cmp_bot_uniq_contra; apply: ntrvlU x xinU.
       by apply: inverse_right.
-      by rewrite Hdiff.
+      by rewrite Hdiff; reflexivity.
       1-2: by rewrite size_cat size_map ltn_addr.
 
   + rewrite /g /= .
@@ -3808,6 +3807,7 @@ Proof.
       by rewrite /x /U mem_cat; apply/orP; left; rewrite mem_nth.
     move: (ntrvlU x xinU) => L.
     by rewrite eqe' in L.
+    by reflexivity.
 Qed.
 
 Lemma g_normK x: FreeGroup_norm (g x) = g x.

@@ -668,7 +668,7 @@ Lemma freely_reduced_power
     (w: FreeGroup Sigma)
     (ks: seq int)
     (Hsize: (size w == size ks)%B)
-    (Hn0: all (fun k => k != 0) ks)
+    (Hn0: all (fun k => (k != 0)%Z) ks)
     (Hdistinct: freely_reduced_helper w):
   (w == FreeGroup_norm w)%B ->
   freely_reduced (prod (map (fun '(x, k) => power (`[x]_(FGP Sigma)) k) (zip w ks))).

@@ -81,7 +81,7 @@ Lemma M_trans : forall x y z, eq x y -> eq y z -> eq x z.
 Proof. exact: Derivation_trans. Qed.
 
 (* HB bug: having a duplicate (P: presentation) results in a Ocaml assertion failure *)
-HB.instance Definition _ := @hasEq.Build M eq M_refl M_symm M_trans.
+HB.instance Definition _ := @hasEquiv.Build M eq M_refl M_symm M_trans.
 End PresentedEq.
 
 (* All presented structures have a monoid structure *)
@@ -127,7 +127,7 @@ move=> b u v; elim => [|//||].
 - by move=> ? a; transitivity (a .@ b).
 Qed.
 
-HB.instance Definition _ := isMonoid.Build M concat epsilon associativity neutral_left neutral_right congruent_left congruent_right.
+HB.instance Definition _ := isSetoidMonoid.Build M associativity neutral_left neutral_right congruent_left congruent_right.
 End PresentedMonoid.
 
 Lemma reduction {P: presentation}:
@@ -340,7 +340,7 @@ Proof.
   by rewrite /= IH invlK.
 Qed.
 
-HB.instance Definition _ := isGroup.Build G inv_word inv_word_law inv_word_left inv_word_right.
+HB.instance Definition _ := isGroup.Build G inv_word_law inv_word_left inv_word_right.
 
 
 Lemma power_inv_word' (w: G) (x: nat):

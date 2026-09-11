@@ -80,7 +80,7 @@ Definition mkFGcons a (n: int) fge :=
     | FGnil => FGcons a n FGnil
     | FGcons a' n' fge' =>
       if (a == a')%B then
-        if (n + n' == 0) then
+        if (n + n' == 0)%R then
           fge'
         else
           FGcons a (n + n') fge'

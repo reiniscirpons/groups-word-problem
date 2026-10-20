@@ -1,7 +1,8 @@
 From elpi.apps Require Import coercion.
 From HB Require Import structures.
 Require Import ssreflect ssrfun ssrbool Morphisms.
-From mathcomp Require Import ssrnat ssrint ssralg all_algebra seq zify.
+From mathcomp Require Import ssrnat ssrint ssralg seq eqtype choice monoid.
+From mathcomp Require Import all_algebra zify.
 Import GRing.Theory.
 From GWP Require Import Equivalence.
 
@@ -32,8 +33,29 @@ HB.structure Definition SetoidMonoid := { G of isSetoidMonoid G & hasEquiv G }.
 
 Bind Scope setoid_group_scope with SetoidMonoid.sort.
 
+(* Every monoid is a setoid monoid wrt the trivial setoid. *)
+HB.builders Context M of isMonoid M.
+  
+  HB.instance Definition _ :=
+    hasEquiv.Build M eq_Reflexive eq_Symmetric eq_Transitive.
+
+  Fact mulg_extl : forall (x y z: M),
+    y \approx z -> mul x y \approx mul x z.
+  Proof. by move => x y z ->. Qed.
+
+  Fact mulg_extr : forall (x y z: M),
+    y \approx z -> mul y x \approx mul z x.
+  Proof. by move => x y z ->. Qed.
+
+  HB.instance Definition _ :=
+    isSetoidMonoid.Build M mulgA mul1g mulg1 mulg_extl mulg_extr.
+
+HB.end.  
+
+
 Local Notation "*%sg" := (@mul _) : function_scope.
 Local Notation "x * y" := (mul x y) : setoid_group_scope.
+Local Notation "1" := one : setoid_group_scope.
 
 #[deprecated(since="2026-09-11", note="Use isSetoidMonoid instead.")]
 Notation isMonoid M := (isSetoidMonoid M).
@@ -61,136 +83,130 @@ Notation Monoid M := (SetoidMonoid M).
 Infix "@" := mul (at level 50).
 
 Section ProperMonoid.
-HB.declare Context G of hasEq G & isMonoid G.
+  HB.declare Context G of hasEquiv G & isSetoidMonoid G.
 
-Global Instance : Proper (eq ==> eq ==> eq) (law : G -> G -> G).
-Proof.
-move=> a b eq_ab u v eq_uv.
-transitivity (a @ v); do [exact: congruent_left|exact: congruent_right].
-Qed.
-
+  Global Instance : Proper (equiv ==> equiv ==> equiv) (mul: G -> G -> G).
+  Proof.
+  move=> a b eq_ab u v eq_uv.
+  transitivity (a * v).
+  - by exact: muls_extl.
+  - by exact: muls_extr.
+  Qed.
 End ProperMonoid.
 
 (* If `l = [a; b; c; ...; z]`, `prod l = a @ b @ ... @ z` *)
-Definition prod {M: monoid} (l: seq M) : M :=
-  foldr (fun y acc => y @ acc) e l.
+Definition prod {M: setoidMonoidType} (l: seq M) : M :=
+  foldr (fun y acc => y * acc) 1 l.
 Arguments prod {_} / !_.
 
-Lemma prod0 {M: monoid} : @prod M nil = e.
+Lemma prod0 {M: setoidMonoidType} : @prod M [::] = 1.
 Proof. done. Qed.
 
-Lemma prod1s {M: monoid} (a: M) (l: seq M) : prod (a :: l) == a @ prod l.
+Lemma prod1s {M: setoidMonoidType} (a: M) (l: seq M):
+  prod (a :: l) = a * prod l.
 Proof. done. Qed.
 
-Lemma prod_cat {M: monoid} (l1 l2: seq M): prod (l1 ++ l2) == (prod l1) @ (prod l2).
+Lemma prod_cat {M: setoidMonoidType} (l1 l2: seq M):
+  prod (l1 ++ l2) \approx (prod l1) * (prod l2).
 Proof.
-elim: l1 => [|a l1 /= ->]; first by rewrite /= neutral_left.
-by rewrite associativity.
+elim: l1 => [|a l1 /= ->];
+  first by rewrite /= mul1s.
+by rewrite mulsA.
 Qed.
 
 (** Some theory about morphisms *)
 
-HB.mixin Record isMonoidMorphism (G H: monoid) (f: G -> H) := {
-  morphism_preserve_e: f e == e;
-  morphism_preserve_law: forall x y, f (x @ y) == (f x) @ (f y);
+HB.mixin Record isMonoidMorphism (G H: setoidMonoidType) (f: G -> H) := {
+  onefM: f 1 \approx 1;
+  mulfM: forall x y,
+    f (x * y) \approx (f x) * (f y);
 }.
+
 #[short(type="morphism")]
-HB.structure Definition Morphism (G H: monoid) :=
+HB.structure Definition Morphism (G H: setoidMonoidType) :=
   { f of isSetoidMorphism G H f 
        & isMonoidMorphism G H f}.
 
-
-HB.mixin Record isInjective (A B: equivType) (f: A -> B) := {
-  injectivity_property: forall x y, f x == f y -> x == y;
-}.
-
-#[short(type="injectiveFunType")]
-HB.structure Definition Injective (A B: equivType) :=
-  { f of isInjective A B f
-       & isSetoidMorphism A B f}.
+#[deprecated(since="2026-09-11", note="Use onefM instead.")]
+Notation morphism_preserve_e := onefM.
+#[deprecated(since="2026-09-11", note="Use mulfM instead.")]
+Notation morphism_preserve_law := mulfM.
 
 #[short(type="injectiveMorphism")]
-HB.structure Definition InjectiveMorphism (G H: monoid) :=
+HB.structure Definition InjectiveMorphism (G H: setoidMonoidType) :=
   { f of isInjective G H f
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-HB.mixin Record isSurjective (A B: equivType) (f: A -> B) := {
-  surjectivity_property: forall y, exists x, f x == y;
-}.
-
-#[short(type="surjectiveFunType")]
-HB.structure Definition Surjective (A B: equivType) :=
-  { f of isSurjective A B f
-       & isSetoidMorphism A B f}.
-
 #[short(type="surjectiveMorphism")]
-HB.structure Definition SurjectiveMorphism (G H: monoid) :=
+HB.structure Definition SurjectiveMorphism (G H: setoidMonoidType) :=
   { f of isSurjective G H f
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-#[short(type="bijectiveFunType")]
-HB.structure Definition Bijective (A B: equivType) :=
-  { f of isInjective A B f
-       & isSurjective A B f
-       & isSetoidMorphism A B f}.
-
 #[short(type="isomorphism")]
-HB.structure Definition Isomorphism (G H: monoid) :=
+HB.structure Definition Isomorphism (G H: setoidMonoidType) :=
   { f of isInjective G H f
        & isSurjective G H f
        & isSetoidMorphism G H f
        & isMonoidMorphism G H f }.
 
-HB.factory Record isIsomorphismInverse (S T: monoid)
+HB.factory Record isIsomorphismInverse (S T: setoidMonoidType)
   (f: isomorphism S T) (g: T -> S) := {
-    morphism_preserve_equiv':
-      forall x y, x == y -> g x == g y;
-    morphism_inverse_left: forall x, g (f x) == x;
-    morphism_inverse_right: forall x, f (g x) == x;
+    equivfM:
+      forall x y, x \approx y -> g x \approx g y;
+    isominvKl: forall x, g (f x) \approx x;
+    isominvKr: forall x, f (g x) \approx x;
 }.
 
+#[deprecated(since="2026-09-11", note="Use equivfM instead.")]
+Notation morphism_preserve_equiv' := isIsomorphismInverse.equivfM.
+#[deprecated(since="2026-09-11", note="Use isominvKl instead.")]
+Notation morphism_inverse_left := isIsomorphismInverse.isominvKl.
+#[deprecated(since="2026-09-11", note="Use isominvKr instead.")]
+Notation morphism_inverse_right := isIsomorphismInverse.isominvKr.
+
 HB.builders Context 
-  (S T: monoid) (f: isomorphism S T) g of 
+  (S T: setoidMonoidType) (f: isomorphism S T) g of 
     isIsomorphismInverse S T f g.
 
   HB.instance Definition _ :=
-    isSetoidMorphism.Build _ _ g morphism_preserve_equiv'.
+    isSetoidMorphism.Build T S g equivfM.
 
-  Fact g_surjectivity_property: forall y, exists x, g x == y.
+  Fact surjgM: forall y, exists x, g x \approx y.
   Proof.
-    move => y; exists (f y); by apply morphism_inverse_left.
+    move => y; exists (f y); by apply isominvKl.
   Qed.
 
   HB.instance Definition _ :=
-    isSurjective.Build _ _ g g_surjectivity_property.
+    isSurjective.Build T S g surjgM.
   
-  Fact g_injectivity_property: forall x y, g x == g y -> x == y.
+  Fact injgM: forall x y, g x \approx g y -> x \approx y.
   Proof.
-    move => x y Hg; have: f (g x) == f (g y).
-    - by apply morphism_preserve_equiv.
-    by rewrite !morphism_inverse_right.
+    move => x y Hg; have: f (g x) \approx f (g y);
+      first by rewrite Hg.
+    by rewrite !isominvKr.
   Qed.
 
   HB.instance Definition _ :=
-    isInjective.Build _ _ g g_injectivity_property.
+    isInjective.Build T S g injgM.
 
-  Fact g_preserve_e: g e == e.
+  Fact onegM: g 1 \approx 1.
   Proof.
-    by rewrite -(morphism_inverse_left e) morphism_preserve_e.
+    by rewrite -(isominvKl 1) onefM.
   Qed.
 
-  Fact g_preserve_law: forall x y, g (x @ y) == g x @ g y.
+  Fact g_preserve_law: forall x y, g (x * y) \approx g x * g y.
   Proof.
     move => x y.
-    move: (@surjectivity_property _ _ f x) => [x'] <-.
-    move: (@surjectivity_property _ _ f y) => [y'] <-.
-    by rewrite -morphism_preserve_law !morphism_inverse_left.
+    Check surjfM.
+    move: (@surjfM _ _ f x) => [x'] <-.
+    move: (@surjfM _ _ f y) => [y'] <-.
+    by rewrite -mulfM !isominvKl.
   Qed.
 
   HB.instance Definition _ :=
-    isMonoidMorphism.Build _ _ g g_preserve_e g_preserve_law.
+    isMonoidMorphism.Build T S g onegM mulgM.
 HB.end.
 
 HB.factory Record isIsomorphismLeftInverse (S T: monoid)
@@ -421,7 +437,7 @@ Qed.
 
 (* TODO(reiniscirpons): Should I be defining my own induction principles?*)
 Definition nat_pairs_ind: forall (P: nat -> Prop),
-  P 0 -> P 1 -> (forall n, P n -> P n.+1 -> P n.+2) ->
+  P 0 -> P 1%N -> (forall n, P n -> P n.+1 -> P n.+2) ->
   forall n, P n.
 Proof.
   move => P H0 H1 HnSn n; enough (H: P n /\ P n.+1).

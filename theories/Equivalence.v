@@ -130,6 +130,36 @@ Section SetoidMorphismComp.
     isSetoidMorphism.Build A C (g \o f) comp_equiv.
 End SetoidMorphismComp.
 
+HB.mixin Record isInjective (A B: setoidType) (f: A -> B) := {
+  injfM: forall x y, f x \approx f y -> x \approx y;
+}.
+
+#[short(type="injectiveFunType")]
+HB.structure Definition Injective (A B: setoidType) :=
+  { f of isInjective A B f
+       & isSetoidMorphism A B f}.
+
+HB.mixin Record isSurjective (A B: setoidType) (f: A -> B) := {
+  surjfM: forall y, exists x, f x \approx y;
+}.
+
+#[short(type="surjectiveFunType")]
+HB.structure Definition Surjective (A B: setoidType) :=
+  { f of isSurjective A B f
+       & isSetoidMorphism A B f}.
+
+#[short(type="bijectiveFunType")]
+HB.structure Definition Bijective (A B: setoidType) :=
+  { f of isInjective A B f
+       & isSurjective A B f
+       & isSetoidMorphism A B f}.
+
+#[deprecated(since="2026-09-11", note="Use injfM instead.", use=equivfM)]
+Notation injectivity_property := injfM.
+
+#[deprecated(since="2026-09-11", note="Use surjfM instead.", use=equivfM)]
+Notation surjectivity_property := surjfM.
+
 #[deprecated(since="2026-09-11", note="Use comp_equiv instead.", use=equivfM)]
 Notation comp_preserve_equiv := comp_equiv.
 

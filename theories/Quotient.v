@@ -231,7 +231,6 @@ Hint Unfold left_extensional right_extensional: congruences.
 Hint Resolve Build_congruence congr_refl congr_trans
   congr_sym congr_extl congr_extr: congruences.
 
-Notation "{ 'Set' T }" := (Ensemble T).
 Section CongruenceRelationQuotient.
   Context {U: monoidType}.
   Variable rho: relation U.
@@ -314,30 +313,33 @@ Section CongruenceRelationQuotient.
       by reflexivity.
   Qed.
 
-  Variable Q: {Set U}.
+  Variable P: U -> Prop.
 
-  Definition quotient: {Set congruence_class_of} :=
-    fun A => Q (point_of A).
+  Definition quotient := { A: congruence_class_of | P (point_of A) }.
 
 End CongruenceRelationQuotient.
 (* TODO(reiniscirpons): canonical instances for base group,
    left, right multiplication etc. *)
 Arguments quotient {_} _.
-Notation "Q / rho" := (quotient rho Q) : setoid_group_scope.
+Notation "P / rho" := (quotient rho P) : setoid_group_scope.
 Notation "1" := congruence_class_one: setoid_group_scope.
 Notation "A * B" := (congruence_class_mul A B): setoid_group_scope.
 
-Notation "x \In A" := (In _ A x).
 Section Submonoids.
   Context {U: monoidType}.
-  Variable M: {Set U}.
+  Variable P: U -> Prop.
   Variable rho: relation U.
 
   Definition mulg_closed: Prop :=
-    forall (u v: U), u \In M -> v \In M -> (u * v)%g \In M.
+    forall (u v: U), P u -> P v -> P (u * v)%g.
 
-  Definition mul_closed (Q: {Set (congruence_class_of rho)}): Prop :=
-    forall (A B: congruence_class_of rho), A \In Q -> B \In Q -> A * B \In Q.
+  Hypothesis Hmul: mulg_closed.
+
+  Definition 
+
+  Definition mul_closed: Prop :=
+    forall (A B: congruence_class_of rho),
+    P (point_of A) -> P (point_of B) ->  P (A * B).
 
   Lemma quotient_mul_closed:
     congruence rho ->

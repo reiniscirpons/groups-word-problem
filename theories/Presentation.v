@@ -340,7 +340,7 @@ Proof.
   by rewrite /= IH invlK.
 Qed.
 
-HB.instance Definition _ := isGroup.Build G inv_word_law inv_word_left inv_word_right.
+HB.instance Definition _ := isSetoidGroup.Build G inv_word_law inv_word_left inv_word_right.
 
 
 Lemma power_inv_word' (w: G) (x: nat):

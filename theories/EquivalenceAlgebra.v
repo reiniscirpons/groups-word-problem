@@ -563,7 +563,7 @@ elim: x => [|x H|x].
   by rewrite -!mulsA mulsV mulVs muls1.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expC' instead.")]
+#[deprecated(since="2026-10-23", note="Use expsC' instead.")]
 Notation powerC' := expsC'.
 
 Lemma expsC'' {G: setoidGroupType} (w: G) (x: int):
@@ -580,7 +580,7 @@ Proof.
   -- by rewrite expsP -{2}H mulsA.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expC'' instead.")]
+#[deprecated(since="2026-10-23", note="Use expsC'' instead.")]
 Notation powerC'' := expsC''.
 
 Lemma expsC {G: setoidGroupType} (w: G) (x y: int):
@@ -592,7 +592,7 @@ Proof.
   - by rewrite expsP -mulsA IH mulsA -expsC'' mulsA.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expC instead.")]
+#[deprecated(since="2026-10-23", note="Use expsC instead.")]
 Notation powerC := expsC.
 
 Lemma expsS' {G: setoidGroupType} (w: G) (x: int):
@@ -606,7 +606,7 @@ Proof.
      by have ->: (n.+1 - 1 = n)%N by case: n.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expS' instead.")]
+#[deprecated(since="2026-10-23", note="Use expsS' instead.")]
 Notation powerS' := expsS'.
 
 Lemma expsP' {G: setoidGroupType} (w: G) (x: int):
@@ -620,7 +620,7 @@ Proof.
   - by rewrite /exp /=.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expP' instead.")]
+#[deprecated(since="2026-10-23", note="Use expsP' instead.")]
 Notation powerP' := expsP'.
 
 Lemma expsnDr {G: setoidGroupType} (w: G) (x y: int):
@@ -634,135 +634,168 @@ elim: x => [|x H|x H].
   by rewrite expsP expsP' H mulsA.
 Qed.
 
-#[deprecated(since="2026-10-23", note="Use expsnA instead.")]
+#[deprecated(since="2026-10-23", note="Use expsnDr instead.")]
 Notation power_add := expsnDr.
 
-Lemma power_switch_sign {G: setoidGroupType} (w: G) (x y: int):
-  power (power w x) (- y) == power (power w (-x)) y.
+Lemma expsnN {G: setoidGroupType} (w: G) (x y: int):
+  (w ^ x) ^ (- y) \approx (w ^ (-x)) ^ y.
 Proof.
 elim: y => [|y|y].
 - by rewrite oppr0 !exps0.
-- rewrite powerP expsS => ->.
-  by rewrite -power_inv.
-- rewrite !opprK expsS powerP => ->.
-  by rewrite -power_inv opprK.
+- rewrite expsP expsS => ->.
+  by rewrite -expsN.
+- rewrite !opprK expsS expsP => ->.
+  by rewrite -expsN opprK.
 Qed.
 
-Lemma powerC'_tower {G: setoidGroupType} (w: G) (x y: int):
-  power (power w x) y @ w == w @ power (power w x) y.
+#[deprecated(since="2026-10-28", note="Use expsnN instead.")]
+Notation power_switch_sign := expsnN.
+
+Lemma expsnns {G: setoidGroupType} (w: G) (x y: int):
+  (w ^ x) ^ y * w \approx w * (w ^ x) ^ y.
 Proof.
 elim: y => [|y|y].
 - by rewrite exps0 mul1s muls1.
 - rewrite expsS -mulsA => ->.
-  by rewrite mulsA powerC' mulsA.
-- rewrite powerP -mulsA => ->.
-  by rewrite mulsA -power_inv powerC' mulsA.
+  by rewrite mulsA expsC' mulsA.
+- rewrite expsP -mulsA => ->.
+  by rewrite mulsA -expsN expsC' mulsA.
 Qed.
 
-Lemma powerC''_tower {G: setoidGroupType} (w: G) (x y: int):
-  power (power w x) y @ (inv w) == (inv w) @ power (power w x) y.
-Proof.
-elim: y => [|y|y].
-- by rewrite exps0 mul1s muls1.
-- rewrite expsS -mulsA => ->.
-  by rewrite mulsA powerC'' mulsA.
-- rewrite powerP -mulsA => ->.
-  by rewrite mulsA -power_inv powerC'' mulsA.
-Qed.
+#[deprecated(since="2026-10-28", note="Use expsnns instead.")]
+Notation powerC'_tower := expsnns.
 
-Lemma power_mul {G: setoidGroupType} (w: G) (x y: int):
-  power w (x * y) == power (power w x) y.
+Lemma expsnnV {G: setoidGroupType} (w: G) (x y: int):
+  (w ^ x) ^ y * (w^-1) \approx (w^-1) * (w ^ x) ^ y.
 Proof.
-elim: x => [|x|x].
-- by rewrite mul0r !exps0 power_e.
-- rewrite expsS.
-  have ->: (x.+1%:Z * y)%R = (x%:Z * y + y)%R by lia.
-  rewrite power_add => ->.
   elim: y => [|y|y].
-  - by rewrite !exps0 mul1s.
-  - rewrite !expsS => <-.
-    by rewrite !mulsA -[w @ _]powerC' -![((_ @ w) @ _)]mulsA
-            -powerC'_tower !mulsA.
-  - rewrite !power_switch_sign !powerP => <-.
-    rewrite expsS inverse_law -power_inv.
-    by rewrite mulsA -[(_ @ _) @ inv w]mulsA
-            -mulsA powerC''_tower !mulsA.
-- have ->: (- x.+1%:Z * y)%R = (- x%:Z*y + (-y))%R by lia.
-  rewrite power_add => ->.
-  elim: y => [|y|y].
-  - by rewrite !exps0 mul1s.
-  - rewrite !expsS !powerP => <-.
-    by rewrite !mulsA -[inv w @ _]powerC'' -![((_ @ inv w) @ _)]mulsA
-            -powerC''_tower !mulsA.
-  - have ->: ((- - y%:Z) = y%:Z)%R by lia.
-    have ->: ((- - y.+1%:Z) = y.+1%:Z)%R by lia.
-    rewrite expsS ![power _ (- y.+1%:Z)]powerP => <-.
-    rewrite powerP inverse_law inv_involutive.
-    by rewrite !mulsA -[(_ @ _) @ w]mulsA
-            -mulsA  powerC'_tower  !mulsA.
+  - by rewrite exps0 mul1s muls1.
+  - rewrite expsS -mulsA => ->.
+    by rewrite mulsA expsC'' mulsA.
+  - rewrite expsP -mulsA => ->.
+    by rewrite mulsA -expsN expsC'' mulsA.
 Qed.
 
-Lemma power_proper_pos {G: setoidGroupType} (x y: G) (k: nat):
-  x == y -> power x k == power y k.
+#[deprecated(since="2026-10-28", note="Use expsnnV instead.")]
+Notation powerC''_tower := expsnnV.
+
+Lemma expsnA {G: setoidGroupType} (w: G) (x y: int):
+  w ^ (x * y) \approx (w ^ x) ^ y.
 Proof.
-move=> Heq.
-elim: k => [//|k IH].
-by rewrite !expsS IH Heq.
+  elim: x => [|x|x].
+  - by rewrite mul0r !exps0 exp1n.
+  - rewrite expsS.
+    have ->: (x.+1%:Z * y)%R = (x%:Z * y + y)%R by lia.
+    rewrite expsnDr => ->.
+    elim: y => [|y|y].
+    + by rewrite !exps0 mul1s.
+    + rewrite !expsS => <-.
+      by rewrite !mulsA -[w * _]expsC' -![((_ * w) * _)]mulsA
+              -expsnns !mulsA.
+    + rewrite !expsnN !expsP => <-.
+      rewrite expsS invsM -expsN.
+      by rewrite mulsA -[(_ * _) * w^-1]mulsA
+              -mulsA expsnnV !mulsA.
+  - have ->: (- x.+1%:Z * y)%R = (- x%:Z*y + (-y))%R by lia.
+    rewrite expsnDr => ->.
+    elim: y => [|y|y].
+    + by rewrite !exps0 mul1s.
+    + rewrite !expsS !expsP => <-.
+      by rewrite !mulsA -[w^-1 * _]expsC''
+                 -![((_ * w^-1) * _)]mulsA -expsnnV !mulsA.
+    + have ->: ((- - y%:Z) = y%:Z)%R by lia.
+      have ->: ((- - y.+1%:Z) = y.+1%:Z)%R by lia.
+      rewrite expsS ![_ ^ (- y.+1%:Z)]expsP => <-.
+      rewrite expsP invsM invsK.
+      by rewrite !mulsA -[(_ * _) * w]mulsA
+              -mulsA  expsnns  !mulsA.
 Qed.
-Lemma power_proper {G: setoidGroupType} (x y: G) (k: int):
-  x == y -> power x k == power y k.
+
+#[deprecated(since="2026-10-28", note="Use expsnA instead.")]
+Notation power_mul := expsnA.
+
+Lemma exps_extl' {G: setoidGroupType} (x y: G) (k: nat):
+  x \approx y -> x ^ k \approx y ^ k.
 Proof.
-move=> Heq.
-case: k => k.
-  exact: power_proper_pos.
-have ->: Negz k = (- (k.+1)%:Z)%R by done.
-by rewrite !power_inv power_proper_pos.
+  move=> Heq.
+  elim: k => [//|k IH].
+  by rewrite !expsS IH Heq.
 Qed.
-Arguments power_proper {_ _ _}.
 
-Global Instance: forall G, Proper (eq ==> Logic.eq ==> eq) (@power G).
+#[deprecated(since="2026-10-28", note="Use exps_extl' instead.")]
+Notation power_proper_pos := exps_extl'.
+
+Lemma exps_extl {G: setoidGroupType} (x y: G) (k: int):
+  x \approx y -> x ^ k \approx y ^ k.
 Proof.
-  by move => G x y Hxy h k ->; apply power_proper.
+  move=> Heq.
+  case: k => k;
+    first by exact: exps_extl'.
+  have ->: Negz k = (- (k.+1)%:Z)%R by done.
+  by rewrite !expsN exps_extl'.
 Qed.
 
-Lemma morphism_preserve_power_pos {G G': group} (f: morphism G G') (x: G) (k: nat):
-  f (power x k) == power (f x) k.
+#[deprecated(since="2026-10-28", note="Use exps_extl instead.")]
+Notation power_proper := exps_extl.
+
+Arguments exps_extl {_ _ _}.
+
+Global Instance: forall G,
+  Proper (equiv ==> Logic.eq ==> equiv) (@exp G).
 Proof.
-elim: k => [/=|k].
-  by rewrite morphism_preserve_e.
-by rewrite !expsS morphism_preserve_law => <-.
+  by move => G x y Hxy h k ->; apply exps_extl.
 Qed.
-Lemma morphism_preserve_power {G G': group} (f: morphism G G') (x: G) (k: int):
-  f (power x k) == power (f x) k.
+
+Lemma expfM' {G G': setoidGroupType}
+  (f: morphism G G') (x: G) (k: nat):
+  f (x ^ k) \approx (f x) ^ k.
 Proof.
-case: k => k.
-  exact: morphism_preserve_power_pos.
-have ->: Negz k = (- (k.+1)%:Z)%R by done.
-rewrite !power_inv -morphism_preserve_inv.
-by rewrite morphism_preserve_power_pos.
+  elim: k => [/=|k];
+    first by rewrite onefM.
+  by rewrite !expsS mulfM => <-.
 Qed.
 
+#[deprecated(since="2026-10-28", note="Use expfM' instead.")]
+Notation morphism_preserve_power_pos := expfM'.
 
-(*#[short(type="deceqGroupType")]*)
-(*HB.structure Definition DecEqGroup := { G of isGroup G & hasEq G & isMonoid G & hasDecEq G }.*)
+Lemma expfM {G G': setoidGroupType}
+  (f: morphism G G') (x: G) (k: int):
+  f (x ^ k) \approx (f x) ^ k.
+Proof.
+  case: k => k;
+    first by exact: expfM'.
+  have ->: Negz k = (- (k.+1)%:Z)%R by done.
+  rewrite !expsN -invfM.
+  by rewrite expfM'.
+Qed.
 
-HB.mixin Record isSubgroup (G: group) (H: group) := {
+#[deprecated(since="2026-10-28", note="Use expfM instead.")]
+Notation morphism_preserve_power := expfM.
+
+(* TODO(reiniscirpons): move to generated subgroup *)
+(* TODO(reiniscirpons): Should we not use this definition given
+   what we spoke about with Assia, or is this ok because we
+   do some magic later on? *)
+HB.mixin Record isSubgroup (G H: setoidGroupType) := {
   subgroup_inj: injectiveMorphism H G;
 }.
 
 #[short(type="subgroup")]
-HB.structure Definition Subgroup (G: group) := { H of isSubgroup G (* super group *) H (* sub group *)}.
+HB.structure Definition Subgroup (G: setoidGroupType) :=
+  { H of isSubgroup G (* super group *) H (* sub group *)}.
+
+Notation "'[og' x ']'" := (@subgroup_inj _ _ x)
+  (at level 10, format "[og  x ]").
+
 
 (* NOTE(reiniscirpons): I don't understand this well enough to change. Assume ok for now. *)
 
 Elpi Accumulate coercion.db lp:{{
-
 % See https://rocq-prover.zulipchat.com/#narrow/channel/237868-Hierarchy-Builder-devs-.26-users/topic/Missing.20instance.20in.20a.20hierarchy.20for.20subtypes/with/561428680
 coercion _ T {{ Type }} ExpectedType Solution :-
   ExpectedType = {{ subgroup _ }},
-  coq.elaborate-skeleton {{ ( lp:T : group) }} ExpectedType Solution Diagnostics,
+  coq.elaborate-skeleton {{ ( lp:T : setoidGroupType) }} ExpectedType Solution Diagnostics,
   ok = Diagnostics.
-
 }}.
 
 (* TODO: it would be cool to "register" subgroup_inj as a coercion.
@@ -776,68 +809,111 @@ coercion _ T {{ Type }} ExpectedType Solution :-
     H -> G := @subgroup_inj G H.
 *)
 
-Definition in_subgroup {G: setoidGroupType} (K: subgroup G) (x: G) :=
-  exists x': K, subgroup_inj x' == x.
-Notation "x '\insubgroup' K" := (in_subgroup K x) (at level 10).
+Definition insubg
+  {G: setoidGroupType} (H: subgroup G) (x: G) :=
+  exists x': H, [og x'] \approx x.
+
+Notation "x '\insubgroup' H" := (@insubg _ H x) (at level 10).
+
+#[deprecated(since="2026-10-28", note="Use insubg instead.")]
+Notation in_subgroup := insubg.
 
 (* this definition is useful as due to non-forgetful inheritance, seeing a subgroup of a subgroup of a group as a subgroup of the group is not easy *)
-Definition in_subsubgroup (G: group) (H: subgroup G) (I: subgroup H) (x: G) :=
-  exists x': I, subgroup_inj (subgroup_inj x') == x.
-Notation "x '\insubsubgroup[' Subgroup ']' Subsubgroup" := (@in_subsubgroup _ Subgroup Subsubgroup x) (at level 10).
+Definition insubsubg (G: setoidGroupType)
+  (H: subgroup G) (I: subgroup H) (x: G) :=
+  exists x': I, [og [og x']] \approx x.
 
-Lemma in_subgroup_proper {Group: group} (Subgroup: subgroup Group) (x x': Group):
-  (x == x') ->
-  (x \insubgroup Subgroup) ->
-  (x' \insubgroup Subgroup).
+Notation "x '\insubsubgroup' '[' H ']' I" :=
+  (@insubsubg _ H I x)
+  (at level 10,
+    format "x  '\insubsubgroup' [ H ]  I").
+
+#[deprecated(since="2026-10-28", note="Use insubsubg instead.")]
+Notation in_subsubgroup := insubsubg.
+
+Lemma insubg_extl {G: setoidGroupType} (H: subgroup G) (x x': G):
+  (x \approx x') ->
+  (x \insubgroup H) ->
+  (x' \insubgroup H).
 Proof.
-move=> Heq [xS ?].
-exists xS.
-by rewrite -Heq.
+  move=> Heq [xS ?].
+  exists xS.
+  by rewrite -Heq.
 Qed.
 
-Lemma in_subgroup_e {Group: group} {Subgroup: subgroup Group}:
-  e \insubgroup Subgroup.
-Proof. exists e; by rewrite morphism_preserve_e. Qed.
+#[deprecated(since="2026-10-28", note="Use insubg_extl instead.")]
+Notation in_subgroup_proper := insubg_extl.
 
-Lemma in_subgroup_law {Group: group} {Subgroup: subgroup Group} (x y: Group):
-  (x \insubgroup Subgroup) -> (y \insubgroup Subgroup) -> ((x @ y) \insubgroup Subgroup).
+Lemma insubg1 {G: setoidGroupType} {H: subgroup G}:
+  1 \insubgroup H.
+Proof. exists 1; by rewrite onefM. Qed.
+
+#[deprecated(since="2026-10-28", note="Use insubg1 instead.")]
+Notation in_subgroup_e := insubg1.
+
+Lemma insubgM {G: setoidGroupType} {H: subgroup G} (x y: G):
+  x \insubgroup H ->
+  y \insubgroup H ->
+  (x * y) \insubgroup H.
 Proof.
-case=> [x' Hx'].
-case=> [y' Hy'].
-exists (x' @ y').
-by rewrite morphism_preserve_law -Hx' -Hy'.
+  case=> [x' Hx'].
+  case=> [y' Hy'].
+  exists (x' * y').
+  by rewrite mulfM -Hx' -Hy'.
 Qed.
 
-Lemma in_subgroup_inv {Group: group} {Subgroup: subgroup Group} (x: Group):
-  (x \insubgroup Subgroup) -> ((inv x) \insubgroup Subgroup).
+#[deprecated(since="2026-10-28", note="Use insubgM instead.")]
+Notation in_subgroup_law := insubgM.
+
+Lemma insubgV {G: setoidGroupType} {H: subgroup G} (x: G):
+  x \insubgroup H ->
+  x^-1 \insubgroup H.
 Proof.
-case=> [x' Hx'].
-exists (inv x').
-by rewrite -Hx' morphism_preserve_inv.
+  case=> [x' Hx'].
+  exists (inv x').
+  by rewrite -Hx' invfM.
 Qed.
 
-Lemma in_subsubgroup_proper {G: setoidGroupType} (H: subgroup G) (I: subgroup H) (x x': G) :
-  x == x' ->
+#[deprecated(since="2026-10-28", note="Use insubgV instead.")]
+Notation in_subgroup_inv := insubgV.
+
+Lemma insubsubg_extl {G: setoidGroupType} (H: subgroup G)
+  (I: subgroup H) (x x': G):
+  x \approx x' ->
   (x \insubsubgroup[H] I) ->
   (x' \insubsubgroup[H] I).
 Proof.
-move=> Heq [xK eq].
-exists xK.
-by rewrite eq.
+  move=> Heq [xK eq].
+  exists xK.
+  by rewrite eq.
 Qed.
 
+#[deprecated(
+  since="2026-10-28",
+  note="Use insubsubg_extl instead.")]
+Notation in_subsubgroup_proper := insubsubg_extl.
 
-Definition is_subgroup_stable {G: setoidGroupType} {H1 H2: subgroup G} (f: morphism H1 H2) (K: subgroup G) :=
-  forall (x: H1), ((subgroup_inj x) \insubgroup K) -> subgroup_inj (f x) \insubgroup K.
 
-Record local_morphism (G: group) := {
+Definition is_insubgfM {G: setoidGroupType}
+  {H1 H2: subgroup G} (f: morphism H1 H2) (K: subgroup G) :=
+  forall (x: H1),
+    [og x] \insubgroup K ->
+    [og (f x)] \insubgroup K.
+
+#[deprecated(
+  since="2026-10-28",
+  note="Use is_insubgfM instead.")]
+Notation is_subgroup_stable := is_insubgfM.
+
+Record local_morphism (G: setoidGroupType) := {
   lm_source_subgroup : subgroup G;
   lm_target_subgroup : subgroup G;
   lm_morphism :> morphism lm_source_subgroup lm_target_subgroup;
 }.
 Arguments lm_source_subgroup {_}.
 Arguments lm_target_subgroup {_}.
-Coercion morphism_to_local_morphism {G} {H1 H2: subgroup G}: morphism H1 H2 -> local_morphism G :=
+Coercion morphism_to_local_morphism {G} {H1 H2: subgroup G}:    
+  morphism H1 H2 -> local_morphism G :=
   fun f => {| lm_morphism := f |}.
 
 
@@ -845,218 +921,354 @@ Section RightCoset.
 
 Context {G: setoidGroupType}.
 Variable H: subgroup G.
+Implicit Types (x y: G).
 
-Definition right_coset_eq (x y: G): Prop := in_subgroup H (x @ inv y).
+Definition rcequiv (K: subgroup G) x y: Prop :=
+  (x * y^-1) \insubgroup K.
 
+Notation "x '\inrcoset' '[' H ']' y" := (rcequiv H x y)
+  (at level 60, no associativity, format "x  \inrcoset [ H ]  y").
+ 
 Lemma right_coset_eq': forall x y,
-  right_coset_eq x y <-> (exists w: H, (subgroup_inj w) @ y == x).
+  (x \inrcoset[H] y) <->
+  (exists w: H, x \approx [og w] * y).
 Proof.
   move => x y; split.
-  - rewrite /right_coset_eq /in_subgroup.
+  - rewrite /rcequiv /insubg.
     case => w Hw; exists w;
     by rewrite Hw -mulsA mulVs muls1.
   - case => w Hw; exists w;
-    by rewrite -Hw -mulsA mulsV muls1.
+    by rewrite Hw -mulsA mulsV muls1.
 Qed.
 
-Instance RightCosetEqReflexivity : Reflexive right_coset_eq.
+Instance RightCosetEqReflexivity: Reflexive (rcequiv H).
 Proof.
-  move => x; rewrite right_coset_eq'; exists e;
-  by rewrite morphism_preserve_e mul1s.
+  move => x; rewrite right_coset_eq'; exists 1;
+  by rewrite onefM mul1s.
 Qed.
-Instance RightCosetEqSymmetry : Symmetric right_coset_eq.
+
+Instance RightCosetEqSymmetry : Symmetric (rcequiv H).
 Proof.
   move => x y; rewrite !right_coset_eq'.
   case => w Hw; exists (inv w).
-  by rewrite -morphism_preserve_inv -Hw mulsA mulVs mul1s.
+  by rewrite -invfM Hw mulsA mulVs mul1s.
 Qed.
-Instance RightCosetEqTransitivity : Transitive right_coset_eq.
+
+Instance RightCosetEqTransitivity : Transitive (rcequiv H).
 Proof.
   move => x y z; rewrite !right_coset_eq'.
-  move => [w1 H1] [w2 H2]; exists (w1 @ w2).
-  by rewrite morphism_preserve_law -mulsA H2 H1.
+  move => [w1 H1] [w2 H2]; exists (w1 * w2).
+  by rewrite mulfM -mulsA -H2 -H1.
 Qed.
-Instance RightCosetEqEquivalence : Equivalence right_coset_eq := {}.
+
+Instance RightCosetEqEquivalence :
+  Equivalence (rcequiv H) := {}.
 End RightCoset.
 Existing Instance RightCosetEqReflexivity.
 Existing Instance RightCosetEqSymmetry.
 Existing Instance RightCosetEqTransitivity.
 Existing Instance RightCosetEqEquivalence.
-Check right_coset_eq.
+
+#[deprecated(since="2026-10-28", note="Use rcequiv instead.")]
+Notation right_coset_eq := rcequiv.
+
+Notation "x '\inrcoset' '[' H ']' y" := (rcequiv H x y)
+  (at level 60,
+    no associativity,
+    format "x  \inrcoset [ H ]  y"): setoid_group_scope.
 
 HB.mixin Record isRightCosetRep
-  (G: group) (H: subgroup G) (f: G -> G) := {
-  right_coset_rep_correct: forall (x: G),
-    right_coset_eq H x (f x);
-  right_coset_rep_unique: forall (x y: G),
-    right_coset_eq H x y -> f x = f y;
+  (G: setoidGroupType) (H: subgroup G) (f: G -> G) := {
+  rcrepE: forall (x: G),
+    x \inrcoset[H] (f x);
+  rcrep_extl: forall (x y: G),
+    x \inrcoset[H] y -> f x = f y;
 }.
 
 #[short(type="rightCosetRep")]
-HB.structure Definition RightCosetRep (G: group) (H: subgroup G) :=
+HB.structure Definition RightCosetRep
+  (G: setoidGroupType) (H: subgroup G) :=
   { f of isRightCosetRep G H f }.
 
-Lemma right_coset_eq_spec: forall (G: group) H (f: rightCosetRep H) (x y: G),
-  (right_coset_eq H x y) <-> (f x = f y).
+#[deprecated(since="2026-10-28", note="Use rcrepE instead.")]
+Notation right_coset_rep_correct := rcrepE.
+
+#[deprecated(since="2026-10-28", note="Use rcrep_extl instead.")]
+Notation right_coset_rep_unique := rcrep_extl.
+
+Lemma rcequivP: forall (G: setoidGroupType) H
+  (f: rightCosetRep H) (x y: G),
+  (x \inrcoset[H] y) <-> (f x = f y).
 Proof.
   move => G H f x y; split.
-  - by apply right_coset_rep_unique.
+  - by apply rcrep_extl.
   move => Hf; transitivity (f x).
-  - by apply right_coset_rep_correct.
-  rewrite Hf; symmetry; by apply right_coset_rep_correct.
+  - by apply rcrepE.
+  (* TODO: How to make reflexivity of the new equivalence relation
+  get tried automatically? *)
+  by rewrite Hf -rcrepE; reflexivity.
 Qed.
 
-HB.mixin Record isSubgroupCharacterizer (G: group) (P: G -> Type) := {
-  P_law: forall x y, P x -> P y -> P (x @ y);
-  P_neutral: P e;
-  P_inv: forall x, P x -> P (inv x);
+#[deprecated(since="2026-10-28", note="Use rcequivP instead.")]
+Notation right_coset_eq_spec := rcequivP.
+
+HB.mixin Record isSubgroupCharacterizer
+  (G: setoidGroupType) (P: G -> Type) := {
+  sgcharM: forall x y,
+    P x -> P y -> P (x * y);
+  sgchar1: P 1;
+  sgcharV: forall x,
+    P x -> P (x^-1);
 }.
-#[short(type = "subgroup_characterizer")]
-HB.structure Definition SubgroupCharacterizer (G: group) := { P of isSubgroupCharacterizer G P }.
+#[short(type = "subgroupChar")]
+HB.structure Definition SubgroupCharacterizer
+  (G: setoidGroupType) :=
+  { P of isSubgroupCharacterizer G P }.
+
+#[deprecated(since="2026-10-28", note="Use sgcharM instead.")]
+Notation P_law := sgcharM.
+
+#[deprecated(since="2026-10-28", note="Use sgchar1 instead.")]
+Notation P_neutral := sgchar1.
+
+#[deprecated(since="2026-10-28", note="Use sgcharV instead.")]
+Notation P_inv := sgcharV.
+
+#[deprecated(since="2026-10-28", note="Use subgroupChar instead.")]
+Notation subgroup_characterizer := subgroupChar.
 
 Section SubgroupByCharacterization.
 Context {G: setoidGroupType}.
-Variable P: subgroup_characterizer G.
+Variable P: subgroupChar G.
 
 #[projections(primitive)]
 Record subgroup_by := {
   sb_point :> G;
-  sb_point_characterization: P sb_point;
+  sb_char: P sb_point;
 }.
 
-Definition subgroupby_inj (x: subgroup_by): G := x.
+#[deprecated(since="2026-10-28", note="Use sb_char instead.")]
+Notation sb_point_characterization := sb_char.
 
-Definition subgroupby_eq (x y: subgroup_by) := (subgroupby_inj x) == (subgroupby_inj y).
-Lemma subgroupby_eq_refl: forall x, subgroupby_eq x x.
-Proof. by move=> x; rewrite /subgroupby_eq. Qed.
-Lemma subgroupby_eq_sym: forall x y, subgroupby_eq x y -> subgroupby_eq y x.
-Proof. move=> x y; rewrite /subgroupby_eq; by symmetry. Qed.
-Lemma subgroupby_eq_trans: forall x y z, subgroupby_eq x y -> subgroupby_eq y z -> subgroupby_eq x z.
-Proof. move=> x y z; rewrite /subgroupby_eq => ? ?; by transitivity (subgroupby_inj y). Qed.
+Definition sb_inj (x: subgroup_by): G := x.
+
+#[deprecated(since="2026-10-28", note="Use sb_inj instead.")]
+Notation subgroupby_inj := sb_inj.
+
+Definition sb_equiv (x y: subgroup_by) :=
+  (sb_inj x) \approx (sb_inj y).
+
+#[deprecated(since="2026-10-28", note="Use sb_equiv instead.")]
+Notation subgroupby_eq := sb_equiv.
+
+Lemma sb_equiv_refl: forall x, sb_equiv x x.
+Proof. by move=> x; rewrite /sb_equiv. Qed.
+
+Lemma sb_equiv_sym: forall x y,
+  sb_equiv x y ->
+  sb_equiv y x.
+Proof. move=> x y; rewrite /sb_equiv; by symmetry. Qed.
+
+Lemma sb_equiv_trans: forall x y z,
+  sb_equiv x y ->
+  sb_equiv y z ->
+  sb_equiv x z.
+Proof.
+  move=> x y z; rewrite /sb_equiv => ? ?;
+  by transitivity (sb_inj y).
+Qed.
 
 HB.instance Definition _ :=
-  hasEquiv.Build subgroup_by subgroupby_eq_refl subgroupby_eq_sym subgroupby_eq_trans.
+  hasEquiv.Build subgroup_by
+  sb_equiv_refl sb_equiv_sym sb_equiv_trans.
 
-Definition subgroupby_law (x y : subgroup_by): subgroup_by.
+Definition sb_mul (x y : subgroup_by): subgroup_by.
 Proof.
-exists (x.(sb_point) @ y.(sb_point)).
-apply /P_law; exact /sb_point_characterization.
+exists ((sb_point x) * (sb_point y)).
+by apply /sgcharM; exact /sb_char.
 Defined.
 
-Definition subgroupby_neutral: subgroup_by.
-Proof. exists e; exact: P_neutral. Defined.
+Definition sb_one: subgroup_by.
+Proof. by exists 1; exact: sgchar1. Defined.
 
-Lemma subgroupby_mulsA: forall (x y z: subgroup_by), subgroupby_law x (subgroupby_law y z) == subgroupby_law (subgroupby_law x y) z.
-Proof. by move=> x y z; rewrite /subgroupby_law/= /equiv/= /subgroupby_eq/= /subgroupby_inj/= mulsA. Qed.
-
-Lemma subgroupby_mul1s: forall (x: subgroup_by), subgroupby_law subgroupby_neutral x == x.
-Proof. move=> x; by rewrite /subgroupby_law/= /equiv/= /subgroupby_eq/= /subgroupby_inj/= mul1s. Qed.
-
-Lemma subgroupby_muls1: forall (x: subgroup_by), subgroupby_law x subgroupby_neutral == x.
-Proof. move=> x; by rewrite /subgroupby_law/= /equiv/= /subgroupby_eq/= /subgroupby_inj/= muls1. Qed.
-
-Lemma subgroupby_congruent_left: forall (x y z: subgroup_by), y == z -> subgroupby_law x y == subgroupby_law x z.
+Lemma sb_mulsA: forall (x y z: subgroup_by),
+  sb_mul x (sb_mul y z) \approx sb_mul (sb_mul x y) z.
 Proof.
-move=> x y z ?.
-rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/=.
-exact: congruent_left.
+  move=> x y z.
+  rewrite /sb_mul /= /equiv/= /sb_equiv /= /sb_inj /=.
+  by rewrite mulsA.
 Qed.
 
-Lemma subgroupby_congruent_right: forall (x y z: subgroup_by), y == z -> subgroupby_law y x == subgroupby_law z x.
+Lemma sb_mul1s: forall (x: subgroup_by),
+  sb_mul sb_one x \approx x.
 Proof.
-move=> x y z ?.
-rewrite /subgroupby_law/= /eq/= /subgroupby_eq/= /subgroupby_inj/=.
-exact: congruent_right.
+  move=> x;
+  rewrite /sb_mul /= /equiv /= /sb_equiv /= /sb_inj /=.
+  by rewrite mul1s.
 Qed.
 
-HB.instance Definition _ := isSetoidMonoid.Build subgroup_by subgroupby_mulsA subgroupby_mul1s subgroupby_muls1 subgroupby_congruent_left subgroupby_congruent_right.
+Lemma sb_muls1: forall (x: subgroup_by),
+  sb_mul x sb_one \approx x.
+Proof.
+  move=> x;
+  rewrite /sb_mul /= /equiv /= /sb_equiv /= /sb_inj /=.
+  by rewrite muls1.
+Qed.
 
-Definition subgroupby_inv: subgroup_by -> subgroup_by.
-Proof. move=> x; exists (inv x.(sb_point)); exact /P_inv /sb_point_characterization. Defined.
+Lemma sb_muls_extl: forall (x y z: subgroup_by),
+  y \approx z -> sb_mul x y \approx sb_mul x z.
+Proof.
+  move => x y z ?.
+  rewrite /sb_mul /= /equiv /= /sb_equiv /= /sb_inj /=.
+  exact: muls_extl.
+Qed.
 
-Lemma subgroupby_inverse_law: forall x y, subgroupby_inv (x @ y) == (subgroupby_inv y) @ (subgroupby_inv x).
-Proof. move=> x y; by rewrite /subgroupby_inv/=/equiv/=/subgroupby_eq/subgroupby_inj/= inverse_law. Qed.
+Lemma sb_muls_extr: forall (x y z: subgroup_by),
+  y \approx z -> sb_mul y x \approx sb_mul z x.
+Proof.
+  move => x y z ?.
+  rewrite /sb_mul /= /equiv /= /sb_equiv /= /sb_inj /=.
+  exact: muls_extr.
+Qed.
 
-Lemma subgroupby_mulsV : forall x, x @ (subgroupby_inv x) == e.
-Proof. move=> x; by rewrite /subgroupby_inv/=/mul/=/subgroupby_law/=/equiv/=/subgroupby_eq/=/subgroupby_inj/= mulsV. Qed.
+HB.instance Definition _ := isSetoidMonoid.Build subgroup_by
+  sb_mulsA sb_mul1s sb_muls1 sb_muls_extl sb_muls_extr.
 
-Lemma subgroupby_mulVs : forall x, (subgroupby_inv x) @ x == e.
-Proof. move=> x; by rewrite /subgroupby_inv/=/mul/=/subgroupby_law/=/equiv/=/subgroupby_eq/=/subgroupby_inj/= mulVs. Qed.
+Definition sb_inv: subgroup_by -> subgroup_by.
+Proof.
+  move=> x; exists (sb_point x)^-1;
+  by exact /sgcharV /sb_char.
+Defined.
 
-HB.instance Definition _ := isSetoidGroup.Build subgroup_by subgroupby_inverse_law subgroupby_mulsV subgroupby_mulVs.
+Lemma sb_invsM: forall x y,
+  sb_inv (x * y) \approx (sb_inv y) * (sb_inv x).
+Proof.
+  move=> x y;
+  rewrite /sb_inv /= /equiv /= /sb_equiv /sb_inj /=;
+  by rewrite invsM.
+Qed.
 
-Lemma subgroupby_inj_preserve_equiv: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
+Lemma sb_mulsV : forall x,
+  x * (sb_inv x) \approx 1.
+Proof.
+  move=> x;
+  rewrite /sb_inv /= /equiv /= /sb_equiv /sb_inj /=;
+  by rewrite mulsV.
+Qed.
+
+Lemma sb_mulVs : forall x,
+  (sb_inv x) * x \approx 1.
+Proof.
+  move=> x;
+  rewrite /sb_inv /= /equiv /= /sb_equiv /sb_inj /=;
+  by rewrite mulVs.
+Qed.
+
+HB.instance Definition _ := isSetoidGroup.Build subgroup_by
+  sb_invsM sb_mulsV sb_mulVs.
+
+Lemma sb_equivfM: forall x y,
+  x \approx y ->
+  sb_inj x \approx sb_inj y.
 Proof. done. Qed.
 
 HB.instance Definition _ := 
-  isSetoidMorphism.Build _ _ 
-    subgroupby_inj 
-    subgroupby_inj_preserve_equiv.
+  isSetoidMorphism.Build _ _ sb_inj sb_equivfM.
 
-Lemma subgroupby_inj_injectivity: forall x y, x == y -> subgroupby_inj x == subgroupby_inj y.
+Lemma sb_injfM: forall x y,
+  x \approx y ->
+  sb_inj x \approx sb_inj y.
 Proof. done. Qed.
 
 HB.instance Definition _ := 
   isInjective.Build _ _ 
-    subgroupby_inj 
-    subgroupby_inj_injectivity.
+    sb_inj 
+    sb_injfM.
 
-Lemma subgroupby_inj_preserve_e: subgroupby_inj one == one.
+Lemma sb_onefM: sb_inj 1 \approx 1.
 Proof. done. Qed.
-Lemma subgroupby_inj_preserve_law: forall x y, subgroupby_inj (law x y) == law (subgroupby_inj x) (subgroupby_inj y).
+
+Lemma sb_mulfM: forall x y,
+  sb_inj (x * y) \approx (sb_inj x) * (sb_inj y).
 Proof. done. Qed.
 
 HB.instance Definition _ := 
   isMonoidMorphism.Build _ _
-    subgroupby_inj 
-    subgroupby_inj_preserve_e 
-    subgroupby_inj_preserve_law.
+    sb_inj 
+    sb_onefM 
+    sb_mulfM.
 
 HB.instance Definition _ :=
-  isSubgroup.Build G subgroup_by subgroupby_inj.
+  isSubgroup.Build G subgroup_by sb_inj.
 
 End SubgroupByCharacterization.
 Arguments subgroup_by {_}.
-Arguments sb_point_characterization {_ _}.
+Arguments sb_char {_ _}.
 Arguments sb_point {_ _}.
 
+#[deprecated(since="2026-10-28", note="Use sb_char instead.")]
+Notation sb_point_characterization := sb_char.
+#[deprecated(since="2026-10-28", note="Use sb_inj instead.")]
+Notation subgroupby_inj := sb_inj.
+#[deprecated(since="2026-10-28", note="Use sb_equiv instead.")]
+Notation subgroupby_eq := sb_equiv.
+
+(* TODO(reiniscirpons): Do we need this? *)
 (* {e}, the subgroup! *)
 Section SingletonSubgroup.
-Variable K: group.
+Variable K: setoidGroupType.
 
-Definition singleton_subgroup_char (x: K): Type := (x == e).
+Definition ssc_char (x: K): Prop :=
+  (x \approx 1).
 
-Lemma ssc_neutral: singleton_subgroup_char e.
-Proof. by rewrite /singleton_subgroup_char. Qed.
+Lemma ssc_one: ssc_char 1.
+Proof. by rewrite /ssc_char. Qed.
 
-Lemma ssc_inv (x: K): singleton_subgroup_char x -> singleton_subgroup_char (inv x).
-Proof. by rewrite /singleton_subgroup_char => ->; rewrite inv_e. Qed.
+Lemma ssc_inv (x: K): ssc_char x -> ssc_char (x^-1).
+Proof.
+  by rewrite /ssc_char => ->; rewrite invs1.
+Qed.
 
-Lemma ssc_law (x y: K): singleton_subgroup_char x -> singleton_subgroup_char y -> singleton_subgroup_char (x @ y).
-Proof. by rewrite /singleton_subgroup_char => -> ->; rewrite mul1s. Qed.
+Lemma ssc_mul (x y: K):
+  ssc_char x ->
+  ssc_char y ->
+  ssc_char (x * y).
+Proof.
+  by rewrite /ssc_char => -> ->; rewrite mul1s.
+Qed.
 
-HB.instance Definition _ := isSubgroupCharacterizer.Build K singleton_subgroup_char ssc_law ssc_neutral ssc_inv.
+HB.instance Definition _ := isSubgroupCharacterizer.Build K
+  ssc_char ssc_mul ssc_one ssc_inv.
 
-Definition singleton_subgroup := subgroup_by singleton_subgroup_char.
+Definition singleton_subgroup := subgroup_by ssc_char.
 
-Definition singleton_morphism: singleton_subgroup -> singleton_subgroup := id.
+Definition singleton_morphism:
+  singleton_subgroup -> singleton_subgroup := id.
 
-Lemma sm_preserve_equiv: forall x y, x == y -> singleton_morphism x == singleton_morphism y.
+Lemma sm_equivfM: forall x y,
+  x \approx y ->
+  singleton_morphism x \approx singleton_morphism y.
 Proof. done. Qed.
-Lemma sm_preserve_e: singleton_morphism e == e.
+
+Lemma sm_onefM:
+  singleton_morphism 1 \approx 1.
 Proof. done. Qed.
-Lemma sm_preserve_law: forall x y, singleton_morphism (x @ y) == (singleton_morphism x) @ (singleton_morphism y).
+
+Lemma sm_mulfM: forall x y,
+  singleton_morphism (x * y) \approx
+  (singleton_morphism x) * (singleton_morphism y).
 Proof. done. Qed.
 
 HB.instance Definition _ :=
   isSetoidMorphism.Build singleton_subgroup singleton_subgroup
     singleton_morphism
-    sm_preserve_equiv.
+    sm_equivfM.
+
 HB.instance Definition _ :=
   isMonoidMorphism.Build singleton_subgroup singleton_subgroup
     singleton_morphism
-    sm_preserve_e
-    sm_preserve_law.
+    sm_onefM
+    sm_mulfM.
 
 End SingletonSubgroup.
 
@@ -1066,29 +1278,33 @@ Section SubgroupIntersection.
 Context {G: setoidGroupType}.
 Variable (H1 H2: subgroup G).
 
-Record is_in_intersection (x: G) : Prop := {
-  intersection_in_left: x \insubgroup H1;
-  intersection_in_right: x \insubgroup H2;
-}.
+Definition is_in_intersection (x: G): Prop :=
+  (x \insubgroup H1) /\ (x \insubgroup H2).
 
-Definition iii_P_law : forall (x y: G), is_in_intersection x -> is_in_intersection y -> is_in_intersection (x @ y).
+Definition iii_charM : forall (x y: G),
+  is_in_intersection x ->
+  is_in_intersection y ->
+  is_in_intersection (x * y).
 Proof.
-move=> x y [[x1 x1_eq] [x2 x2_eq]] [[y1 y1_eq] [y2 y2_eq]]; eexists.
-- by exists (x1 @ y1); rewrite morphism_preserve_law -x1_eq -y1_eq.
-- by exists (x2 @ y2); rewrite morphism_preserve_law -x2_eq -y2_eq.
+move=> x y [[x1 x1_eq] [x2 x2_eq]] [[y1 y1_eq] [y2 y2_eq]]; 
+eexists.
+- by exists (x1 * y1); rewrite mulfM -x1_eq -y1_eq.
+- by exists (x2 * y2); rewrite mulfM -x2_eq -y2_eq.
 Qed.
 
-Definition iii_P_neutral : is_in_intersection e.
-Proof. by eexists; exists e; rewrite morphism_preserve_e. Qed.
+Definition iii_char1 : is_in_intersection 1.
+Proof. by eexists; exists 1; rewrite onefM. Qed.
 
-Definition iii_P_inv : forall (x: G), is_in_intersection x -> is_in_intersection (inv x).
+Definition iii_charV : forall (x: G),
+  is_in_intersection x ->
+  is_in_intersection (x^-1).
 Proof.
 move=> x [[x1 x1_eq] [x2 x2_eq]]; eexists.
-- by exists (inv x1); rewrite -morphism_preserve_inv -x1_eq.
-- by exists (inv x2); rewrite -morphism_preserve_inv -x2_eq.
+- by exists (inv x1); rewrite -invfM -x1_eq.
+- by exists (inv x2); rewrite -invfM -x2_eq.
 Qed.
 
-HB.instance Definition _ := isSubgroupCharacterizer.Build G is_in_intersection iii_P_law iii_P_neutral iii_P_inv.
+HB.instance Definition _ := isSubgroupCharacterizer.Build G is_in_intersection iii_charM iii_char1 iii_charV.
 
 (* we could also prove that H1 /\ H2 is a subgroup of H1 and H2 *)
 

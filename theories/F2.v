@@ -138,7 +138,7 @@ Definition free_group_relations:
   [seq pair [:: Inverse a; Base a] [::] | a: Sigma].
 
 Definition FGP :=
-  Pres (InverseAlphabet Sigma) free_group_relations.
+  Presentation free_group_relations.
 
 Definition FreeGroup := (presented FGP).
 
@@ -178,7 +178,6 @@ Qed.
 HB.instance Definition _ :=
   hasInvertibleLetters.Build
     FGP
-    FreeGroup_invl
     FreeGroup_invlK
     FreeGroup_invl_left
     FreeGroup_invl_right.
@@ -209,13 +208,13 @@ Qed.
 Lemma FreeGroup_norm_correct w:
   FreeGroup_norm w == w.
 Proof.
-  elim: w => [//|c w IH /=]; rewrite (cons_law _ c w).
+  elim: w => [//|c w IH /=]; rewrite (cons_law c w).
   case Hn: (FreeGroup_norm w) => [//|d w']; rewrite -IH Hn.
   - by rewrite -cons_law.
   case Heq: (c == invl d)%B; last first.
   - by rewrite -cons_law.
   move/eqP: Heq => ->;
-  by rewrite (cons_law _ d) associativity invl_right.
+  by rewrite (cons_law d) associativity invl_right.
 Qed.
 
 Definition FreeGroup_dec_eq (w w': FreeGroup): bool :=
@@ -291,8 +290,8 @@ Proof.
   rewrite invlK; case H1: (invl c == d)%B;
   case H2: (c == invl d)%B => //; exfalso;
   move/eqP: H1 => H1; move/eqP: H2 => H2.
-  - apply H2; by rewrite -(invlK c) invl_inj.
-  - apply H1; by rewrite -(invlK d) invl_inj.
+  - apply H2; by rewrite -(invlK c) H1.
+  - apply H1; by rewrite -(invlK d) H2.
 Qed.
 
 Lemma FreeGroup_norm_inv w:
@@ -337,7 +336,7 @@ Lemma FreeGroup_norm_cons_invl: forall c (w: FreeGroup),
   FreeGroup_norm ([:: c, invl c & w]) = FreeGroup_norm w.
 Proof.
   move => c w; apply FreeGroup_norm_unique;
-  by rewrite cons_law (cons_law _ _ w) associativity invl_left neutral_left.
+  by rewrite cons_law (cons_law _ w) associativity invl_left neutral_left.
 Qed.
 
 Lemma FreeGroup_norm_subseq: forall (w: FreeGroup),
@@ -671,7 +670,8 @@ Lemma freely_reduced_power
     (Hn0: all (fun k => (k != 0)%Z) ks)
     (Hdistinct: freely_reduced_helper w):
   (w == FreeGroup_norm w)%B ->
-  freely_reduced (prod (map (fun '(x, k) => power (`[x]_(FGP Sigma)) k) (zip w ks))).
+  freely_reduced (prod (map (fun '(x, k) =>
+    power ([word [::x]]) k) (zip w ks))).
 Proof.
   move/eqP in Hsize.
   move/allP in Hn0.
@@ -773,8 +773,8 @@ HB.instance Definition _ := isRelationPreservingMorphism.Build
   (FGP Sigma) G
   FreeGroup_universal_extension
   FreeGroup_alphabet_extension_preserve_relations
-  (extension_preserve_e _ _ FreeGroup_alphabet_extension)
-  (extension_preserve_law _ _ FreeGroup_alphabet_extension).
+  (@extension_preserve_e _ _ FreeGroup_alphabet_extension)
+  (@extension_preserve_law _ _ FreeGroup_alphabet_extension).
 
 (* TODO(reiniscirpons): Is it possible to make Rocq treat sigma
   (FreeGroup_presentation Sigma) and InverseAlphabet Sigma as the same? *)

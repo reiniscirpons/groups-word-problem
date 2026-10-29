@@ -6,7 +6,7 @@ From mathcomp Require Import eqtype seq fintype all_algebra tuple.
 From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
 
-From GWP Require Import Presentation AffineMachines F2 EquivalenceAlgebra Equivalence HNN Utils.
+From GWP Require Import Presentation AffineMachines FreeGroup EquivalenceAlgebra Equivalence HNN Utils.
 
 
 Record GWPArguments := {

@@ -30,7 +30,7 @@ From mathcomp Require Import ring lra zify.
 
 Import GRing.Theory.
 
-From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation F2 GeneratedSubgroup Sizelexi WellFounded Preorder SeqExtension.
+From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation FreeGroup GeneratedSubgroup Sizelexi WellFounded Preorder SeqExtension.
 
 Open Scope ring_scope.
 

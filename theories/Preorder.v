@@ -11,7 +11,7 @@ From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat.
 From mathcomp Require Import eqtype seq fintype all_algebra div.
 From mathcomp Require Import ring lra zify.
 
-From GWP Require Import Equivalence EquivalenceAlgebra Presentation F2 WellFounded Sizelexi.
+From GWP Require Import Equivalence EquivalenceAlgebra Presentation FreeGroup WellFounded Sizelexi.
 
 Local Open Scope order_scope.
 
@@ -472,7 +472,7 @@ Proof.
 Qed.
 
 (* Note(mathis): weird proof because Rocq doesn't want to rewrite in a lambda *)
-Fact le_wf: well_founded (fun (x y: F2_InverseAlphabet__canonical__Order_Total) => (x < y)%O).
+Fact le_wf: well_founded (fun (x y: InverseAlphabet Sigma) => (x < y)%O).
 Proof.
   rewrite /Order.lt /=.
   rewrite /le_Sigma.

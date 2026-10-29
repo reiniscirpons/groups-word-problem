@@ -6,7 +6,7 @@ From mathcomp Require Import eqtype seq fintype zify.
 Import GRing.Theory.
 Require Import Setoid Morphisms.
 
-From GWP Require Import Equivalence EquivalenceAlgebra Presentation F2.
+From GWP Require Import Equivalence EquivalenceAlgebra Presentation FreeGroup.
 
 Import PresentationNotations.
 

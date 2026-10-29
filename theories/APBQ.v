@@ -8,7 +8,7 @@ Require Import Setoid Morphisms.
 Import GRing.Theory.
 
 From GWP Require Import Utils Equivalence
-  EquivalenceAlgebra Presentation F2 GeneratedSubgroup
+  EquivalenceAlgebra Presentation FreeGroup GeneratedSubgroup
   NielsenSchreier Sizelexi Preorder GroupTactic.
 
 Open Scope int_scope.

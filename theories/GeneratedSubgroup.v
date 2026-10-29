@@ -6,7 +6,7 @@ From mathcomp Require Import ring lra zify.
 Import GRing.Theory.
 Require Import Setoid Morphisms.
 
-From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation F2.
+From GWP Require Import Utils Equivalence EquivalenceAlgebra Presentation FreeGroup.
 
 Open Scope setoid_group_scope.
 Import SetoidGroupNotations.

@@ -182,37 +182,54 @@ Notation reduction_rule := red1rel.
 
 Module PresentationNotations.
 
-Notation "\epsilon" := ([::] : presented _) (at level 10).
+Notation "\epsilon" := ([::] : presented _)
+  (at level 10): setoid_group_scope.
 Notation "'\epsilon_' P" := ([::] : presented P)
-  (at level 10).
-Notation "'[word' x ']'" := (x : presented _)
-  (at level 10, format "[word  x ]").
-Notation "'[word' x ']_' P" := (x : presented P)
+  (at level 10): setoid_group_scope.
+Notation "'[word' x ']'" := ([:: x] : presented _)
+  (at level 10, format "[word  x ]"): setoid_group_scope.
+Notation "'[word' x ']_' P" := ([:: x] : presented P)
   (at level 10, format "[word  x ]_ P").
+Notation "'[word' x ; y ; .. ; z ']'" :=
+  ((x :: (cons y .. [:: z] ..)) : presented _)
+  (at level 10,
+  format "[word  '[' x ; '/' y ; '/' .. ; '/' z ']' ]")
+  :setoid_group_scope.
+Notation "'[word' x ; y ; .. ; z ']_' P" :=
+  ((x :: (cons y .. [:: z] ..)) : presented P)
+  (at level 10,
+  format "[word  '[' x ; '/' y ; '/' .. ; '/' z ']' ]_ P")
+  :setoid_group_scope.
+Notation "'[word' x ']_' P" := ([:: x] : presented P)
+  (at level 10, format "[word  x ]_ P").
+Notation "x %% P" := (x : presented P)
+  (at level 40).
 Notation "x '\approx' y '%[mod' P ']'" :=
   (x \approx y :> presented P)
-  (at level 70, only parsing).
+  (at level 70, only parsing): setoid_group_scope.
 Notation "x '≈' y '%[mod' P ']'" :=
   (x \approx y %[mod P])
-  (at level 70, only printing, format "x  ≈  y %[mod  P ]").
+  (at level 70,
+    only printing,
+    format "x  ≈  y %[mod  P ]"): setoid_group_scope.
 
 #[deprecated(since="2026-10-29", note="Use \epsilon_ instead.")]
 Notation "`[ ]_ P" := ([::] : presented P)
   (at level 10, format "`[  ]_ P").
 #[deprecated(
   since="2026-10-29",
-  note="Use [pres [::x]]_P instead.")]
-Notation "`[ x ]_ P" := (x : presented P)
+  note="Use [word x]_P instead.")]
+Notation "`[ x ]_ P" := ([word x]_P)
   (at level 10, format "`[ x ]_ P").
 #[deprecated(
   since="2026-10-29",
-  note="Use [pres [::x; y; ... ; z]]_P instead.")]
+  note="Use [word x; y; ... ; z]_P instead.")]
 Notation "`[ x ; y ; .. ; z ]_ P" :=
   ((x :: (cons y .. [:: z] ..)) : presented P)
   (format "`[ '[' x ; '/' y ; '/' .. ; '/' z ']' ]_ P").
 #[deprecated(
   since="2026-10-29",
-  note="Use [pres x]_P instead.")]
+  note="Use x %% P instead.")]
 Notation "x \mod P" := (x : presented P)
   (at level 10, format "x  \mod  P").
 
@@ -224,21 +241,21 @@ Import PresentationNotations.
    law conversions to simplify future lemmas. *)
 (* TODO(reiniscirpons: Do we still need this?) *)
 Lemma catmulE: forall P (x y: presented P),
-    [word x ++ y] = x * y.
+    x ++ y %% P = x * y.
 Proof. by done. Qed.
 
 #[deprecated(since="2026-10-29", note="Use catmulE instead.")]
 Notation cat_law := catmulE.
 
 Lemma consmulE: forall P (a: sigma P) (x: presented P),
-    [word a::x] = [word [::a]] * x.
+    (a::x) %% P = [word a] * x.
 Proof. by []. Qed.
 
 #[deprecated(since="2026-10-29", note="Use consmulE instead.")]
 Notation cons_law := consmulE.
 
 Lemma rconsmulE: forall P (a: sigma P) (x: presented P),
-    [word rcons x a] = x * [word [::a]].
+    (rcons x a) %% P = x * [word a].
 Proof. 
   move => P a;
   by elim => [//|b w /= ->].
@@ -291,7 +308,7 @@ Lemma pres_ind: forall (P: presentation)
   (p: presented P -> Prop),
   p (\epsilon) ->
   (forall (a: sigma P) (x: presented P),
-    p x -> p ([word [::a]] * x)) ->
+    p x -> p ([word a] * x)) ->
   forall (x: presented P), p x.
 Proof.
   move => P p Hnil Hcons.
@@ -302,7 +319,7 @@ Lemma pres_last_ind: forall (P: presentation)
   (p: presented P -> Prop),
   p (\epsilon) ->
   (forall (a: sigma P) (x: presented P),
-    p x -> p (x * [word [::a]])) ->
+    p x -> p (x * [word a])) ->
   forall (x: presented P), p x.
 Proof.
   move => P p Hnil Hrcons.
@@ -325,7 +342,7 @@ Definition cat_ind: forall (T: Type) (P: seq T -> Prop),
 Lemma pres_cat_ind: forall (P: presentation)
   (p: presented P -> Prop),
   p (\epsilon) ->
-  (forall (a: sigma P), p ([word [:: a]])) ->
+  (forall (a: sigma P), p ([word a])) ->
   (forall (x y: presented P),
     p x -> p y -> p (x * y)) ->
   forall (x: presented P), p x.
@@ -352,7 +369,7 @@ Proof. done. Qed.
 Lemma extension_universality:
   forall (varphi: morphism (presented P) M),
     (forall a: sigma P,
-      varphi ([word [:: a]]) \approx f a) -> 
+      varphi ([word a]) \approx f a) -> 
     (forall w: presented P, 
       varphi w \approx extension w).
 Proof.
@@ -393,9 +410,9 @@ HB.mixin Record hasInvertibleLetters (P: presentation) := {
   involsK:
     forall c, invol (invol c) = c;
   involsV: forall c,
-    [word [::c]] * [word [:: invol c]] \approx 1;
+    [word c] * [word invol c] \approx 1;
   involVs: forall c,
-    [word [::invol c]] * [word [:: c]] \approx 1;
+    [word invol c] * [word c] \approx 1;
 }.
 #[short(type="invertiblePresentationType")]
 HB.structure Definition InvertiblePresentation :=
@@ -541,11 +558,11 @@ Proof.
   by rewrite expsS exps0 -catmulE cats0.
 Qed.
 Lemma invs_cons1 (c: sigma P):
-  ([word [:: c]])^-1 = [:: invol c].
+  ([word c])^-1 = [word c^~1].
 Proof. done. Qed.
 
 Lemma exps_rev1 c (x: int):
-  rev ([word [::c]] ^ x) = [word [::c]] ^ x.
+  rev ([word c] ^ x) = [word c] ^ x.
 Proof.
   elim: x => [//||] n IH.
   - by rewrite expsS rev_cat -!catmulE -exps_catC' IH.
@@ -553,7 +570,7 @@ Proof.
 Qed.
 
 Lemma size_expsN0 c (x: int):
-  x != 0 -> (size ([word [::c]] ^ x) > 0).
+  x != 0 -> (size ([word c] ^ x) > 0).
 Proof.
   case: (intP x) => [//|n|n].
   - by rewrite expsS -catmulE size_cat /=.
@@ -561,7 +578,7 @@ Proof.
 Qed.
 
 Lemma size_expcn c (x: int):
-  size ([word [::c]] ^ x) = absz x.
+  size ([word c] ^ x) = absz x.
 Proof.
   case x => n; elim n => [//|n0 IH].
   - by rewrite expsS -catmulE size_cat /= IH.

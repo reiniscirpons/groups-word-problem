@@ -598,7 +598,7 @@ HB.instance Definition _ := isSubgroupCharacterizer.Build
 *)
 Lemma igs_gen (s: Sigma): in_generated_subgroup (nth_gen s).
 Proof.
-  exists ([word [:: Base s]]_(FGP Sigma)).
+  exists ([word Base s]_(FGP Sigma)).
   by rewrite /= neutral_right.
 Defined.
 
@@ -680,12 +680,12 @@ Section GeneratedSubgroupPermMorphism.
     - rewrite hat_cons; case: wh => wh /=.
     -- move/(congruent_left (inv (nth_gen gens wh))).
       rewrite associativity inverse_right neutral_left.
-      move/IH => [w Hw]; exists (([word [::Base (perm wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Base (perm wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= -Hequiv.
       by rewrite associativity inverse_left neutral_left.
     -- move/(congruent_left (nth_gen gens wh)).
       rewrite associativity inverse_left neutral_left.
-      move/IH => [w Hw]; exists (([word [::Inverse (perm wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Inverse (perm wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= -Hequiv.
       by rewrite associativity inverse_right neutral_left.
   Qed.
@@ -772,12 +772,12 @@ Section GeneratedSubgroupInvMorphism.
     - rewrite hat_cons; case: wh => wh /=.
     -- move/(congruent_left (inv (nth_gen gens wh))).
       rewrite associativity inverse_right neutral_left.
-      move/IH => [w Hw]; exists (([word [::Inverse (cast_ord E wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Inverse (cast_ord E wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= (nth_map e) => [|//].
       by rewrite inv_involutive associativity inverse_left neutral_left.
     -- move/(congruent_left (nth_gen gens wh)).
       rewrite associativity inverse_left neutral_left.
-      move/IH => [w Hw]; exists (([word [::Base (cast_ord E wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Base (cast_ord E wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= (nth_map e) => [|//].
       by rewrite associativity inverse_right neutral_left.
   Qed.
@@ -865,13 +865,13 @@ Section GeneratedSubgroupRconsMorphism.
     - rewrite hat_cons; case: wh => wh /=.
     -- move/(congruent_left (inv (nth_gen gens wh))).
       rewrite associativity inverse_right neutral_left.
-      move/IH => [w Hw]; exists (([word [::Base (widen_ord E wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Base (widen_ord E wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= nth_rcons.
       case: wh Hw => m H Hw /=; rewrite H.
       by rewrite associativity inverse_left neutral_left.
     -- move/(congruent_left (nth_gen gens wh)).
       rewrite associativity inverse_left neutral_left.
-      move/IH => [w Hw]; exists (([word [::Inverse (widen_ord E wh)]]_(FGP _)) @ w).
+      move/IH => [w Hw]; exists (([word Inverse (widen_ord E wh)]_(FGP _)) @ w).
       rewrite hat_cons Hw /= nth_rcons.
       case: wh Hw => m H Hw /=; rewrite H.
       by rewrite associativity inverse_right neutral_left.
@@ -932,7 +932,7 @@ Section GeneratedSubgroupRconsMorphism.
     -- move/(congruent_left (inv (nth_gen rcons_gens wh))).
        rewrite associativity inverse_right neutral_left.
        move/IH => [w Hw]; case H: (wh < size gens)%N.
-    --- exists (([word [::Base (Ordinal H)]]_(FGP _)) @ w).
+    --- exists (([word Base (Ordinal H)]_(FGP _)) @ w).
         rewrite hat_cons Hw /= /nth_gen nth_rcons H.
         by rewrite associativity inverse_left neutral_left.
     --- move: Hg => [wg Hwg]; exists (wg @ w).
@@ -943,7 +943,7 @@ Section GeneratedSubgroupRconsMorphism.
     -- move/(congruent_left (nth_gen rcons_gens wh)).
        rewrite associativity inverse_left neutral_left.
        move/IH => [w Hw]; case H: (wh < size gens)%N.
-    --- exists (([word [::Inverse (Ordinal H)]]_(FGP _)) @ w).
+    --- exists (([word Inverse (Ordinal H)]_(FGP _)) @ w).
         rewrite hat_cons Hw /= /nth_gen nth_rcons H.
         by rewrite associativity inverse_right neutral_left.
     --- move: Hg => [wg Hwg]; exists ((inv wg) @ w).

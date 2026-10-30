@@ -1,5 +1,6 @@
 From HB Require Import structures.
 From mathcomp Require Import ssreflect ssrfun ssrbool.
+From Equations.Prop Require Import Logic Equations.
 From mathcomp Require Import eqtype seq fintype choice ssrnat all_algebra.
 From mathcomp Require Import ring lra zify.
 Require Import Setoid Morphisms.
@@ -7,67 +8,85 @@ From Stdlib Require Import Btauto.
 
 From GWP Require Import Presentation Equivalence EquivalenceAlgebra.
 
+Import SetoidGroupNotations.
 Import PresentationNotations.
 
-Inductive InverseAlphabet (Sigma: eqType) :=
-| Base: Sigma -> InverseAlphabet Sigma
-| Inverse: Sigma -> InverseAlphabet Sigma.
-Arguments Base {_}.
-Arguments Inverse {_}.
+Local Open Scope setoid_group_scope.
 
-Definition inverse_alphabet_map {Sigma Gamma: eqType} (f: Sigma -> Gamma):
-  InverseAlphabet Sigma -> InverseAlphabet Gamma :=
+(* A starred alphabet consists of the original alphabet together
+   with a formal copy. *)
+Inductive starred (Sigma: eqType) :=
+| Base: Sigma -> starred Sigma
+| Star: Sigma -> starred Sigma.
+Arguments Base {_}.
+Arguments Star {_}.
+
+#[deprecated(since="2026-10-29", note="Use starred instead.")]
+Notation InverseAlphabet := starred.
+
+#[deprecated(since="2026-10-29", note="Use Star instead.")]
+Notation Inverse := Star.
+
+Definition star_lift {Sigma Gamma: eqType} (f: Sigma -> Gamma):
+  starred Sigma -> starred Gamma :=
     fun a =>
       match a with
       | Base a' => Base (f a')
-      | Inverse a' => Inverse (f a')
+      | Star a' => Star (f a')
       end.
+
+#[deprecated(since="2026-10-29", note="Use star_lift instead.")]
+Notation inverse_alphabet_map := star_lift.
+
 
 Section InverseAlphabetEqType.
 Context {Sigma: eqType}.
 
-Definition InverseAlphabet_eq (u v: InverseAlphabet Sigma) :=
+Definition starred_beq (u v: starred Sigma) :=
   match (u, v) with
   | (Base a, Base b) => (a == b)%B
-  | (Inverse a, Inverse b) => (a == b)%B
+  | (Star a, Star b) => (a == b)%B
   | _ => false
   end.
 
-Lemma InverseAlphabet_eqP: eq_axiom InverseAlphabet_eq.
+Lemma starred_eqP: eq_axiom starred_beq.
 Proof.
-(* TODO(reiniscirpons): how do I make this proof nicer? *)
-rewrite /InverseAlphabet_eq; case => x; case => y; apply (iffP idP) => //.
-- move/eqP => H; by rewrite H.
-- case => H; by rewrite H.
-- move/eqP => H; by rewrite H.
-- case => H; by rewrite H.
+  move => x y; apply (iffP idP) => [|<-].
+  - by case: x; case: y => // y x /eqP ->.
+  - by case: x => [|] x; apply /eqP.
 Qed.
 
-HB.instance Definition _ := hasDecEq.Build (InverseAlphabet Sigma) InverseAlphabet_eqP.
+HB.instance Definition _ := hasDecEq.Build
+  (starred Sigma) starred_eqP.
 End InverseAlphabetEqType.
+
+#[deprecated(since="2026-10-29", note="Use starred_beq instead.")]
+Notation  InverseAlphabet_eq := starred_beq.
+
+#[deprecated(since="2026-10-29", note="Use starred_eqP instead.")]
+Notation  InverseAlphabet_eqP := starred_eqP.
 
 Section InverseAlphabetCountType.
 Context {Sigma: countType}.
 
-Definition InverseAlphabet_pickle (x: InverseAlphabet Sigma) :=
+Definition starred_pickle (x: starred Sigma) :=
   match x with
   | Base a => (pickle a).*2
-  | Inverse a => (pickle a).*2.+1
+  | Star a => (pickle a).*2.+1
   end.
 
-Definition InverseAlphabet_unpickle (n: nat):
-  option (InverseAlphabet Sigma) :=
+Definition starred_unpickle (n: nat):
+  option (starred Sigma) :=
     match unpickle n./2, odd n with
     | Some a, false => Some (Base a)
-    | Some a, true => Some (Inverse a)
+    | Some a, true => Some (Star a)
     | None, _ => None
     end.
 
-
-Lemma InverseAlphabet_pickleK:
-  pcancel InverseAlphabet_pickle InverseAlphabet_unpickle.
+Lemma starred_pickleK:
+  pcancel starred_pickle starred_unpickle.
 Proof.
-  case => a /=; rewrite /InverseAlphabet_unpickle /=.
+  case => [|] a; rewrite /starred_unpickle /=.
   - by rewrite doubleK pickleK odd_double.
   - by rewrite uphalf_double pickleK odd_double.
 Qed.
@@ -75,147 +94,398 @@ Qed.
 (* TODO(reiniscirpons): Are the "Ignoring canonical projection ..."
    warnings an issue? *)
 HB.instance Definition _ := isCountable.Build
-  (InverseAlphabet Sigma)
-  InverseAlphabet_pickleK.
+  (starred Sigma) starred_pickleK.
 End InverseAlphabetCountType.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_pickle instead.")]
+Notation  InverseAlphabet_pickle := starred_pickle.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_unpickle instead.")]
+Notation  InverseAlphabet_unpickle := starred_unpickle.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_pickleK instead.")]
+Notation  InverseAlphabet_pickleK := starred_pickleK.
 
 Section InverseAlphabetFinType.
 Context {Sigma: finType}.
 
-Definition InverseAlphabet_enum:
-  seq (InverseAlphabet Sigma) :=
-    [seq Base a | a: Sigma] ++ [seq Inverse a | a: Sigma].
+(* TODO: This is where it would be nice not to have a
+   restriction to fintype alphabets *)
+Definition starred_enum:
+  seq (starred Sigma) :=
+    [seq Base a | a: Sigma] ++ [seq Star a | a: Sigma].
 
-Lemma InverseAlphabet_enum_in:
-  forall (a: InverseAlphabet Sigma),
-    a \in InverseAlphabet_enum.
+Lemma starred_enum_in:
+  forall (a: starred Sigma),
+    a \in starred_enum.
 Proof.
-  move => a; rewrite /InverseAlphabet_enum mem_cat.
-  apply/orP; case: a => a.
-  - left; apply map_f; by rewrite mem_enum.
-  - right; apply map_f; by rewrite mem_enum.
+  case => a; rewrite mem_cat; apply /orP.
+  - left; apply map_f.
+    by rewrite mem_enum.
+  - right; apply map_f.
+    by rewrite mem_enum.
 Qed.
 
-Lemma InverseAlphabet_enum_uniq: uniq InverseAlphabet_enum.
+Lemma starred_enum_uniq: uniq starred_enum.
 Proof.
-  rewrite /InverseAlphabet_enum cat_uniq; apply /andP; split.
-  - rewrite map_inj_uniq.
-  -- by apply enum_uniq.
-  -- move => x y; by case.
-  apply /andP; split; last first.
-  - rewrite map_inj_uniq.
-  -- by apply enum_uniq.
-  -- move => x y; by case.
-  - apply/hasP; case => a.
-    move/codomP => [b H]; move/codomP => [c]; by rewrite H.
+  rewrite cat_uniq map_inj_uniq;
+    last by move => x y; case.
+  rewrite [uniq (map Star _)]map_inj_uniq;
+    last by move => x y; case.
+  rewrite enum_uniq /= andbT.
+  apply /hasP.
+  case => /= [x /mapP [y _ ->] /mapP [z _ //]].
 Qed.
 
-Lemma InverseAlphabet_enumP:
-  Finite.axiom InverseAlphabet_enum.
+Lemma starred_enumP: Finite.axiom starred_enum.
 Proof.
-  move => a; rewrite /InverseAlphabet_enum.
-  (* TODO(reiniscirpons): Should I import ssrnat? *)
-  have H: ssrnat.nat_of_bool (a \in InverseAlphabet_enum) = 1%N.
-  - by rewrite InverseAlphabet_enum_in.
-  rewrite -H; apply count_uniq_mem.
-  by exact InverseAlphabet_enum_uniq.
+  move => a /=.
+  rewrite count_uniq_mem;
+    last by exact: starred_enum_uniq.
+  by rewrite starred_enum_in.
 Qed.
 
 HB.instance Definition _ := isFinite.Build
-  (InverseAlphabet Sigma)
-  InverseAlphabet_enumP.
+  (starred Sigma) starred_enumP.
 
 End InverseAlphabetFinType.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_enum instead.")]
+Notation InverseAlphabet_enum := starred_enum.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_enum_in instead.")]
+Notation InverseAlphabet_enum_in := starred_enum_in.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_enum_uniq instead.")]
+Notation InverseAlphabet_enum_uniq := starred_enum_uniq.
+
+#[deprecated(
+  since="2026-10-29",
+  note="Use starred_enumP instead.")]
+Notation InverseAlphabet_enumP := starred_enumP.
 
 Section FreeGroup.
 
 (* NOTE(reiniscirpons): Only finitely generated free groups are formalized. *)
+(* TODO(reiniscirpons): Is this required? *)
 Variable (Sigma: finType).
 
-Definition free_group_relations:
-  seq (relation (InverseAlphabet Sigma)) :=
-  [seq pair [:: Base a; Inverse a] [::] | a: Sigma] ++
-  [seq pair [:: Inverse a; Base a] [::] | a: Sigma].
+Definition fg_relations: seq (relation (starred Sigma)) :=
+  [seq ([:: Base a; Star a], [::]) | a: Sigma] ++
+  [seq ([:: Star a; Base a], [::]) | a: Sigma].
 
-Definition FGP :=
-  Presentation free_group_relations.
+
+#[deprecated(since="2026-10-29", note="Use fg_relations instead.")]
+Notation free_group_relations := fg_relations.
+
+Definition FGP := Presentation fg_relations.
 
 Definition FreeGroup := (presented FGP).
 
+Implicit Types (u v w: FreeGroup) (c: sigma FGP) (a: Sigma)
+               (r: relation (sigma FGP)).
+
 (* NOTE(reiniscirpons): Need to use the sigma here instead of
    InverseAlphabet Sigma because of technical reasons. *)
-Definition FreeGroup_invl (c: sigma FGP): sigma FGP :=
+Definition fg_invol (c: starred Sigma): starred Sigma :=
   match c with
-  | Base a => Inverse a
-  | Inverse a => Base a
+  | Base a => Star a
+  | Star a => Base a
   end.
 
-Lemma FreeGroup_invlK : forall c: sigma FGP,
-  FreeGroup_invl (FreeGroup_invl c) = c.
+#[deprecated(since="2026-10-29", note="Use fg_invol instead.")]
+Notation FreeGroup_invl := fg_invol.
+
+Lemma fg_involsK : forall c,
+  fg_invol (fg_invol c) = c.
 Proof. by case. Qed.
 
+#[deprecated(since="2026-10-29", note="Use fg_involK instead.")]
+Notation FreeGroup_invlK := fg_involsK.
 
-Lemma FreeGroup_invl_left : forall c: sigma FGP,
-  [:: c; FreeGroup_invl c] \mod FGP == [::] \mod FGP.
+Lemma fg_involsV : forall c: starred Sigma,
+  [:: c; fg_invol c] \approx [::] %[mod FGP].
 Proof.
-  move=> c; apply: reduction_rule; case: c => a;
-  rewrite /relations /= /free_group_relations mem_cat; apply /orP.
-  - left; apply/mapP; exists a => [|//]; by apply mem_enum.
-  - right; apply/mapP; exists a => [|//]; by apply mem_enum.
+  move => c; apply red1rel; case: c => c /=;
+  rewrite mem_cat; apply /orP.
+  - left; apply/mapP; exists c => [|//]; by apply mem_enum.
+  - right; apply/mapP; exists c => [|//]; by apply mem_enum.
 Qed.
 
-Lemma FreeGroup_invl_right : forall c: sigma FGP,
-  [:: FreeGroup_invl c; c] \mod FGP == [:: ] \mod FGP.
-(* TODO(reiniscirpons): fix *)
+#[deprecated(since="2026-10-29", note="Use fg_involsV instead.")]
+Notation FreeGroup_invl_left := fg_involsV.
+
+Lemma fg_involVs : forall c: starred Sigma,
+  [:: fg_invol c; c] \approx [::] %[mod FGP].
 Proof.
-  case => a /=.
-  - set c := Inverse a; have: Base a = FreeGroup_invl c => [//|->].
-    by apply FreeGroup_invl_left.
-  - set c := Base a; have: Inverse a = FreeGroup_invl c => [//|->].
-    by apply FreeGroup_invl_left.
+  move => c; apply red1rel; case: c => c /=;
+  rewrite mem_cat; apply /orP.
+  - right; apply/mapP; exists c => [|//]; by apply mem_enum.
+  - left; apply/mapP; exists c => [|//]; by apply mem_enum.
 Qed.
+
+#[deprecated(since="2026-10-29", note="Use fg_involsV instead.")]
+Notation FreeGroup_invl_right := fg_involVs.
 
 HB.instance Definition _ :=
   hasInvertibleLetters.Build
     FGP
-    FreeGroup_invlK
-    FreeGroup_invl_left
-    FreeGroup_invl_right.
+    fg_involsK
+    fg_involsV
+    fg_involVs.
 
-
-(* NOTE(reiniscirpons): in theory we could do this more efficiently with the
- complete rewriting system *)
-Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with
-  | [::] => [:: ] \mod FGP
-  | c::w' => match (FreeGroup_norm w') with
-    | [::] => [:: c] \mod FGP
-    | d::n =>
-      if (c == invl d)%B then n
-      else c::(d::n)
-    end
-  end.
-
-Lemma FreeGroup_norm_e:
-  FreeGroup_norm e = e.
-Proof. done. Qed.
-
-Lemma FreeGroup_norm_1: forall (c: sigma FGP),
-  FreeGroup_norm ([:: c] \mod FGP) = ([:: c] \mod FGP).
+Lemma mem_fg_relations: forall r,
+  r \in fg_relations ->
+  exists c,
+    r = ([:: c^~1; c], [::]).
 Proof.
-  by case => c.
+  move => r. rewrite mem_cat => /orP [] /mapP [a _ ->].
+  - by exists (Star a).
+  - by exists (Base a).
 Qed.
 
-Lemma FreeGroup_norm_correct w:
-  FreeGroup_norm w == w.
+Fixpoint can_fg_red' c w: bool :=
+  if w is c'::w' then
+    if c == invol c' then true
+    else can_fg_red' c' w'
+  else false.
+
+Definition can_fg_red w: bool :=
+  if w is c'::w' then can_fg_red' c' w'
+  else false.
+
+Lemma can_fg_redP: forall w,
+  reflect
+    (exists u v c, w = u * [word [:: invol c; c]] * v)
+    (can_fg_red w).
 Proof.
-  elim: w => [//|c w IH /=]; rewrite (cons_law c w).
-  case Hn: (FreeGroup_norm w) => [//|d w']; rewrite -IH Hn.
-  - by rewrite -cons_law.
-  case Heq: (c == invl d)%B; last first.
-  - by rewrite -cons_law.
-  move/eqP: Heq => ->;
-  by rewrite (cons_law d) associativity invl_right.
+  move => w /=; apply (iffP idP) => [|[u [v [c]]] ->].
+  - case: w => [//|c w /=].
+    elim: w c => [//|c' w IH c /=].
+    case: ifP => [/eqP -> _|_ /IH [u [v [d H]]]].
+    + by exists [::]; exists w; exists c'.
+    + by exists (c:: u); exists v; exists d; rewrite H.
+  - case: u => /= [|d u];
+      first by rewrite eq_refl.
+    elim: u d => /= [d|d u IH d']; case: ifP => [//|_];
+      first by rewrite eq_refl.
+    by apply IH.
 Qed.
+
+Lemma can_fg_red_mulr: forall u v,
+  can_fg_red u -> can_fg_red (u * v).
+Proof.
+  case => [//|c u].
+  elim/pres_ind: u c => [//|/= c u IH c' v].
+  case: ifP => [//|_ /IH {}IH].
+  by apply IH.
+Qed.
+
+Fixpoint fg_1red' c w: FreeGroup :=
+  if w is c'::w' then
+    if c == invol c' then w'
+    else [word [::c]] * (fg_1red' c' w')
+  else [word [::c]] * w.
+
+Definition fg_1red w: FreeGroup :=
+  if w is c'::w' then fg_1red' c' w'
+  else w.
+
+Lemma fg_1red_size: forall w,
+  can_fg_red w -> size (fg_1red w) < size w.
+Proof.
+  case => [//|c w].
+  elim: w c => [//|c' w /= IH c].
+  case: ifP => [//|_ /= /IH H].
+  by rewrite ltnS.
+Qed.
+
+Lemma fg_1redN: forall w,
+  ~~ can_fg_red w -> fg_1red w = w.
+Proof.
+  case => [//|c w].
+  elim: w c => [//|c' w /= IH c].
+  by case: ifP => [//|_ /= /IH ->//].
+Qed.
+
+Lemma fg_1redE: forall w,
+  fg_1red w \approx w.
+Proof.
+  case => [//|c w]; rewrite consmulE.
+  elim/pres_ind: w c => [//|c' w /= IH c].
+  case: ifP => [/eqP ->|_ /=];
+    first by rewrite mulsA involVs mul1s.
+  by rewrite IH.
+Qed.
+
+Lemma fg_1red_mulr: forall u v,
+  can_fg_red u -> fg_1red (u * v) = (fg_1red u) * v.
+Proof.
+  move => [//|c u /=].
+  elim/pres_ind: u c => [//|c' u IH c v /=].
+  by case: ifP => [//|_ /IH ->].
+Qed.
+
+Lemma fg_1red_mulE: forall u v,
+  fg_1red (u * v) =
+    if can_fg_red u then (fg_1red u) * v
+    else
+      if u is d::u' then
+        let c := last d u' in
+        if v is c'::v' then
+          if c == invol c' then [word belast d u'] * v'
+          else u * (fg_1red v)
+        else u
+      else fg_1red v.
+Proof.
+  move => [//|d u /= v].
+  case: ifP => [Hu|];
+    first by apply (fg_1red_mulr (d::u)).
+  case: v => [H|c' v].
+  - rewrite cats0; apply (fg_1redN (d::u));
+    by rewrite /= H.
+  - elim/pres_ind: u d v => [/= d v _ //|d' u IH d v /=].
+    case: ifP => [//|_ /IH ->].
+    by case: ifP.
+Qed.
+
+
+(* TODO: move to well founded. *)
+Lemma wf_ltnat : well_founded (fun n m => n < m).
+Proof. by elim/ltn_ind => n IHn; apply: Acc_intro => m /IHn. Qed.
+
+Instance ltnat_well_founded:
+  WellFounded (ltn: rel nat) := wf_ltnat.
+
+Notation "x 'eqn:' p" := (exist _ x p) (only parsing, at level 20).
+
+Equations? fg_red w: FreeGroup
+  by wf (size w) (ltn: rel nat) :=
+    fg_red w with inspect (can_fg_red w) := {
+      | true eqn: H => fg_red (fg_1red w);
+      | false eqn: _ => w
+    }.
+Proof.
+  by apply fg_1red_size.
+Qed.
+
+(* NOTE(reiniscirpons): in theory we could do this more
+   efficiently with the complete rewriting system *)
+(* TODO(reiniscirpons): Use equations here?
+   rewrite it so that it repeatedly does one step
+   normalization until it can't anymore? This probably fixes
+   a lot of stuff. *)
+(*Fixpoint FreeGroup_norm (w: FreeGroup): FreeGroup := match w with*)
+(*  | [::] => [word [:: ]]*)
+(*  | c::w' => match (FreeGroup_norm w') with*)
+(*    | [::] => [word [:: c]]*)
+(*    | d::n =>*)
+(*      if (c == invl d)%B then n*)
+(*      else c::(d::n)*)
+(*    end*)
+(*  end.*)
+
+#[deprecated(since="2026-10-29", note="Use fg_red instead.")]
+Notation FreeGroup_norm := fg_red.
+
+Lemma fg_red1E:
+  fg_red 1 = 1.
+Proof.
+  by simp fg_red.
+Qed.
+
+#[deprecated(since="2026-10-29", note="Use fg_red1E instead.")]
+Notation FreeGroup_norm_e := fg_red1E.
+
+Lemma fg_redcons1E: forall c,
+  fg_red ([word [:: c]]) = [word [:: c]].
+Proof.
+  move => c; by simp fg_red.
+Qed.
+
+#[deprecated(since="2026-10-29", note="Use fg_redcons1E instead.")]
+Notation FreeGroup_norm_1 := fg_redcons1E.
+
+Lemma fg_redE: forall w,
+  fg_red w \approx w.
+Proof.
+  move => w.
+  funelim (fg_red w) => [|//].
+  by rewrite H0 fg_1redE.
+Qed.
+
+Lemma fg_red_step: forall w,
+  fg_red w = if can_fg_red w then fg_red (fg_1red w) else w.
+Proof.
+  move => w.
+  rewrite {2}[fg_red]lock.
+  simp fg_red.
+  rewrite -lock /=.
+  by case: ifP.
+Qed.
+
+Lemma fg_red_rel: forall u v c,
+  fg_red (u * [word [:: c^~1; c]] * v) = fg_red (u * v).
+Proof.
+  move => u v c.
+  funelim (fg_red _).
+  - move: H0 {H1 Heqcall H} => IH.
+    rewrite -!catmulE -catA fg_1red_mulE /= eq_refl involsK.
+    case: ifP => [Hu|].
+    (* case 1: reduction happened inside of u, so is
+       non-overlapping, and we are done by the IH
+       (the mess is because multiplication and concatenation
+       associate opposite each other :)) *)
+    + rewrite -!catmulE -cat1s -[c::_]cat1s !catA.
+      rewrite -[_ ++ [::c]]catA /=.
+      have:
+        (fg_1red (u * [:: invol c; c] * v) =
+        fg_1red u * [:: invol c; c] * v) => [|H];
+        first by rewrite -!catmulE -catA fg_1red_mulr // -catA.
+      rewrite IH ?H //.
+      rewrite (fg_red_step (u ++ v)).
+      case: ifP => [_|/negP Hfalso];
+        first by rewrite fg_1red_mulr //.
+      by exfalso; apply /Hfalso /can_fg_red_mulr.
+    (* case 2: reduction overlaps, so it looks like c*c^~1*c, but
+       this is easy to resolve. *)
+    + case: u {IH} => [//|d u Hu].
+      case: ifP => [/eqP Hc|//].
+      by rewrite [d::u]lastI Hc -cats1 -catA.
+  (* the (c^~1; c) fragment is reducible,
+     so this case cannot occur! *)
+  - move: e0 {H Heqcall} => /can_fg_redP H.
+    exfalso; apply H.
+    by exists u; exists v; exists c.
+Qed.
+
+Lemma fg_redP: forall u v,
+  reflect (u \approx v) (fg_red u == fg_red v)%B.
+Proof.
+  move => u v; apply (iffP idP) => [/eqP H|].
+  - by rewrite -[u]fg_redE -[v]fg_redE H.
+  - elim =>
+      [r a c /mem_fg_relations [c' ->] /=
+      |//
+      |{}u {}v _ /eqP -> //
+      |{}u {}v w _ /eqP -> _ /eqP -> //].
+    by rewrite cats0 fg_red_rel.
+Qed.
+
+#[deprecated(since="2026-10-29", note="Use fg_redE instead.")]
+Notation FreeGroup_norm_correct := fg_redE.
 
 Definition FreeGroup_dec_eq (w w': FreeGroup): bool :=
   ((FreeGroup_norm w) == (FreeGroup_norm w'))%B.
